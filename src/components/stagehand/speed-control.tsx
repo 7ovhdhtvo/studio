@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from "@/components/ui/badge";
-import { LineChart, Zap, ChevronDown } from 'lucide-react';
+import { LineChart, Rabbit, ChevronDown } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -29,10 +29,10 @@ export default function SpeedControl({ speed, onSpeedChange, showAutomation, onT
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader>
            <CollapsibleTrigger asChild>
               <button className="flex items-center gap-2 flex-1 text-left">
-                  <Zap className="w-5 h-5" />
+                  <Rabbit className="w-5 h-5" />
                   <CardTitle>Speed</CardTitle>
                   <ChevronDown className={cn("w-4 h-4 ml-auto transition-transform", isOpen && "rotate-180")} />
               </button>

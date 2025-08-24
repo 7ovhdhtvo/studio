@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { Clock, Volume2, ChevronDown } from 'lucide-react';
+import { Music, Volume2, ChevronDown } from 'lucide-react';
 import { Input } from "../ui/input";
 import { useState } from 'react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
@@ -29,7 +29,7 @@ export default function MetronomeControl({ speed }: MetronomeControlProps) {
         <CardHeader>
            <CollapsibleTrigger asChild>
                 <button className="flex items-center gap-2 flex-1 text-left">
-                    <Clock className="w-5 h-5" />
+                    <Music className="w-5 h-5" />
                     <CardTitle>Metronome</CardTitle>
                     <ChevronDown className={cn("w-4 h-4 ml-auto transition-transform", isOpen && "rotate-180")} />
                 </button>
