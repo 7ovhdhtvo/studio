@@ -27,6 +27,8 @@ export default function Home() {
   const [tracks, setTracks] = useState<Track[]>(initialTracks);
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(initialTracks[0]);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [showVolumeAutomation, setShowVolumeAutomation] = useState(true);
+  const [showSpeedAutomation, setShowSpeedAutomation] = useState(false);
 
   return (
     <div className="flex h-screen w-full bg-background text-foreground">
@@ -45,12 +47,22 @@ export default function Home() {
             <p className="text-muted-foreground">{selectedTrack?.artist}</p>
           </div>
 
-          <WaveformDisplay isPlaying={isPlaying} />
+          <WaveformDisplay 
+            isPlaying={isPlaying} 
+            showVolumeAutomation={showVolumeAutomation}
+            showSpeedAutomation={showSpeedAutomation}
+          />
           <PlaybackControls isPlaying={isPlaying} setIsPlaying={setIsPlaying} />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-            <VolumeControl />
-            <SpeedControl />
+            <VolumeControl 
+              showAutomation={showVolumeAutomation}
+              onToggleAutomation={setShowVolumeAutomation}
+            />
+            <SpeedControl 
+              showAutomation={showSpeedAutomation}
+              onToggleAutomation={setShowSpeedAutomation}
+            />
           </div>
         </div>
       </main>

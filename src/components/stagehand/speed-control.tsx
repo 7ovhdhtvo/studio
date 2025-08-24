@@ -4,15 +4,30 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { LineChart } from 'lucide-react';
 import { useState } from 'react';
 
-export default function SpeedControl() {
+type SpeedControlProps = {
+  showAutomation: boolean;
+  onToggleAutomation: (value: boolean) => void;
+};
+
+export default function SpeedControl({ showAutomation, onToggleAutomation }: SpeedControlProps) {
   const [speed, setSpeed] = useState(100);
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Speed Control</CardTitle>
+        <div className="flex items-center space-x-2">
+            <LineChart className="w-4 h-4 text-muted-foreground" />
+            <Switch
+                id="speed-automation-switch"
+                checked={showAutomation}
+                onCheckedChange={onToggleAutomation}
+            />
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid gap-2">

@@ -2,41 +2,33 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from '@/components/ui/chart';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { ArrowDown, ArrowUp, Volume2, VolumeX } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Volume2, VolumeX, LineChart } from 'lucide-react';
 import { useState } from 'react';
-import { Area, AreaChart, CartesianGrid, XAxis } from 'recharts';
 
-const chartData = [
-  { time: '0s', volume: 0 },
-  { time: '1s', volume: 20 },
-  { time: '2s', volume: 50 },
-  { time: '3s', volume: 80 },
-  { time: '4s', volume: 100 },
-];
+type VolumeControlProps = {
+  showAutomation: boolean;
+  onToggleAutomation: (value: boolean) => void;
+};
 
-const chartConfig = {
-  volume: {
-    label: 'Volume',
-    color: 'hsl(var(--primary))',
-  },
-} satisfies ChartConfig;
-
-export default function VolumeControl() {
+export default function VolumeControl({ showAutomation, onToggleAutomation }: VolumeControlProps) {
   const [volume, setVolume] = useState(75);
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Volume Automation</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>Volume Control</CardTitle>
+        <div className="flex items-center space-x-2">
+            <LineChart className="w-4 h-4 text-muted-foreground" />
+            <Switch
+                id="volume-automation-switch"
+                checked={showAutomation}
+                onCheckedChange={onToggleAutomation}
+            />
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid gap-2">
@@ -64,35 +56,6 @@ export default function VolumeControl() {
             <Label htmlFor="fade-out">Fade-out (s)</Label>
             <Input id="fade-out" type="number" placeholder="2.5" />
           </div>
-        </div>
-         <div className="space-y-2">
-            <Label>Automation Curve</Label>
-             <ChartContainer config={chartConfig} className="h-[100px] w-full">
-              <AreaChart
-                accessibilityLayer
-                data={chartData}
-                margin={{
-                  left: -20,
-                  right: 0,
-                  top: 10,
-                  bottom: 0,
-                }}
-              >
-                <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                 <XAxis dataKey="time" tickLine={false} axisLine={false} tickMargin={8} hide />
-                <ChartTooltip
-                  cursor={false}
-                  content={<ChartTooltipContent indicator="dot" />}
-                />
-                <Area
-                  dataKey="volume"
-                  type="natural"
-                  fill="var(--color-volume)"
-                  fillOpacity={0.4}
-                  stroke="var(--color-volume)"
-                />
-              </AreaChart>
-            </ChartContainer>
         </div>
       </CardContent>
     </Card>
