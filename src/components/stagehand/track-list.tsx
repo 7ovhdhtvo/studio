@@ -127,7 +127,7 @@ const TrackNode = ({ item, selectedTrack, onSelectTrack, level = 0 }: { item: Tr
         >
             <CollapsibleTrigger asChild>
                 <button className="flex items-center flex-1 text-left">
-                    <ChevronDown className="h-4 w-4 mr-3 shrink-0 transition-transform duration-200 [&[data-state=open]>svg]:rotate-180"/>
+                    <ChevronDown className="h-4 w-4 mr-3 shrink-0 transition-transform duration-200 data-[state=open]:rotate-0 data-[state=closed]:-rotate-90"/>
                     <FolderIcon className="mr-3 h-4 w-4 flex-shrink-0" />
                     <span>{item.name}</span>
                 </button>
@@ -174,10 +174,14 @@ const TrackNode = ({ item, selectedTrack, onSelectTrack, level = 0 }: { item: Tr
 
 export default function TrackList(props: TrackListProps) {
   const { tracks, selectedTrack, onSelectTrack, isOpen, onAddFolder } = props;
+  
+  if (!isOpen) {
+    return null;
+  }
+
   return (
     <aside className={cn(
-      "w-80 flex-col border-r bg-secondary/50 transition-all duration-300 ease-in-out",
-      isOpen ? "flex" : "hidden"
+      "w-80 flex flex-col border-r bg-secondary/50 transition-all duration-300 ease-in-out"
     )}>
       <div className="p-4 space-y-4">
         <ProjectSelector {...props} />
@@ -189,7 +193,7 @@ export default function TrackList(props: TrackListProps) {
             </Button>
         </div>
       </div>
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 pr-4">
         <nav className="p-2 space-y-1">
           {tracks.map((item) => (
             <TrackNode key={item.id} item={item} selectedTrack={selectedTrack} onSelectTrack={onSelectTrack} />

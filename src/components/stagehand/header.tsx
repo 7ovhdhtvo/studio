@@ -1,6 +1,6 @@
 "use client";
 
-import { Speaker, Sun, Moon, PanelLeft } from 'lucide-react';
+import { Speaker, Sun, Moon, PanelLeft, PanelRight } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
@@ -38,17 +38,18 @@ function ThemeToggle() {
 
 type HeaderProps = {
   onToggleSidebar: () => void;
+  isSidebarOpen: boolean;
 };
 
-export default function Header({ onToggleSidebar }: HeaderProps) {
+export default function Header({ onToggleSidebar, isSidebarOpen }: HeaderProps) {
   return (
     <header className="flex h-16 items-center justify-between border-b bg-card px-6 lg:px-8 flex-shrink-0">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={onToggleSidebar} className="md:hidden">
-            <PanelLeft className="h-5 w-5" />
+        <Button variant="ghost" size="icon" onClick={onToggleSidebar}>
+            {isSidebarOpen ? <PanelLeft className="h-5 w-5" /> : <PanelRight className="h-5 w-5" />}
             <span className="sr-only">Toggle Sidebar</span>
         </Button>
-        <h1 className="text-xl font-bold tracking-wider" style={{ color: '#34495E' }}>
+        <h1 className="text-xl font-bold tracking-wider hidden sm:block">
           STAGEHAND
         </h1>
       </div>

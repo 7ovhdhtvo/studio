@@ -136,11 +136,11 @@ export default function Home() {
         onSelectTrack={setSelectedTrack}
       />
       <main className="flex flex-1 flex-col overflow-hidden">
-        <Header onToggleSidebar={() => setSidebarOpen(!isSidebarOpen)} />
+        <Header onToggleSidebar={() => setSidebarOpen(!isSidebarOpen)} isSidebarOpen={isSidebarOpen}/>
         <div className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6">
           <div className="flex justify-between items-start">
             <div className="space-y-4">
-              <h2 className="text-2xl font-bold tracking-tight" style={{ color: '#34495E' }}>
+              <h2 className="text-2xl font-bold tracking-tight">
                 {selectedTrack?.title || 'No Track Selected'}
               </h2>
               <p className="text-muted-foreground">{selectedTrack?.artist}</p>
@@ -165,7 +165,7 @@ export default function Home() {
           />
           <PlaybackControls isPlaying={isPlaying} setIsPlaying={setIsPlaying} />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-4">
+          <div className="flex justify-center items-start gap-4 pt-4 flex-wrap">
             <VolumeControl 
               showAutomation={showVolumeAutomation}
               onToggleAutomation={setShowVolumeAutomation}
