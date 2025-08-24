@@ -126,6 +126,7 @@ export default function Home() {
     <div className="flex h-screen w-full bg-background text-foreground">
       <TrackList 
         isOpen={isSidebarOpen}
+        onToggle={() => setSidebarOpen(!isSidebarOpen)}
         projects={Object.keys(projects)}
         currentProject={currentProject}
         onSelectProject={handleSelectProject}
@@ -136,7 +137,7 @@ export default function Home() {
         onSelectTrack={setSelectedTrack}
       />
       <main className="flex flex-1 flex-col overflow-hidden">
-        <Header onToggleSidebar={() => setSidebarOpen(!isSidebarOpen)} isSidebarOpen={isSidebarOpen}/>
+        <Header />
         <div className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6">
           <div className="flex justify-between items-start">
             <div className="space-y-4">

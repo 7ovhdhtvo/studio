@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { Folder as FolderIcon, Music, ChevronDown, ChevronsUpDown, PlusCircle, MoreHorizontal, Edit, Copy, Trash2, FolderPlus } from 'lucide-react';
+import { Folder as FolderIcon, Music, ChevronDown, ChevronsUpDown, PlusCircle, MoreHorizontal, Edit, Copy, Trash2, FolderPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 import ImportDialog from './import-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
@@ -30,6 +30,7 @@ export type TrackItem = Track | Folder;
 
 type TrackListProps = {
   isOpen: boolean;
+  onToggle: () => void;
   projects: string[];
   currentProject: string;
   onSelectProject: (project: string) => void;
@@ -173,37 +174,45 @@ const TrackNode = ({ item, selectedTrack, onSelectTrack, level = 0 }: { item: Tr
 }
 
 export default function TrackList(props: TrackListProps) {
-  const { tracks, selectedTrack, onSelectTrack, isOpen, onAddFolder } = props;
-  
-  if (!isOpen) {
-    return null;
-  }
+  const { tracks, selectedTrack, onSelectTrack, isOpen, onToggle, onAddFolder } = props;
 
   return (
     <aside className={cn(
-      "w-80 flex flex-col border-r bg-secondary/50 transition-all duration-300 ease-in-out"
+      "flex flex-col border-r bg-secondary/50 transition-all duration-300 ease-in-out relative",
+      isOpen ? "w-80" : "w-0"
     )}>
-      <div className="p-4 space-y-4">
-        <ProjectSelector {...props} />
-        <div className="flex gap-2">
-            <ImportDialog />
-            <Button variant="outline" onClick={onAddFolder} className="w-full">
-              <FolderPlus className="mr-2 h-4 w-4" />
-              Add Folder
-            </Button>
-        </div>
+      <div className={cn(
+        "absolute top-1/2 -right-4 z-10 transition-opacity",
+        !isOpen && "right-[-38px]"
+      )}>
+        <Button size="icon" variant="outline" onClick={onToggle} className="rounded-full h-8 w-8">
+            {isOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        </Button>
       </div>
-      <ScrollArea className="flex-1 pr-4">
-        <nav className="p-2 space-y-1">
-          {tracks.map((item) => (
-            <TrackNode key={item.id} item={item} selectedTrack={selectedTrack} onSelectTrack={onSelectTrack} />
-          ))}
-        </nav>
-      </ScrollArea>
-      <div className="p-4 border-t">
-        <p className="text-xs text-muted-foreground text-center">
-          Stagehand v1.0.0
-        </p>
+
+      <div className={cn("flex flex-col h-full transition-opacity duration-100", isOpen ? "opacity-100" : "opacity-0 invisible")}>
+        <div className="p-4 space-y-4">
+          <ProjectSelector {...props} />
+          <div className="flex gap-2">
+              <ImportDialog />
+              <Button variant="outline" onClick={onAddFolder} className="w-full">
+                <FolderPlus className="mr-2 h-4 w-4" />
+                Add Folder
+              </Button>
+          </div>
+        </div>
+        <ScrollArea className="flex-1 pr-2">
+          <nav className="p-2 space-y-1">
+            {tracks.map((item) => (
+              <TrackNode key={item.id} item={item} selectedTrack={selectedTrack} onSelectTrack={onSelectTrack} />
+            ))}
+          </nav>
+        </ScrollArea>
+        <div className="p-4 border-t">
+          <p className="text-xs text-muted-foreground text-center">
+            Stagehand v1.0.0
+          </p>
+        </div>
       </div>
     </aside>
   );
