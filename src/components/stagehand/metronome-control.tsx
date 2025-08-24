@@ -6,8 +6,20 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Clock, Volume2 } from 'lucide-react';
 import { Input } from "../ui/input";
+import { useState } from 'react';
 
-export default function MetronomeControl() {
+type MetronomeControlProps = {
+  speed: number; // Speed in percentage (e.g., 100)
+};
+
+const BASE_BPM = 120; // Assuming a base BPM for calculation
+
+export default function MetronomeControl({ speed }: MetronomeControlProps) {
+  const [baseBpm, setBaseBpm] = useState(BASE_BPM);
+  
+  // Calculate the effective BPM based on the global speed control
+  const effectiveBpm = Math.round(baseBpm * (speed / 100));
+
   return (
     <Card>
       <CardHeader>
@@ -24,9 +36,16 @@ export default function MetronomeControl() {
         <div className="grid gap-2">
           <div className="flex justify-between items-center">
             <Label htmlFor="speed">Speed (BPM)</Label>
-            <span className="text-sm font-medium">120</span>
+            <span className="text-sm font-medium">{effectiveBpm}</span>
           </div>
-          <Slider id="speed" defaultValue={[120]} max={240} min={40} step={1} />
+          <Slider 
+            id="speed" 
+            value={[baseBpm]} 
+            max={240} 
+            min={40} 
+            step={1}
+            onValueChange={(value) => setBaseBpm(value[0])}
+          />
         </div>
         <div className="grid gap-2">
           <div className="flex justify-between items-center">

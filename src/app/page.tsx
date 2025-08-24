@@ -77,6 +77,7 @@ export default function Home() {
   const [showVolumeAutomation, setShowVolumeAutomation] = useState(true);
   const [showSpeedAutomation, setShowSpeedAutomation] = useState(false);
   const [zoom, setZoom] = useState(1); // 1 = 100%
+  const [speed, setSpeed] = useState(100); // Global speed in %
 
   const [volumePoints, setVolumePoints] = useState<AutomationPoint[]>([
     { time: 2.5, value: 80 },
@@ -171,11 +172,13 @@ export default function Home() {
               automationPoints={volumePoints}
             />
             <SpeedControl 
+              speed={speed}
+              onSpeedChange={setSpeed}
               showAutomation={showSpeedAutomation}
               onToggleAutomation={setShowSpeedAutomation}
               automationPoints={speedPoints}
             />
-            <MetronomeControl />
+            <MetronomeControl speed={speed} />
           </div>
         </div>
       </main>

@@ -6,7 +6,6 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from "@/components/ui/badge";
 import { LineChart } from 'lucide-react';
-import { useState } from 'react';
 
 type AutomationPoint = {
   time: number;
@@ -14,14 +13,14 @@ type AutomationPoint = {
 };
 
 type SpeedControlProps = {
+  speed: number;
+  onSpeedChange: (value: number) => void;
   showAutomation: boolean;
   onToggleAutomation: (value: boolean) => void;
   automationPoints: AutomationPoint[];
 };
 
-export default function SpeedControl({ showAutomation, onToggleAutomation, automationPoints }: SpeedControlProps) {
-  const [speed, setSpeed] = useState(100);
-
+export default function SpeedControl({ speed, onSpeedChange, showAutomation, onToggleAutomation, automationPoints }: SpeedControlProps) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -43,11 +42,11 @@ export default function SpeedControl({ showAutomation, onToggleAutomation, autom
           </div>
           <Slider
             id="speed-slider"
-            defaultValue={[100]}
+            value={[speed]}
             max={200}
             min={50}
             step={1}
-            onValueChange={(value) => setSpeed(value[0])}
+            onValueChange={(value) => onSpeedChange(value[0])}
           />
         </div>
          <div className="grid gap-2">
