@@ -1,19 +1,25 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from "@/components/ui/badge";
 import { LineChart } from 'lucide-react';
 import { useState } from 'react';
+
+type AutomationPoint = {
+  time: number;
+  value: number;
+};
 
 type SpeedControlProps = {
   showAutomation: boolean;
   onToggleAutomation: (value: boolean) => void;
+  automationPoints: AutomationPoint[];
 };
 
-export default function SpeedControl({ showAutomation, onToggleAutomation }: SpeedControlProps) {
+export default function SpeedControl({ showAutomation, onToggleAutomation, automationPoints }: SpeedControlProps) {
   const [speed, setSpeed] = useState(100);
 
   return (
@@ -44,9 +50,19 @@ export default function SpeedControl({ showAutomation, onToggleAutomation }: Spe
             onValueChange={(value) => setSpeed(value[0])}
           />
         </div>
-        <div className="grid grid-cols-2 items-center gap-4">
-          <Label htmlFor="ramp-time">Ramp Time (s)</Label>
-          <Input id="ramp-time" type="number" placeholder="0.5" className="w-full" />
+         <div className="grid gap-2">
+          <Label>Automation Points</Label>
+          <div className="flex flex-wrap gap-2 p-2 bg-secondary rounded-md min-h-[40px]">
+             {automationPoints.length > 0 ? (
+                automationPoints.map(point => (
+                    <Badge key={`${point.time}-${point.value}`} variant="outline">
+                        {point.time.toFixed(1)}s: {point.value}%
+                    </Badge>
+                ))
+             ) : (
+                <p className="text-xs text-muted-foreground">Click on the automation line to add points.</p>
+             )}
+          </div>
         </div>
       </CardContent>
     </Card>

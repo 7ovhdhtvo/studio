@@ -1,20 +1,25 @@
 "use client";
 
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
-import { Volume2, VolumeX, LineChart } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { LineChart, Volume2, VolumeX } from 'lucide-react';
 import { useState } from 'react';
+
+type AutomationPoint = {
+  time: number;
+  value: number;
+};
 
 type VolumeControlProps = {
   showAutomation: boolean;
   onToggleAutomation: (value: boolean) => void;
+  automationPoints: AutomationPoint[];
 };
 
-export default function VolumeControl({ showAutomation, onToggleAutomation }: VolumeControlProps) {
+export default function VolumeControl({ showAutomation, onToggleAutomation, automationPoints }: VolumeControlProps) {
   const [volume, setVolume] = useState(75);
 
   return (
@@ -47,14 +52,18 @@ export default function VolumeControl({ showAutomation, onToggleAutomation }: Vo
                 <span className="text-sm font-mono w-12 text-center bg-secondary py-1 rounded-md">{volume}</span>
             </div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="grid gap-2">
-            <Label htmlFor="fade-in">Fade-in (s)</Label>
-            <Input id="fade-in" type="number" placeholder="1.0" />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="fade-out">Fade-out (s)</Label>
-            <Input id="fade-out" type="number" placeholder="2.5" />
+        <div className="grid gap-2">
+          <Label>Automation Points</Label>
+          <div className="flex flex-wrap gap-2 p-2 bg-secondary rounded-md min-h-[40px]">
+             {automationPoints.length > 0 ? (
+                automationPoints.map(point => (
+                    <Badge key={`${point.time}-${point.value}`} variant="outline">
+                        {point.time.toFixed(1)}s: {point.value}%
+                    </Badge>
+                ))
+             ) : (
+                <p className="text-xs text-muted-foreground">Click on the automation line to add points.</p>
+             )}
           </div>
         </div>
       </CardContent>

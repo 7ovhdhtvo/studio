@@ -15,6 +15,11 @@ export type Track = {
   duration: string;
 };
 
+export type AutomationPoint = {
+  time: number;
+  value: number;
+};
+
 const initialTracks: Track[] = [
     { id: 1, title: 'Opening Scene', artist: 'Soundtrack', duration: '3:45' },
     { id: 2, title: 'Interlude Music', artist: 'Soundtrack', duration: '1:30' },
@@ -23,12 +28,31 @@ const initialTracks: Track[] = [
     { id: 5, title: 'Closing Theme', artist: 'Soundtrack', duration: '4:02' },
 ];
 
+const parseDuration = (duration: string): number => {
+    const parts = duration.split(':').map(Number);
+    if (parts.length === 2) {
+        return parts[0] * 60 + parts[1];
+    }
+    return 0;
+}
+
 export default function Home() {
   const [tracks, setTracks] = useState<Track[]>(initialTracks);
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(initialTracks[0]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showVolumeAutomation, setShowVolumeAutomation] = useState(true);
   const [showSpeedAutomation, setShowSpeedAutomation] = useState(false);
+
+  const [volumePoints, setVolumePoints] = useState<AutomationPoint[]>([
+    { time: 2.5, value: 80 },
+    { time: 5.0, value: 50 },
+  ]);
+  const [speedPoints, setSpeedPoints] = useState<AutomationPoint[]>([
+    { time: 3.2, value: 75 },
+    { time: 6.8, value: 125 },
+  ]);
+
+  const durationInSeconds = selectedTrack ? parseDuration(selectedTrack.duration) : 0;
 
   return (
     <div className="flex h-screen w-full bg-background text-foreground">
@@ -51,6 +75,7 @@ export default function Home() {
             isPlaying={isPlaying} 
             showVolumeAutomation={showVolumeAutomation}
             showSpeedAutomation={showSpeedAutomation}
+            durationInSeconds={durationInSeconds}
           />
           <PlaybackControls isPlaying={isPlaying} setIsPlaying={setIsPlaying} />
 
@@ -58,10 +83,12 @@ export default function Home() {
             <VolumeControl 
               showAutomation={showVolumeAutomation}
               onToggleAutomation={setShowVolumeAutomation}
+              automationPoints={volumePoints}
             />
             <SpeedControl 
               showAutomation={showSpeedAutomation}
               onToggleAutomation={setShowSpeedAutomation}
+              automationPoints={speedPoints}
             />
           </div>
         </div>
