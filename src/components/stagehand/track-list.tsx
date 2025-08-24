@@ -3,11 +3,12 @@
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { Folder as FolderIcon, Music, ChevronDown, ChevronsUpDown, PlusCircle } from 'lucide-react';
+import { Folder as FolderIcon, Music, ChevronDown, ChevronsUpDown, PlusCircle, MoreHorizontal, Edit, Copy, Trash2 } from 'lucide-react';
 import ImportDialog from './import-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
 import { useState } from 'react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 
 export type Track = {
   type: 'track';
@@ -86,18 +87,53 @@ const ProjectSelector = ({ projects, currentProject, onSelectProject, onNewProje
   )
 }
 
+const TrackActions = () => {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto shrink-0">
+          <MoreHorizontal className="h-4 w-4" />
+          <span className="sr-only">Track actions</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          <Edit className="mr-2 h-4 w-4" />
+          <span>Rename</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          <Copy className="mr-2 h-4 w-4" />
+          <span>Copy</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive">
+          <Trash2 className="mr-2 h-4 w-4" />
+          <span>Delete</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 
 const TrackNode = ({ item, selectedTrack, onSelectTrack, level = 0 }: { item: TrackItem, selectedTrack: Track | null, onSelectTrack: (track: Track) => void, level?: number }) => {
   if (item.type === 'folder') {
     return (
-      <Collapsible defaultOpen className="pl-4">
-        <CollapsibleTrigger asChild>
-           <div className="flex items-center w-full text-left text-sm font-semibold cursor-pointer py-1.5 hover:bg-accent rounded-md px-2">
-              <FolderIcon className="mr-3 h-4 w-4 flex-shrink-0" />
-              <span>{item.name}</span>
-              <ChevronDown className="h-4 w-4 ml-auto shrink-0 transition-transform duration-200 [&[data-state=open]>svg]:rotate-180"/>
+      <Collapsible defaultOpen>
+        <div 
+            className="flex items-center w-full text-left text-sm font-semibold py-1.5 hover:bg-accent rounded-md px-2 group"
+            style={{ paddingLeft: `${12 + level * 16}px` }}
+        >
+            <CollapsibleTrigger asChild>
+                <button className="flex items-center flex-1 text-left">
+                    <ChevronDown className="h-4 w-4 mr-3 shrink-0 transition-transform duration-200 [&[data-state=open]>svg]:rotate-180"/>
+                    <FolderIcon className="mr-3 h-4 w-4 flex-shrink-0" />
+                    <span>{item.name}</span>
+                </button>
+            </CollapsibleTrigger>
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                <TrackActions />
             </div>
-        </CollapsibleTrigger>
+        </div>
         <CollapsibleContent className="py-1">
           {item.children.map(child => (
             <TrackNode key={child.id} item={child} selectedTrack={selectedTrack} onSelectTrack={onSelectTrack} level={level + 1} />
@@ -109,21 +145,28 @@ const TrackNode = ({ item, selectedTrack, onSelectTrack, level = 0 }: { item: Tr
 
   // item.type === 'track'
   return (
-    <Button
-      variant="ghost"
+    <div
       className={cn(
-        "w-full justify-start h-auto py-2 px-3 text-left",
-        selectedTrack?.id === item.id && "bg-accent"
+        "flex items-center w-full justify-start h-auto py-1.5 px-2 rounded-md group",
+        selectedTrack?.id === item.id ? "bg-accent" : "hover:bg-accent"
       )}
       style={{ paddingLeft: `${12 + level * 16}px` }}
-      onClick={() => onSelectTrack(item)}
     >
-      <Music className="mr-3 h-4 w-4 flex-shrink-0" />
-      <div className="flex flex-col truncate">
-        <span className="font-medium">{item.title}</span>
-        <span className="text-xs text-muted-foreground">{item.originalFilename} - {item.duration}</span>
-      </div>
-    </Button>
+      <Button
+        variant="ghost"
+        className="flex-1 justify-start h-auto p-0 bg-transparent hover:bg-transparent"
+        onClick={() => onSelectTrack(item)}
+      >
+        <Music className="mr-3 h-4 w-4 flex-shrink-0" />
+        <div className="flex flex-col truncate text-left">
+          <span className="font-medium leading-tight">{item.title}</span>
+          <span className="text-xs text-muted-foreground">{item.originalFilename} - {item.duration}</span>
+        </div>
+      </Button>
+       <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+         <TrackActions />
+       </div>
+    </div>
   )
 }
 
