@@ -17,6 +17,8 @@ export type AutomationPoint = {
   value: number;
 };
 
+export type OpenControlPanel = 'volume' | 'speed' | 'metronome' | null;
+
 const initialProjects: { [key: string]: TrackItem[] } = {
   'Show - 24.07.24': [
     { 
@@ -78,6 +80,8 @@ export default function Home() {
   const [showSpeedAutomation, setShowSpeedAutomation] = useState(false);
   const [zoom, setZoom] = useState(1); // 1 = 100%
   const [speed, setSpeed] = useState(100); // Global speed in %
+  const [openControlPanel, setOpenControlPanel] = useState<OpenControlPanel>(null);
+
 
   const [volumePoints, setVolumePoints] = useState<AutomationPoint[]>([
     { time: 2.5, value: 80 },
@@ -89,6 +93,10 @@ export default function Home() {
   ]);
   
   const [isSidebarOpen, setSidebarOpen] = useState(true);
+
+  const handleToggleControlPanel = (panel: OpenControlPanel) => {
+    setOpenControlPanel(prev => (prev === panel ? null : panel));
+  };
 
 
   const handleSelectProject = (projectName: string) => {
@@ -168,18 +176,26 @@ export default function Home() {
 
           <div className="flex justify-center items-start gap-4 pt-4 flex-wrap">
             <VolumeControl 
+              isOpen={openControlPanel === 'volume'}
+              onToggle={() => handleToggleControlPanel('volume')}
               showAutomation={showVolumeAutomation}
               onToggleAutomation={setShowVolumeAutomation}
               automationPoints={volumePoints}
             />
             <SpeedControl 
+              isOpen={openControlPanel === 'speed'}
+              onToggle={() => handleToggleControlPanel('speed')}
               speed={speed}
               onSpeedChange={setSpeed}
               showAutomation={showSpeedAutomation}
               onToggleAutomation={setShowSpeedAutomation}
               automationPoints={speedPoints}
             />
-            <MetronomeControl speed={speed} />
+            <MetronomeControl 
+              isOpen={openControlPanel === 'metronome'}
+              onToggle={() => handleToggleControlPanel('metronome')}
+              speed={speed} 
+            />
           </div>
         </div>
       </main>

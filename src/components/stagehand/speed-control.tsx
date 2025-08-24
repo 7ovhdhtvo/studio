@@ -5,8 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from "@/components/ui/badge";
-import { LineChart, Rabbit } from 'lucide-react';
-import { useState } from 'react';
+import { LineChart, Rabbit, Minus } from 'lucide-react';
 import { Button } from '../ui/button';
 
 type AutomationPoint = {
@@ -15,6 +14,8 @@ type AutomationPoint = {
 };
 
 type SpeedControlProps = {
+  isOpen: boolean;
+  onToggle: () => void;
   speed: number;
   onSpeedChange: (value: number) => void;
   showAutomation: boolean;
@@ -22,12 +23,11 @@ type SpeedControlProps = {
   automationPoints: AutomationPoint[];
 };
 
-export default function SpeedControl({ speed, onSpeedChange, showAutomation, onToggleAutomation, automationPoints }: SpeedControlProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export default function SpeedControl({ isOpen, onToggle, speed, onSpeedChange, showAutomation, onToggleAutomation, automationPoints }: SpeedControlProps) {
 
   if (!isOpen) {
     return (
-      <Button variant="outline" size="icon" className="w-16 h-16" onClick={() => setIsOpen(true)}>
+      <Button variant="outline" size="icon" className="w-16 h-16" onClick={onToggle}>
         <Rabbit className="w-6 h-6" />
       </Button>
     )
@@ -35,11 +35,14 @@ export default function SpeedControl({ speed, onSpeedChange, showAutomation, onT
 
   return (
       <Card>
-        <CardHeader>
+        <CardHeader className="flex-row items-center justify-center relative py-4">
            <div className="flex items-center gap-2">
               <Rabbit className="w-5 h-5" />
               <CardTitle>Speed</CardTitle>
           </div>
+          <Button variant="ghost" size="icon" onClick={onToggle} className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7">
+            <Minus className="w-4 h-4" />
+          </Button>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid gap-2">
@@ -83,9 +86,6 @@ export default function SpeedControl({ speed, onSpeedChange, showAutomation, onT
                )}
             </div>
           </div>
-           <Button variant="ghost" onClick={() => setIsOpen(false)} className="w-full">
-              Collapse
-            </Button>
         </CardContent>
       </Card>
   );
