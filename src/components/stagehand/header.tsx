@@ -1,7 +1,42 @@
 "use client";
 
-import { Speaker } from 'lucide-react';
+import { Speaker, Sun, Moon } from 'lucide-react';
 import MetronomeControl from './metronome-control';
+import { useTheme } from 'next-themes';
+import { Button } from '@/components/ui/button';
+import { useEffect, useState } from 'react';
+
+function ThemeToggle() {
+  const [mounted, setMounted] = useState(false)
+  const { theme, setTheme } = useTheme();
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return (
+        <Button variant="ghost" size="icon" disabled>
+            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <span className="sr-only">Toggle theme</span>
+        </Button>
+    )
+  }
+
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
+
+  return (
+    <Button variant="ghost" size="icon" onClick={toggleTheme}>
+      <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+      <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+      <span className="sr-only">Toggle theme</span>
+    </Button>
+  );
+}
+
 
 export default function Header() {
   return (
@@ -15,6 +50,7 @@ export default function Header() {
           <span>MacBook Pro Speakers</span>
         </div>
         <MetronomeControl />
+        <ThemeToggle />
       </div>
     </header>
   );
