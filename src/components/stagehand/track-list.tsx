@@ -1,42 +1,144 @@
 "use client";
 
-import type { Track } from '@/app/page';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { Music } from 'lucide-react';
+import { Folder as FolderIcon, Music, ChevronDown, ChevronsUpDown, PlusCircle } from 'lucide-react';
 import ImportDialog from './import-dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
+import { useState } from 'react';
+
+export type Track = {
+  type: 'track';
+  id: number;
+  title: string;
+  originalFilename: string;
+  artist: string;
+  duration: string;
+};
+
+export type Folder = {
+  type: 'folder';
+  id: number;
+  name: string;
+  children: TrackItem[];
+};
+
+export type TrackItem = Track | Folder;
 
 type TrackListProps = {
-  tracks: Track[];
+  projects: string[];
+  currentProject: string;
+  onSelectProject: (project: string) => void;
+  onNewProject: () => void;
+  tracks: TrackItem[];
   selectedTrack: Track | null;
   onSelectTrack: (track: Track) => void;
 };
 
-export default function TrackList({ tracks, selectedTrack, onSelectTrack }: TrackListProps) {
+const ProjectSelector = ({ projects, currentProject, onSelectProject, onNewProject }: Pick<TrackListProps, 'projects' | 'currentProject' | 'onSelectProject' | 'onNewProject'>) => {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={isOpen}
+          className="w-full justify-between"
+        >
+          {currentProject || "Select project..."}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+         <div className="p-1">
+            {projects.map(project => (
+              <Button
+                key={project}
+                variant="ghost"
+                className="w-full justify-start"
+                onClick={() => {
+                  onSelectProject(project);
+                  setIsOpen(false);
+                }}
+              >
+                {project}
+              </Button>
+            ))}
+         </div>
+         <div className="p-1 border-t">
+            <Button
+              variant="ghost"
+              className="w-full justify-start text-primary"
+              onClick={() => {
+                onNewProject();
+                setIsOpen(false);
+              }}
+            >
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Create New Project
+            </Button>
+         </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+
+const TrackNode = ({ item, selectedTrack, onSelectTrack, level = 0 }: { item: TrackItem, selectedTrack: Track | null, onSelectTrack: (track: Track) => void, level?: number }) => {
+  if (item.type === 'folder') {
+    return (
+      <Collapsible defaultOpen className="pl-4">
+        <CollapsibleTrigger asChild>
+           <div className="flex items-center w-full text-left text-sm font-semibold cursor-pointer py-1.5 hover:bg-accent rounded-md px-2">
+              <FolderIcon className="mr-3 h-4 w-4 flex-shrink-0" />
+              <span>{item.name}</span>
+              <ChevronDown className="h-4 w-4 ml-auto shrink-0 transition-transform duration-200 [&[data-state=open]>svg]:rotate-180"/>
+            </div>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="py-1">
+          {item.children.map(child => (
+            <TrackNode key={child.id} item={child} selectedTrack={selectedTrack} onSelectTrack={onSelectTrack} level={level + 1} />
+          ))}
+        </CollapsibleContent>
+      </Collapsible>
+    )
+  }
+
+  // item.type === 'track'
+  return (
+    <Button
+      variant="ghost"
+      className={cn(
+        "w-full justify-start h-auto py-2 px-3 text-left",
+        selectedTrack?.id === item.id && "bg-accent"
+      )}
+      style={{ paddingLeft: `${12 + level * 16}px` }}
+      onClick={() => onSelectTrack(item)}
+    >
+      <Music className="mr-3 h-4 w-4 flex-shrink-0" />
+      <div className="flex flex-col truncate">
+        <span className="font-medium">{item.title}</span>
+        <span className="text-xs text-muted-foreground">{item.originalFilename} - {item.duration}</span>
+      </div>
+    </Button>
+  )
+}
+
+export default function TrackList(props: TrackListProps) {
+  const { tracks, selectedTrack, onSelectTrack } = props;
   return (
     <aside className="w-80 hidden md:flex flex-col border-r bg-secondary/50">
-      <div className="p-4">
+      <div className="p-4 space-y-4">
+        <ProjectSelector {...props} />
         <ImportDialog />
       </div>
       <ScrollArea className="flex-1">
-        <nav className="p-4 space-y-1">
-          {tracks.map((track) => (
-            <Button
-              key={track.id}
-              variant="ghost"
-              className={cn(
-                "w-full justify-start h-auto py-2 px-3 text-left",
-                selectedTrack?.id === track.id && "bg-accent"
-              )}
-              onClick={() => onSelectTrack(track)}
-            >
-              <Music className="mr-3 h-4 w-4 flex-shrink-0" />
-              <div className="flex flex-col">
-                <span className="font-medium">{track.title}</span>
-                <span className="text-xs text-muted-foreground">{track.artist} - {track.duration}</span>
-              </div>
-            </Button>
+        <nav className="p-2 space-y-1">
+          {tracks.map((item) => (
+            <TrackNode key={item.id} item={item} selectedTrack={selectedTrack} onSelectTrack={onSelectTrack} />
           ))}
         </nav>
       </ScrollArea>

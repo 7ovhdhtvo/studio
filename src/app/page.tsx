@@ -9,26 +9,53 @@ import SpeedControl from '@/components/stagehand/speed-control';
 import VolumeControl from '@/components/stagehand/volume-control';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut } from 'lucide-react';
-
-export type Track = {
-  id: number;
-  title: string;
-  artist: string;
-  duration: string;
-};
+import type { TrackItem, Track } from '@/components/stagehand/track-list';
 
 export type AutomationPoint = {
   time: number;
   value: number;
 };
 
-const initialTracks: Track[] = [
-    { id: 1, title: 'Opening Scene', artist: 'Soundtrack', duration: '3:45' },
-    { id: 2, title: 'Interlude Music', artist: 'Soundtrack', duration: '1:30' },
-    { id: 3, title: 'Thunder SFX', artist: 'Effects', duration: '0:12' },
-    { id: 4, title: 'Walk-on Music', artist: 'Generic Band', duration: '2:15' },
-    { id: 5, title: 'Closing Theme', artist: 'Soundtrack', duration: '4:02' },
-];
+const initialProjects: { [key: string]: TrackItem[] } = {
+  'Show - 24.07.24': [
+    { 
+      type: 'folder', 
+      id: 100, 
+      name: 'Intro Music', 
+      children: [
+        { id: 1, type: 'track', title: 'Opening Scene', originalFilename: 'opening_final_v3.wav', artist: 'Soundtrack', duration: '3:45' },
+        { id: 4, type: 'track', title: 'Walk-on Music', originalFilename: 'generic_walkon.mp3', artist: 'Generic Band', duration: '2:15' },
+      ] 
+    },
+    { 
+      type: 'folder', 
+      id: 101, 
+      name: 'Sound Effects', 
+      children: [
+        { id: 3, type: 'track', title: 'Thunder SFX', originalFilename: 'sfx_thunder_rain.wav', artist: 'Effects', duration: '0:12' },
+      ]
+    },
+    { id: 2, type: 'track', title: 'Interlude Music', originalFilename: 'interlude_temp.mp3', artist: 'Soundtrack', duration: '1:30' },
+    { id: 5, type: 'track', title: 'Closing Theme', originalFilename: 'closing_theme_master.flac', artist: 'Soundtrack', duration: '4:02' },
+  ],
+  'Rehearsal - 20.07.24': [
+      { id: 6, type: 'track', title: 'Test Track 1', originalFilename: 'test_1.wav', artist: 'Test', duration: '1:00' },
+      { id: 7, type: 'track', title: 'Test Track 2', originalFilename: 'test_2.mp3', artist: 'Test', duration: '2:30' },
+  ]
+};
+
+const findFirstTrack = (items: TrackItem[]): Track | null => {
+  for (const item of items) {
+    if (item.type === 'track') {
+      return item;
+    }
+    if (item.type === 'folder') {
+      const track = findFirstTrack(item.children);
+      if (track) return track;
+    }
+  }
+  return null;
+};
 
 const parseDuration = (duration: string): number => {
     const parts = duration.split(':').map(Number);
@@ -39,8 +66,12 @@ const parseDuration = (duration: string): number => {
 }
 
 export default function Home() {
-  const [tracks, setTracks] = useState<Track[]>(initialTracks);
-  const [selectedTrack, setSelectedTrack] = useState<Track | null>(initialTracks[0]);
+  const [projects, setProjects] = useState(initialProjects);
+  const [currentProject, setCurrentProject] = useState('Show - 24.07.24');
+
+  const tracks = projects[currentProject] || [];
+  
+  const [selectedTrack, setSelectedTrack] = useState<Track | null>(findFirstTrack(tracks));
   const [isPlaying, setIsPlaying] = useState(false);
   const [showVolumeAutomation, setShowVolumeAutomation] = useState(true);
   const [showSpeedAutomation, setShowSpeedAutomation] = useState(false);
@@ -55,6 +86,19 @@ export default function Home() {
     { time: 6.8, value: 125 },
   ]);
 
+  const handleSelectProject = (projectName: string) => {
+    setCurrentProject(projectName);
+    const firstTrack = findFirstTrack(projects[projectName] || []);
+    setSelectedTrack(firstTrack);
+  };
+
+  const handleCreateNewProject = () => {
+    const newProjectName = `New Project ${Object.keys(projects).length + 1}`;
+    setProjects(prev => ({ ...prev, [newProjectName]: [] }));
+    setCurrentProject(newProjectName);
+    setSelectedTrack(null);
+  }
+
   const durationInSeconds = selectedTrack ? parseDuration(selectedTrack.duration) : 0;
 
   const handleZoomIn = () => setZoom(prev => Math.min(prev * 1.5, 20));
@@ -63,6 +107,10 @@ export default function Home() {
   return (
     <div className="flex h-screen w-full bg-background text-foreground">
       <TrackList 
+        projects={Object.keys(projects)}
+        currentProject={currentProject}
+        onSelectProject={handleSelectProject}
+        onNewProject={handleCreateNewProject}
         tracks={tracks} 
         selectedTrack={selectedTrack} 
         onSelectTrack={setSelectedTrack}
