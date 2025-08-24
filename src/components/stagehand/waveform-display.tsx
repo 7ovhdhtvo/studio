@@ -1,14 +1,16 @@
 "use client";
 
 import { cn } from '@/lib/utils';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Line, LineChart as RechartsLineChart, ResponsiveContainer } from 'recharts';
+import TimeRuler from './time-ruler';
 
 type WaveformDisplayProps = {
   isPlaying: boolean;
   showVolumeAutomation: boolean;
   showSpeedAutomation: boolean;
   durationInSeconds: number;
+  zoom: number;
 };
 
 const volumeData = [
@@ -51,31 +53,16 @@ const AutomationCurve = ({ data, color, visible }: { data: any[], color: string,
   );
 };
 
-const TimeAxis = ({ duration }: { duration: number }) => {
-  const markers = Array.from({ length: Math.floor(duration / 5) + 1 }, (_, i) => i * 5);
-
-  return (
-    <div className="absolute bottom-0 left-0 right-0 h-6 flex justify-between text-xs text-muted-foreground px-2">
-      {markers.map(marker => {
-        const percentage = (marker / duration) * 100;
-        return (
-          <div key={marker} className="absolute" style={{ left: `${percentage}%` }}>
-            <span className="absolute -translate-x-1/2">{marker}s</span>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
 export default function WaveformDisplay({ 
   isPlaying, 
   showVolumeAutomation, 
   showSpeedAutomation,
-  durationInSeconds
+  durationInSeconds,
+  zoom
 }: WaveformDisplayProps) {
   const [bars, setBars] = useState<number[]>([]);
-  const [progress, setProgress] = useState(30);
+  const [progress, setProgress] = useState(0); // Progress in percentage
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const newBars = Array.from({ length: 150 }, () => Math.random() * 0.8 + 0.2);
@@ -85,9 +72,17 @@ export default function WaveformDisplay({
   useEffect(() => {
     let animationFrameId: number;
     if (isPlaying) {
+      const startTime = Date.now() - (progress / 100) * durationInSeconds * 1000;
       const animate = () => {
-        setProgress(prev => (prev >= 100 ? 0 : prev + (0.05 / durationInSeconds * 100)));
-        animationFrameId = requestAnimationFrame(animate);
+        const elapsedTime = Date.now() - startTime;
+        const newProgress = (elapsedTime / (durationInSeconds * 1000)) * 100;
+        
+        if (newProgress >= 100) {
+          setProgress(100);
+        } else {
+          setProgress(newProgress);
+          animationFrameId = requestAnimationFrame(animate);
+        }
       };
       animationFrameId = requestAnimationFrame(animate);
     }
@@ -95,33 +90,51 @@ export default function WaveformDisplay({
       cancelAnimationFrame(animationFrameId);
     };
   }, [isPlaying, durationInSeconds]);
+  
+  const currentTime = (progress / 100) * durationInSeconds;
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    const ms = Math.floor((seconds - Math.floor(seconds)) * 100);
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(2, '0')}`;
+  }
+  
   return (
-    <div className="relative w-full h-56 flex flex-col">
-      <div className="relative w-full h-48 bg-card rounded-lg p-2 flex items-center gap-0.5 overflow-hidden shadow-inner">
-        {bars.map((height, index) => (
-          <div
-            key={index}
-            className={cn(
-              "w-full rounded-sm transition-colors duration-200",
-              index < (progress / 100) * bars.length ? "bg-primary" : "bg-primary/20"
-            )}
-            style={{ height: `${height * 100}%` }}
-          />
-        ))}
-        
-        <AutomationCurve data={volumeData} color="hsl(var(--destructive))" visible={showVolumeAutomation} />
-        <AutomationCurve data={speedData} color="#F5B041" visible={showSpeedAutomation} />
+    <div className="flex flex-col items-center space-y-2">
+       <div className="font-mono text-4xl font-bold text-center w-full bg-secondary text-secondary-foreground py-2 rounded-lg">
+          {formatTime(currentTime)}
+       </div>
+       <div 
+         ref={containerRef}
+         className="w-full overflow-x-auto"
+       >
+        <div 
+          className="relative h-48 bg-card rounded-lg p-2 flex items-center gap-0.5 shadow-inner"
+          style={{ width: `${100 * zoom}%` }}
+        >
+          {bars.map((height, index) => (
+            <div
+              key={index}
+              className={cn(
+                "w-full rounded-sm transition-colors duration-200",
+                (index / bars.length * 100) < progress ? "bg-primary" : "bg-primary/20"
+              )}
+              style={{ height: `${height * 100}%` }}
+            />
+          ))}
+          
+          <AutomationCurve data={volumeData} color="hsl(var(--destructive))" visible={showVolumeAutomation} />
+          <AutomationCurve data={speedData} color="#F5B041" visible={showSpeedAutomation} />
 
-         <div 
-          className="absolute top-0 h-full w-0.5 bg-foreground/70"
-          style={{ left: `${progress}%` }}
-         >
-           <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 bg-foreground/70 rounded-full"></div>
-         </div>
-      </div>
-      <div className="relative h-8 w-full mt-1">
-         <TimeAxis duration={durationInSeconds} />
+          <div 
+            className="absolute top-0 h-full w-0.5 bg-foreground/70"
+            style={{ left: `${progress}%` }}
+          >
+            <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 bg-foreground/70 rounded-full"></div>
+          </div>
+        </div>
+        <TimeRuler duration={durationInSeconds} zoom={zoom} />
       </div>
     </div>
   );

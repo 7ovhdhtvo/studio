@@ -7,6 +7,8 @@ import PlaybackControls from '@/components/stagehand/playback-controls';
 import WaveformDisplay from '@/components/stagehand/waveform-display';
 import SpeedControl from '@/components/stagehand/speed-control';
 import VolumeControl from '@/components/stagehand/volume-control';
+import { Button } from '@/components/ui/button';
+import { ZoomIn, ZoomOut } from 'lucide-react';
 
 export type Track = {
   id: number;
@@ -42,6 +44,7 @@ export default function Home() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showVolumeAutomation, setShowVolumeAutomation] = useState(true);
   const [showSpeedAutomation, setShowSpeedAutomation] = useState(false);
+  const [zoom, setZoom] = useState(1); // 1 = 100%
 
   const [volumePoints, setVolumePoints] = useState<AutomationPoint[]>([
     { time: 2.5, value: 80 },
@@ -54,6 +57,9 @@ export default function Home() {
 
   const durationInSeconds = selectedTrack ? parseDuration(selectedTrack.duration) : 0;
 
+  const handleZoomIn = () => setZoom(prev => Math.min(prev * 1.5, 20));
+  const handleZoomOut = () => setZoom(prev => Math.max(prev / 1.5, 1));
+
   return (
     <div className="flex h-screen w-full bg-background text-foreground">
       <TrackList 
@@ -64,18 +70,30 @@ export default function Home() {
       <main className="flex flex-1 flex-col overflow-hidden">
         <Header />
         <div className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6">
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold tracking-tight" style={{ color: '#34495E' }}>
-              {selectedTrack?.title || 'No Track Selected'}
-            </h2>
-            <p className="text-muted-foreground">{selectedTrack?.artist}</p>
+          <div className="flex justify-between items-start">
+            <div className="space-y-4">
+              <h2 className="text-2xl font-bold tracking-tight" style={{ color: '#34495E' }}>
+                {selectedTrack?.title || 'No Track Selected'}
+              </h2>
+              <p className="text-muted-foreground">{selectedTrack?.artist}</p>
+            </div>
+             <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" onClick={handleZoomOut}>
+                <ZoomOut className="w-4 h-4" />
+              </Button>
+              <Button variant="outline" size="icon" onClick={handleZoomIn}>
+                <ZoomIn className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
+
 
           <WaveformDisplay 
             isPlaying={isPlaying} 
             showVolumeAutomation={showVolumeAutomation}
             showSpeedAutomation={showSpeedAutomation}
             durationInSeconds={durationInSeconds}
+            zoom={zoom}
           />
           <PlaybackControls isPlaying={isPlaying} setIsPlaying={setIsPlaying} />
 
