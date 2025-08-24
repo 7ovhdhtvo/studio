@@ -40,7 +40,7 @@ export default function SpeedControl({ isOpen, onToggle, speed, onSpeedChange, s
               <Rabbit className="w-5 h-5" />
               <CardTitle>Speed</CardTitle>
           </div>
-          <Button variant="ghost" size="icon" onClick={onToggle} className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7">
+          <Button variant="ghost" size="icon" onClick={onToggle} className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full">
             <Minus className="w-4 h-4" />
           </Button>
         </CardHeader>
