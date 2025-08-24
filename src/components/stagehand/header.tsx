@@ -1,7 +1,6 @@
 "use client";
 
-import { Speaker, Sun, Moon } from 'lucide-react';
-import MetronomeControl from './metronome-control';
+import { Speaker, Sun, Moon, PanelLeft } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
@@ -37,19 +36,27 @@ function ThemeToggle() {
   );
 }
 
+type HeaderProps = {
+  onToggleSidebar: () => void;
+};
 
-export default function Header() {
+export default function Header({ onToggleSidebar }: HeaderProps) {
   return (
     <header className="flex h-16 items-center justify-between border-b bg-card px-6 lg:px-8 flex-shrink-0">
-      <h1 className="text-xl font-bold tracking-wider" style={{ color: '#34495E' }}>
-        STAGEHAND
-      </h1>
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={onToggleSidebar} className="md:hidden">
+            <PanelLeft className="h-5 w-5" />
+            <span className="sr-only">Toggle Sidebar</span>
+        </Button>
+        <h1 className="text-xl font-bold tracking-wider" style={{ color: '#34495E' }}>
+          STAGEHAND
+        </h1>
+      </div>
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Speaker className="h-4 w-4" />
           <span>MacBook Pro Speakers</span>
         </div>
-        <MetronomeControl />
         <ThemeToggle />
       </div>
     </header>

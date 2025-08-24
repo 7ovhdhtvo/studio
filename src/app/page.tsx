@@ -7,6 +7,7 @@ import PlaybackControls from '@/components/stagehand/playback-controls';
 import WaveformDisplay from '@/components/stagehand/waveform-display';
 import SpeedControl from '@/components/stagehand/speed-control';
 import VolumeControl from '@/components/stagehand/volume-control';
+import MetronomeControl from '@/components/stagehand/metronome-control';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut } from 'lucide-react';
 import type { TrackItem, Track } from '@/components/stagehand/track-list';
@@ -85,6 +86,9 @@ export default function Home() {
     { time: 3.2, value: 75 },
     { time: 6.8, value: 125 },
   ]);
+  
+  const [isSidebarOpen, setSidebarOpen] = useState(true);
+
 
   const handleSelectProject = (projectName: string) => {
     setCurrentProject(projectName);
@@ -98,6 +102,19 @@ export default function Home() {
     setCurrentProject(newProjectName);
     setSelectedTrack(null);
   }
+  
+  const handleAddFolder = () => {
+    const newFolder: TrackItem = {
+      type: 'folder',
+      id: Date.now(),
+      name: `New Folder ${projects[currentProject].filter(i => i.type === 'folder').length + 1}`,
+      children: [],
+    };
+    setProjects(prev => ({
+      ...prev,
+      [currentProject]: [...prev[currentProject], newFolder],
+    }));
+  }
 
   const durationInSeconds = selectedTrack ? parseDuration(selectedTrack.duration) : 0;
 
@@ -107,16 +124,18 @@ export default function Home() {
   return (
     <div className="flex h-screen w-full bg-background text-foreground">
       <TrackList 
+        isOpen={isSidebarOpen}
         projects={Object.keys(projects)}
         currentProject={currentProject}
         onSelectProject={handleSelectProject}
         onNewProject={handleCreateNewProject}
+        onAddFolder={handleAddFolder}
         tracks={tracks} 
         selectedTrack={selectedTrack} 
         onSelectTrack={setSelectedTrack}
       />
       <main className="flex flex-1 flex-col overflow-hidden">
-        <Header />
+        <Header onToggleSidebar={() => setSidebarOpen(!isSidebarOpen)} />
         <div className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6">
           <div className="flex justify-between items-start">
             <div className="space-y-4">
@@ -145,7 +164,7 @@ export default function Home() {
           />
           <PlaybackControls isPlaying={isPlaying} setIsPlaying={setIsPlaying} />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-4">
             <VolumeControl 
               showAutomation={showVolumeAutomation}
               onToggleAutomation={setShowVolumeAutomation}
@@ -156,6 +175,7 @@ export default function Home() {
               onToggleAutomation={setShowSpeedAutomation}
               automationPoints={speedPoints}
             />
+            <MetronomeControl />
           </div>
         </div>
       </main>

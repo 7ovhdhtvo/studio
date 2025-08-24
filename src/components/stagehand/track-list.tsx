@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { Folder as FolderIcon, Music, ChevronDown, ChevronsUpDown, PlusCircle, MoreHorizontal, Edit, Copy, Trash2 } from 'lucide-react';
+import { Folder as FolderIcon, Music, ChevronDown, ChevronsUpDown, PlusCircle, MoreHorizontal, Edit, Copy, Trash2, FolderPlus } from 'lucide-react';
 import ImportDialog from './import-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
@@ -29,10 +29,12 @@ export type Folder = {
 export type TrackItem = Track | Folder;
 
 type TrackListProps = {
+  isOpen: boolean;
   projects: string[];
   currentProject: string;
   onSelectProject: (project: string) => void;
   onNewProject: () => void;
+  onAddFolder: () => void;
   tracks: TrackItem[];
   selectedTrack: Track | null;
   onSelectTrack: (track: Track) => void;
@@ -171,12 +173,21 @@ const TrackNode = ({ item, selectedTrack, onSelectTrack, level = 0 }: { item: Tr
 }
 
 export default function TrackList(props: TrackListProps) {
-  const { tracks, selectedTrack, onSelectTrack } = props;
+  const { tracks, selectedTrack, onSelectTrack, isOpen, onAddFolder } = props;
   return (
-    <aside className="w-80 hidden md:flex flex-col border-r bg-secondary/50">
+    <aside className={cn(
+      "w-80 flex-col border-r bg-secondary/50 transition-all duration-300 ease-in-out",
+      isOpen ? "flex" : "hidden"
+    )}>
       <div className="p-4 space-y-4">
         <ProjectSelector {...props} />
-        <ImportDialog />
+        <div className="flex gap-2">
+            <ImportDialog />
+            <Button variant="outline" onClick={onAddFolder} className="w-full">
+              <FolderPlus className="mr-2 h-4 w-4" />
+              Add Folder
+            </Button>
+        </div>
       </div>
       <ScrollArea className="flex-1">
         <nav className="p-2 space-y-1">
