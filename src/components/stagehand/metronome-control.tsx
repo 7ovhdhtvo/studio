@@ -37,7 +37,7 @@ export default function MetronomeControl({ isOpen, onToggle, speed }: MetronomeC
             <Music className="w-5 h-5" />
             <CardTitle>Metronome</CardTitle>
         </div>
-        <Button variant="ghost" size="icon" onClick={onToggle} className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full">
+        <Button variant="outline" size="icon" onClick={onToggle} className="absolute right-2 top-2 h-7 w-7 bg-secondary">
             <Minus className="w-4 h-4" />
         </Button>
       </CardHeader>
