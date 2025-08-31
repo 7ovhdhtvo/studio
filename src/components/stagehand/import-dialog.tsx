@@ -14,10 +14,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UploadCloud } from 'lucide-react';
+import type { ChangeEvent } from "react";
+import { useState } from "react";
 
-export default function ImportDialog() {
+type ImportDialogProps = {
+  onImportTrack: (file: File) => void;
+};
+
+export default function ImportDialog({ onImportTrack }: ImportDialogProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      onImportTrack(file);
+      setIsOpen(false); // Close dialog after import
+    }
+  };
+
   return (
-    <Dialog>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button variant="default" className="w-full">
           <UploadCloud className="mr-2 h-4 w-4" />
@@ -45,13 +61,10 @@ export default function ImportDialog() {
                           <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
                           <p className="text-xs text-muted-foreground">MP3, WAV, or FLAC</p>
                       </div>
-                      <input id="dropzone-file" type="file" className="hidden" />
+                      <input id="dropzone-file" type="file" className="hidden" onChange={handleFileChange} accept="audio/*" />
                   </label>
               </div>
             </div>
-             <DialogFooter>
-              <Button type="submit">Import</Button>
-            </DialogFooter>
           </TabsContent>
           <TabsContent value="cloud">
             <div className="grid gap-4 py-4">

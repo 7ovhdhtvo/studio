@@ -36,6 +36,7 @@ type TrackListProps = {
   onSelectProject: (project: string) => void;
   onNewProject: () => void;
   onAddFolder: () => void;
+  onImportTrack: (file: File) => void;
   tracks: TrackItem[];
   selectedTrack: Track | null;
   onSelectTrack: (track: Track) => void;
@@ -174,7 +175,7 @@ const TrackNode = ({ item, selectedTrack, onSelectTrack, level = 0 }: { item: Tr
 }
 
 export default function TrackList(props: TrackListProps) {
-  const { tracks, selectedTrack, onSelectTrack, isOpen, onToggle, onAddFolder } = props;
+  const { tracks, selectedTrack, onSelectTrack, isOpen, onToggle, onAddFolder, onImportTrack } = props;
 
   return (
     <aside className={cn(
@@ -194,7 +195,7 @@ export default function TrackList(props: TrackListProps) {
         <div className="p-4 space-y-4">
           <ProjectSelector {...props} />
           <div className="flex gap-2">
-              <ImportDialog />
+              <ImportDialog onImportTrack={onImportTrack} />
               <Button variant="outline" onClick={onAddFolder} className="w-full">
                 <FolderPlus className="mr-2 h-4 w-4" />
                 Add Folder

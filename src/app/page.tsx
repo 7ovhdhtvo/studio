@@ -169,6 +169,32 @@ export default function Home() {
     }));
   }
 
+  const handleImportTrack = (file: File) => {
+    const audio = new Audio(URL.createObjectURL(file));
+    audio.addEventListener('loadedmetadata', () => {
+      const duration = audio.duration;
+      const minutes = Math.floor(duration / 60);
+      const seconds = Math.floor(duration % 60);
+      const newTrack: Track = {
+        id: Date.now(),
+        type: 'track',
+        title: file.name.replace(/\.[^/.]+$/, ""),
+        originalFilename: file.name,
+        artist: 'Unknown Artist',
+        duration: `${minutes}:${seconds.toString().padStart(2, '0')}`,
+      };
+
+      setProjects(prev => {
+        const currentTracks = prev[currentProject] || [];
+        return {
+          ...prev,
+          [currentProject]: [...currentTracks, newTrack]
+        }
+      });
+      URL.revokeObjectURL(audio.src);
+    });
+  };
+
   const durationInSeconds = selectedTrack ? parseDuration(selectedTrack.duration) : 0;
 
   const handleZoomIn = () => setZoom(prev => Math.min(prev * 1.5, 20));
@@ -184,6 +210,7 @@ export default function Home() {
         onSelectProject={handleSelectProject}
         onNewProject={handleCreateNewProject}
         onAddFolder={handleAddFolder}
+        onImportTrack={handleImportTrack}
         tracks={tracks} 
         selectedTrack={selectedTrack} 
         onSelectTrack={setSelectedTrack}
