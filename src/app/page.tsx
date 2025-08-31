@@ -21,31 +21,7 @@ export type AutomationPoint = {
 export type OpenControlPanel = 'volume' | 'speed' | 'metronome' | null;
 
 const initialProjects: { [key: string]: TrackItem[] } = {
-  'Show - 24.07.24': [
-    { 
-      type: 'folder', 
-      id: 100, 
-      name: 'Intro Music', 
-      children: [
-        { id: 1, type: 'track', title: 'Opening Scene', originalFilename: 'opening_final_v3.wav', artist: 'Soundtrack', duration: '3:45' },
-        { id: 4, type: 'track', title: 'Walk-on Music', originalFilename: 'generic_walkon.mp3', artist: 'Generic Band', duration: '2:15' },
-      ] 
-    },
-    { 
-      type: 'folder', 
-      id: 101, 
-      name: 'Sound Effects', 
-      children: [
-        { id: 3, type: 'track', title: 'Thunder SFX', originalFilename: 'sfx_thunder_rain.wav', artist: 'Effects', duration: '0:12' },
-      ]
-    },
-    { id: 2, type: 'track', title: 'Interlude Music', originalFilename: 'interlude_temp.mp3', artist: 'Soundtrack', duration: '1:30' },
-    { id: 5, type: 'track', title: 'Closing Theme', originalFilename: 'closing_theme_master.flac', artist: 'Soundtrack', duration: '4:02' },
-  ],
-  'Rehearsal - 20.07.24': [
-      { id: 6, type: 'track', title: 'Test Track 1', originalFilename: 'test_1.wav', artist: 'Test', duration: '1:00' },
-      { id: 7, type: 'track', title: 'Test Track 2', originalFilename: 'test_2.mp3', artist: 'Test', duration: '2:30' },
-  ]
+  'New Show': []
 };
 
 const findFirstTrack = (items: TrackItem[]): Track | null => {
@@ -71,7 +47,7 @@ const parseDuration = (duration: string): number => {
 
 export default function Home() {
   const [projects, setProjects] = useState(initialProjects);
-  const [currentProject, setCurrentProject] = useState('Show - 24.07.24');
+  const [currentProject, setCurrentProject] = useState('New Show');
 
   const tracks = projects[currentProject] || [];
   
@@ -176,10 +152,14 @@ export default function Home() {
   };
 
   const handleCreateNewProject = () => {
-    const newProjectName = `New Project ${Object.keys(projects).length + 1}`;
-    setProjects(prev => ({ ...prev, [newProjectName]: [] }));
-    setCurrentProject(newProjectName);
-    setSelectedTrack(null);
+    const newProjectName = prompt("Enter new project name:", `New Project ${Object.keys(projects).length + 1}`);
+    if (newProjectName && !projects[newProjectName]) {
+      setProjects(prev => ({ ...prev, [newProjectName]: [] }));
+      setCurrentProject(newProjectName);
+      setSelectedTrack(null);
+    } else if (newProjectName) {
+      alert("A project with this name already exists.");
+    }
   }
   
   const handleAddFolder = () => {
@@ -223,13 +203,63 @@ export default function Home() {
       // Do not revoke object URL as it's needed for playback
     });
   };
+  
+  const handleDeleteItem = (itemId: number, parentFolder?: TrackItem) => {
+    const deleteRecursively = (items: TrackItem[], idToDelete: number): TrackItem[] => {
+      return items.filter(item => {
+        if (item.id === idToDelete) {
+          if (item.type === 'track' && selectedTrack?.id === item.id) {
+            setSelectedTrack(null);
+            setAudioSrc(null);
+            setIsPlaying(false);
+          }
+          return false;
+        }
+        if (item.type === 'folder') {
+          item.children = deleteRecursively(item.children, idToDelete);
+        }
+        return true;
+      });
+    };
+
+    setProjects(prev => {
+      const newProjects = { ...prev };
+      newProjects[currentProject] = deleteRecursively(newProjects[currentProject], itemId);
+      return newProjects;
+    });
+  };
+
+  const handleRenameItem = (itemId: number, newName: string) => {
+    const renameRecursively = (items: TrackItem[]): TrackItem[] => {
+      return items.map(item => {
+        if (item.id === itemId) {
+          if (item.type === 'track') {
+            return { ...item, title: newName };
+          }
+          return { ...item, name: newName };
+        }
+        if (item.type === 'folder') {
+          return { ...item, children: renameRecursively(item.children) };
+        }
+        return item;
+      });
+    };
+
+    setProjects(prev => {
+      const newProjects = { ...prev };
+      newProjects[currentProject] = renameRecursively(newProjects[currentProject]);
+      return newProjects;
+    });
+    
+    if (selectedTrack?.id === itemId) {
+      setSelectedTrack(prev => prev ? { ...prev, title: newName } : null);
+    }
+  };
 
   const handleSelectTrack = (track: Track) => {
     setSelectedTrack(track);
-    // This is a placeholder. In a real app, you'd load the actual audio file.
-    // For now, we'll just stop playback.
     setIsPlaying(false);
-    setAudioSrc(null); // We don't have the audio blob, so we can't play it yet.
+    setAudioSrc(null); 
     alert("Track selection is for display only. Please import a track to hear audio.")
   }
 
@@ -253,12 +283,12 @@ export default function Home() {
         tracks={tracks} 
         selectedTrack={selectedTrack} 
         onSelectTrack={(track) => {
-            // For now, selecting pre-existing tracks doesn't work as we don't have their audio data.
-            // Only newly imported tracks can be played.
             if(track.id !== selectedTrack?.id){
                 handleSelectTrack(track);
             }
         }}
+        onDeleteItem={handleDeleteItem}
+        onRenameItem={handleRenameItem}
       />
       <main className="flex flex-1 flex-col overflow-hidden">
         <Header />
@@ -318,5 +348,3 @@ export default function Home() {
     </div>
   );
 }
-
-    

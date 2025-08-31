@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,8 @@ type TrackListProps = {
   tracks: TrackItem[];
   selectedTrack: Track | null;
   onSelectTrack: (track: Track) => void;
+  onDeleteItem: (itemId: number, parentFolder?: TrackItem) => void;
+  onRenameItem: (itemId: number, newName: string) => void;
 };
 
 const ProjectSelector = ({ projects, currentProject, onSelectProject, onNewProject }: Pick<TrackListProps, 'projects' | 'currentProject' | 'onSelectProject' | 'onNewProject'>) => {
@@ -91,7 +94,7 @@ const ProjectSelector = ({ projects, currentProject, onSelectProject, onNewProje
   )
 }
 
-const TrackActions = () => {
+const TrackActions = ({ item, onDelete, onRename }: { item: TrackItem, onDelete: () => void, onRename: () => void }) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -101,7 +104,7 @@ const TrackActions = () => {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
-        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onRename(); }}>
           <Edit className="mr-2 h-4 w-4" />
           <span>Rename</span>
         </DropdownMenuItem>
@@ -109,7 +112,7 @@ const TrackActions = () => {
           <Copy className="mr-2 h-4 w-4" />
           <span>Copy</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive">
+        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onDelete(); }} className="text-destructive">
           <Trash2 className="mr-2 h-4 w-4" />
           <span>Delete</span>
         </DropdownMenuItem>
@@ -119,7 +122,22 @@ const TrackActions = () => {
 }
 
 
-const TrackNode = ({ item, selectedTrack, onSelectTrack, level = 0 }: { item: TrackItem, selectedTrack: Track | null, onSelectTrack: (track: Track) => void, level?: number }) => {
+const TrackNode = ({ item, selectedTrack, onSelectTrack, level = 0, onDeleteItem, onRenameItem }: { item: TrackItem, selectedTrack: Track | null, onSelectTrack: (track: Track) => void, level?: number, onDeleteItem: (id: number) => void, onRenameItem: (id: number, newName: string) => void }) => {
+  
+  const handleDelete = () => {
+    if (confirm(`Are you sure you want to delete "${item.type === 'track' ? item.title : item.name}"?`)) {
+      onDeleteItem(item.id);
+    }
+  }
+
+  const handleRename = () => {
+    const currentName = item.type === 'track' ? item.title : item.name;
+    const newName = prompt("Enter new name:", currentName);
+    if (newName && newName !== currentName) {
+      onRenameItem(item.id, newName);
+    }
+  }
+
   if (item.type === 'folder') {
     return (
       <Collapsible defaultOpen>
@@ -135,12 +153,12 @@ const TrackNode = ({ item, selectedTrack, onSelectTrack, level = 0 }: { item: Tr
                 </button>
             </CollapsibleTrigger>
             <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                <TrackActions />
+                <TrackActions item={item} onDelete={handleDelete} onRename={handleRename} />
             </div>
         </div>
         <CollapsibleContent className="py-1">
           {item.children.map(child => (
-            <TrackNode key={child.id} item={child} selectedTrack={selectedTrack} onSelectTrack={onSelectTrack} level={level + 1} />
+            <TrackNode key={child.id} item={child} selectedTrack={selectedTrack} onSelectTrack={onSelectTrack} level={level + 1} onDeleteItem={onDeleteItem} onRenameItem={onRenameItem} />
           ))}
         </CollapsibleContent>
       </Collapsible>
@@ -168,14 +186,14 @@ const TrackNode = ({ item, selectedTrack, onSelectTrack, level = 0 }: { item: Tr
         </div>
       </Button>
        <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-         <TrackActions />
+         <TrackActions item={item} onDelete={handleDelete} onRename={handleRename} />
        </div>
     </div>
   )
 }
 
 export default function TrackList(props: TrackListProps) {
-  const { tracks, selectedTrack, onSelectTrack, isOpen, onToggle, onAddFolder, onImportTrack } = props;
+  const { tracks, selectedTrack, onSelectTrack, isOpen, onToggle, onAddFolder, onImportTrack, onDeleteItem, onRenameItem } = props;
 
   return (
     <aside className={cn(
@@ -205,7 +223,7 @@ export default function TrackList(props: TrackListProps) {
         <ScrollArea className="flex-1 pr-2">
           <nav className="p-2 space-y-1">
             {tracks.map((item) => (
-              <TrackNode key={item.id} item={item} selectedTrack={selectedTrack} onSelectTrack={onSelectTrack} />
+              <TrackNode key={item.id} item={item} selectedTrack={selectedTrack} onSelectTrack={onSelectTrack} onDeleteItem={onDeleteItem} onRenameItem={onRenameItem} />
             ))}
           </nav>
         </ScrollArea>
