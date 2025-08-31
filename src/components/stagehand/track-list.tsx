@@ -43,13 +43,15 @@ type TrackListProps = {
   tracks: TrackItem[];
   selectedTrack: Track | null;
   onSelectTrack: (track: Track) => void;
-  onDeleteItem: (itemId: number, parentFolder?: TrackItem) => void;
+  onDeleteItem: (itemId: number) => void;
   onRenameItem: (itemId: number, newName: string) => void;
 };
 
-const ProjectSelector = ({ projects, currentProject, onSelectProject, onNewProject, onDeleteProject, isOpen, onOpenChange }: Pick<TrackListProps, 'projects' | 'currentProject' | 'onSelectProject' | 'onNewProject' | 'onDeleteProject'> & { isOpen: boolean, onOpenChange: (open: boolean) => void }) => {
+const ProjectSelector = ({ projects, currentProject, onSelectProject, onNewProject, onDeleteProject }: Pick<TrackListProps, 'projects' | 'currentProject' | 'onSelectProject' | 'onNewProject' | 'onDeleteProject'>) => {
+  const [isOpen, setIsOpen] = useState(false);
+  
   return (
-    <Popover open={isOpen} onOpenChange={onOpenChange}>
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -70,7 +72,7 @@ const ProjectSelector = ({ projects, currentProject, onSelectProject, onNewProje
                   className="w-full justify-start flex-1"
                   onClick={() => {
                     onSelectProject(project);
-                    onOpenChange(false);
+                    setIsOpen(false);
                   }}
                 >
                   {project}
@@ -82,7 +84,7 @@ const ProjectSelector = ({ projects, currentProject, onSelectProject, onNewProje
                   onClick={(e) => {
                     e.stopPropagation();
                     onDeleteProject(project);
-                    onOpenChange(false);
+                    setIsOpen(false);
                   }}
                 >
                   <Trash2 className="h-4 w-4 text-destructive" />
@@ -198,8 +200,7 @@ const TrackNode = ({ item, selectedTrack, onSelectTrack, level = 0, onDeleteItem
 
 export default function TrackList(props: TrackListProps) {
   const { tracks, selectedTrack, onSelectTrack, isOpen, onToggle, onAddFolder, onImportTrack, onDeleteItem, onRenameItem, ...projectSelectorProps } = props;
-  const [isProjectSelectorOpen, setProjectSelectorOpen] = useState(false);
-
+  
   return (
     <aside className={cn(
       "flex flex-col border-r bg-secondary/50 transition-all duration-300 ease-in-out relative",
@@ -216,11 +217,7 @@ export default function TrackList(props: TrackListProps) {
 
       <div className={cn("flex flex-col h-full transition-opacity duration-100", isOpen ? "opacity-100" : "opacity-0 invisible")}>
         <div className="p-4 space-y-4">
-          <ProjectSelector 
-            {...projectSelectorProps} 
-            isOpen={isProjectSelectorOpen}
-            onOpenChange={setProjectSelectorOpen}
-          />
+          <ProjectSelector {...projectSelectorProps} />
           <div className="flex gap-2">
               <ImportDialog onImportTrack={onImportTrack} />
               <Button variant="outline" onClick={onAddFolder} className="w-full">
@@ -245,3 +242,5 @@ export default function TrackList(props: TrackListProps) {
     </aside>
   );
 }
+
+    

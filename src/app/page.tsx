@@ -53,17 +53,14 @@ export default function Home() {
   useEffect(() => {
     try {
       const savedProjects = localStorage.getItem('stagehand_projects');
-      if (savedProjects) {
-        setProjects(JSON.parse(savedProjects));
-      } else {
-        setProjects(initialProjects);
-      }
+      const loadedProjects = savedProjects ? JSON.parse(savedProjects) : initialProjects;
+      setProjects(loadedProjects);
       
       const savedCurrentProject = localStorage.getItem('stagehand_currentProject');
-      if (savedCurrentProject && (savedProjects ? JSON.parse(savedProjects)[savedCurrentProject] : false)) {
+      if (savedCurrentProject && loadedProjects[savedCurrentProject]) {
         setCurrentProject(savedCurrentProject);
       } else {
-        setCurrentProject(Object.keys(savedProjects ? JSON.parse(savedProjects) : initialProjects)[0] || '');
+        setCurrentProject(Object.keys(loadedProjects)[0] || '');
       }
     } catch (error) {
       console.error("Failed to load projects from local storage", error);
@@ -78,7 +75,7 @@ export default function Home() {
       if (Object.keys(projects).length > 0) {
         localStorage.setItem('stagehand_projects', JSON.stringify(projects));
       } else {
-        // If all projects are deleted, remove from local storage
+        // If all projects are deleted, remove from local storage and create a new default one.
         localStorage.removeItem('stagehand_projects');
       }
       if (currentProject) {
@@ -164,7 +161,7 @@ export default function Home() {
         audioRef.current.pause();
       }
     }
-  }, [isPlaying, audioSrc]);
+  }, [isPlaying]);
 
   useEffect(() => {
     if (audioRef.current && audioSrc) {
@@ -173,7 +170,7 @@ export default function Home() {
         audioRef.current.play().catch(e => console.error("Playback failed", e));
       }
     }
-  }, [audioSrc, isPlaying]);
+  }, [audioSrc]);
 
 
   const [volumePoints, setVolumePoints] = useState<AutomationPoint[]>([
@@ -221,9 +218,9 @@ export default function Home() {
         delete newProjects[projectName];
 
         if (currentProject === projectName) {
-          const remainingProjects = Object.keys(newProjects);
-          if (remainingProjects.length > 0) {
-            setCurrentProject(remainingProjects[0]);
+          const remainingProjectKeys = Object.keys(newProjects);
+          if (remainingProjectKeys.length > 0) {
+            setCurrentProject(remainingProjectKeys[0]);
           } else {
             // No projects left, create a default one
             newProjects['New Show'] = [];
@@ -278,7 +275,7 @@ export default function Home() {
     });
   };
   
-  const handleDeleteItem = (itemId: number, parentFolder?: TrackItem) => {
+  const handleDeleteItem = (itemId: number) => {
     const deleteRecursively = (items: TrackItem[], idToDelete: number): TrackItem[] => {
       return items.filter(item => {
         if (item.id === idToDelete) {
@@ -429,3 +426,5 @@ export default function Home() {
     </div>
   );
 }
+
+    
