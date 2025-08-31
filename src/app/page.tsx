@@ -82,6 +82,10 @@ export default function Home() {
   const [zoom, setZoom] = useState(1); // 1 = 100%
   const [speed, setSpeed] = useState(100); // Global speed in %
   const [openControlPanel, setOpenControlPanel] = useState<OpenControlPanel>(null);
+  
+  const [audioSrc, setAudioSrc] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
 
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
@@ -126,6 +130,25 @@ export default function Home() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [isPlaying]);
+  
+  useEffect(() => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.play().catch(e => console.error("Playback failed", e));
+      } else {
+        audioRef.current.pause();
+      }
+    }
+  }, [isPlaying, audioSrc]);
+
+  useEffect(() => {
+    if (audioRef.current && audioSrc) {
+      audioRef.current.src = audioSrc;
+      if (isPlaying) {
+        audioRef.current.play().catch(e => console.error("Playback failed", e));
+      }
+    }
+  }, [audioSrc, isPlaying]);
 
 
   const [volumePoints, setVolumePoints] = useState<AutomationPoint[]>([
@@ -148,6 +171,8 @@ export default function Home() {
     setCurrentProject(projectName);
     const firstTrack = findFirstTrack(projects[projectName] || []);
     setSelectedTrack(firstTrack);
+    setAudioSrc(null);
+    setIsPlaying(false);
   };
 
   const handleCreateNewProject = () => {
@@ -171,7 +196,8 @@ export default function Home() {
   }
 
   const handleImportTrack = (file: File) => {
-    const audio = new Audio(URL.createObjectURL(file));
+    const audioUrl = URL.createObjectURL(file);
+    const audio = new Audio(audioUrl);
     audio.addEventListener('loadedmetadata', () => {
       const duration = audio.duration;
       const minutes = Math.floor(duration / 60);
@@ -192,9 +218,20 @@ export default function Home() {
           [currentProject]: [...currentTracks, newTrack]
         }
       });
-      URL.revokeObjectURL(audio.src);
+      setSelectedTrack(newTrack);
+      setAudioSrc(audioUrl);
+      // Do not revoke object URL as it's needed for playback
     });
   };
+
+  const handleSelectTrack = (track: Track) => {
+    setSelectedTrack(track);
+    // This is a placeholder. In a real app, you'd load the actual audio file.
+    // For now, we'll just stop playback.
+    setIsPlaying(false);
+    setAudioSrc(null); // We don't have the audio blob, so we can't play it yet.
+    alert("Track selection is for display only. Please import a track to hear audio.")
+  }
 
   const durationInSeconds = selectedTrack ? parseDuration(selectedTrack.duration) : 0;
 
@@ -203,6 +240,7 @@ export default function Home() {
 
   return (
     <div className="flex h-screen w-full bg-background text-foreground">
+      <audio ref={audioRef} onEnded={() => setIsPlaying(false)} />
       <TrackList 
         isOpen={isSidebarOpen}
         onToggle={() => setSidebarOpen(!isSidebarOpen)}
@@ -214,7 +252,13 @@ export default function Home() {
         onImportTrack={handleImportTrack}
         tracks={tracks} 
         selectedTrack={selectedTrack} 
-        onSelectTrack={setSelectedTrack}
+        onSelectTrack={(track) => {
+            // For now, selecting pre-existing tracks doesn't work as we don't have their audio data.
+            // Only newly imported tracks can be played.
+            if(track.id !== selectedTrack?.id){
+                handleSelectTrack(track);
+            }
+        }}
       />
       <main className="flex flex-1 flex-col overflow-hidden">
         <Header />
@@ -274,3 +318,5 @@ export default function Home() {
     </div>
   );
 }
+
+    
