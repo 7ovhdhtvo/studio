@@ -4,12 +4,13 @@
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { Folder as FolderIcon, Music, ChevronDown, ChevronsUpDown, PlusCircle, MoreHorizontal, Edit, Copy, Trash2, FolderPlus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Folder as FolderIcon, Music, ChevronDown, ChevronsUpDown, MoreHorizontal, Edit, Copy, Trash2, FolderPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 import ImportDialog from './import-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
 import { useState } from 'react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import NewProjectDialog from './new-project-dialog';
 
 export type Track = {
   type: 'track';
@@ -35,7 +36,7 @@ type TrackListProps = {
   projects: string[];
   currentProject: string;
   onSelectProject: (project: string) => void;
-  onNewProject: () => void;
+  onNewProject: (name: string) => boolean;
   onAddFolder: () => void;
   onImportTrack: (file: File) => void;
   tracks: TrackItem[];
@@ -77,17 +78,7 @@ const ProjectSelector = ({ projects, currentProject, onSelectProject, onNewProje
             ))}
          </div>
          <div className="p-1 border-t">
-            <Button
-              variant="ghost"
-              className="w-full justify-start text-primary"
-              onClick={() => {
-                onNewProject();
-                setIsOpen(false);
-              }}
-            >
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Create New Project
-            </Button>
+            <NewProjectDialog onNewProject={onNewProject} />
          </div>
       </PopoverContent>
     </Popover>

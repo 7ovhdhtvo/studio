@@ -46,12 +46,56 @@ const parseDuration = (duration: string): number => {
 }
 
 export default function Home() {
-  const [projects, setProjects] = useState(initialProjects);
-  const [currentProject, setCurrentProject] = useState('New Show');
+  const [projects, setProjects] = useState<{ [key: string]: TrackItem[] }>({});
+  const [currentProject, setCurrentProject] = useState('');
+
+  // Load projects from local storage on initial render
+  useEffect(() => {
+    try {
+      const savedProjects = localStorage.getItem('stagehand_projects');
+      if (savedProjects) {
+        setProjects(JSON.parse(savedProjects));
+      } else {
+        setProjects(initialProjects);
+      }
+      
+      const savedCurrentProject = localStorage.getItem('stagehand_currentProject');
+      if (savedCurrentProject && (savedProjects ? JSON.parse(savedProjects)[savedCurrentProject] : false)) {
+        setCurrentProject(savedCurrentProject);
+      } else {
+        setCurrentProject(Object.keys(savedProjects ? JSON.parse(savedProjects) : initialProjects)[0] || '');
+      }
+    } catch (error) {
+      console.error("Failed to load projects from local storage", error);
+      setProjects(initialProjects);
+      setCurrentProject('New Show');
+    }
+  }, []);
+
+  // Save projects to local storage whenever they change
+  useEffect(() => {
+    try {
+      if (Object.keys(projects).length > 0) {
+        localStorage.setItem('stagehand_projects', JSON.stringify(projects));
+      }
+      if (currentProject) {
+        localStorage.setItem('stagehand_currentProject', currentProject);
+      }
+    } catch (error) {
+      console.error("Failed to save projects to local storage", error);
+    }
+  }, [projects, currentProject]);
+
 
   const tracks = projects[currentProject] || [];
   
-  const [selectedTrack, setSelectedTrack] = useState<Track | null>(findFirstTrack(tracks));
+  const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
+
+  useEffect(() => {
+    setSelectedTrack(findFirstTrack(tracks));
+  }, [currentProject, projects]);
+
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [showVolumeAutomation, setShowVolumeAutomation] = useState(true);
   const [showSpeedAutomation, setShowSpeedAutomation] = useState(false);
@@ -151,15 +195,18 @@ export default function Home() {
     setIsPlaying(false);
   };
 
-  const handleCreateNewProject = () => {
-    const newProjectName = prompt("Enter new project name:", `New Project ${Object.keys(projects).length + 1}`);
+  const handleCreateNewProject = (newProjectName: string) => {
     if (newProjectName && !projects[newProjectName]) {
-      setProjects(prev => ({ ...prev, [newProjectName]: [] }));
+      const newProjects = { ...projects, [newProjectName]: [] };
+      setProjects(newProjects);
       setCurrentProject(newProjectName);
       setSelectedTrack(null);
+      return true;
     } else if (newProjectName) {
       alert("A project with this name already exists.");
+      return false;
     }
+    return false;
   }
   
   const handleAddFolder = () => {
@@ -259,8 +306,14 @@ export default function Home() {
   const handleSelectTrack = (track: Track) => {
     setSelectedTrack(track);
     setIsPlaying(false);
-    setAudioSrc(null); 
-    alert("Track selection is for display only. Please import a track to hear audio.")
+    // This is a placeholder until we have proper file handling for persisted tracks
+    const objectUrl = audioSrc; // Assume audioSrc is from an imported track
+    if (objectUrl) {
+       setAudioSrc(objectUrl);
+    } else {
+        setAudioSrc(null); 
+        console.log("Track selection is for display only. Please import a track to hear audio.")
+    }
   }
 
   const durationInSeconds = selectedTrack ? parseDuration(selectedTrack.duration) : 0;
