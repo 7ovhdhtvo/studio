@@ -37,7 +37,7 @@ type TrackListProps = {
   currentProject: string;
   onSelectProject: (project: string) => void;
   onNewProject: (name: string) => boolean;
-  onDeleteProject: (name: string) => void;
+  onDeleteProject: (projectName: string) => void;
   onAddFolder: () => void;
   onImportTrack: (file: File) => void;
   tracks: TrackItem[];
