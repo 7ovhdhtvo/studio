@@ -37,6 +37,7 @@ type TrackListProps = {
   currentProject: string;
   onSelectProject: (project: string) => void;
   onNewProject: (name: string) => boolean;
+  onDeleteProject: (name: string) => void;
   onAddFolder: () => void;
   onImportTrack: (file: File) => void;
   tracks: TrackItem[];
@@ -46,7 +47,7 @@ type TrackListProps = {
   onRenameItem: (itemId: number, newName: string) => void;
 };
 
-const ProjectSelector = ({ projects, currentProject, onSelectProject, onNewProject }: Pick<TrackListProps, 'projects' | 'currentProject' | 'onSelectProject' | 'onNewProject'>) => {
+const ProjectSelector = ({ projects, currentProject, onSelectProject, onNewProject, onDeleteProject }: Pick<TrackListProps, 'projects' | 'currentProject' | 'onSelectProject' | 'onNewProject' | 'onDeleteProject'>) => {
   const [isOpen, setIsOpen] = useState(false);
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -64,17 +65,29 @@ const ProjectSelector = ({ projects, currentProject, onSelectProject, onNewProje
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
          <div className="p-1">
             {projects.map(project => (
-              <Button
-                key={project}
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={() => {
-                  onSelectProject(project);
-                  setIsOpen(false);
-                }}
-              >
-                {project}
-              </Button>
+              <div key={project} className="flex items-center group">
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start flex-1"
+                  onClick={() => {
+                    onSelectProject(project);
+                    setIsOpen(false);
+                  }}
+                >
+                  {project}
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7 opacity-0 group-hover:opacity-100"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteProject(project);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
             ))}
          </div>
          <div className="p-1 border-t">

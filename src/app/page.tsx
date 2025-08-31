@@ -77,9 +77,14 @@ export default function Home() {
     try {
       if (Object.keys(projects).length > 0) {
         localStorage.setItem('stagehand_projects', JSON.stringify(projects));
+      } else {
+        // If all projects are deleted, remove from local storage
+        localStorage.removeItem('stagehand_projects');
       }
       if (currentProject) {
         localStorage.setItem('stagehand_currentProject', currentProject);
+      } else {
+        localStorage.removeItem('stagehand_currentProject');
       }
     } catch (error) {
       console.error("Failed to save projects to local storage", error);
@@ -209,6 +214,28 @@ export default function Home() {
     return false;
   }
   
+  const handleDeleteProject = (projectName: string) => {
+    if (confirm(`Are you sure you want to delete the project "${projectName}"? This cannot be undone.`)) {
+      setProjects(prevProjects => {
+        const newProjects = { ...prevProjects };
+        delete newProjects[projectName];
+
+        if (currentProject === projectName) {
+          const remainingProjects = Object.keys(newProjects);
+          if (remainingProjects.length > 0) {
+            setCurrentProject(remainingProjects[0]);
+          } else {
+            // No projects left, create a default one
+            newProjects['New Show'] = [];
+            setCurrentProject('New Show');
+          }
+        }
+        
+        return newProjects;
+      });
+    }
+  }
+
   const handleAddFolder = () => {
     const newFolder: TrackItem = {
       type: 'folder',
@@ -331,6 +358,7 @@ export default function Home() {
         currentProject={currentProject}
         onSelectProject={handleSelectProject}
         onNewProject={handleCreateNewProject}
+        onDeleteProject={handleDeleteProject}
         onAddFolder={handleAddFolder}
         onImportTrack={handleImportTrack}
         tracks={tracks} 
