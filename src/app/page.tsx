@@ -75,7 +75,6 @@ export default function Home() {
       if (Object.keys(projects).length > 0) {
         localStorage.setItem('stagehand_projects', JSON.stringify(projects));
       } else {
-        // If all projects are deleted, remove from local storage and create a new default one.
         localStorage.removeItem('stagehand_projects');
       }
       if (currentProject) {
@@ -426,5 +425,3 @@ export default function Home() {
     </div>
   );
 }
-
-    
