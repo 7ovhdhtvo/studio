@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -90,7 +91,7 @@ export default function Home() {
         try {
           wakeLockRef.current = await navigator.wakeLock.request('screen');
         } catch (err) {
-          console.error(`Failed to acquire wake lock: ${err}`);
+          console.warn(`Failed to acquire wake lock: ${err}`);
         }
       }
     };
@@ -101,7 +102,7 @@ export default function Home() {
           await wakeLockRef.current.release();
           wakeLockRef.current = null;
         } catch (err) {
-          console.error(`Failed to release wake lock: ${err}`);
+          console.warn(`Failed to release wake lock: ${err}`);
         }
       }
     };
