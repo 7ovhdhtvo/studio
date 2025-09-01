@@ -63,6 +63,7 @@ export default function TrackList({
               tracks.map((track) => (
                 <div
                   key={track.id}
+                  onClick={() => onSelectTrack(track)}
                   className={cn(
                     "flex items-center justify-between p-2 rounded-md cursor-pointer group",
                     activeTrackId === track.id
@@ -70,7 +71,7 @@ export default function TrackList({
                       : "hover:bg-accent"
                   )}
                 >
-                  <div className="flex items-center gap-3 flex-1" onClick={() => onSelectTrack(track)}>
+                  <div className="flex items-center gap-3 flex-1">
                     <Music className="w-4 h-4 text-muted-foreground" />
                     <div className="flex-1">
                       <p className="text-sm font-medium leading-none truncate">{track.title}</p>
@@ -81,16 +82,16 @@ export default function TrackList({
                     <span className="text-xs font-mono text-muted-foreground">{formatDuration(track.duration)}</span>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="w-8 h-8 opacity-0 group-hover:opacity-100">
+                        <Button variant="ghost" size="icon" className="w-8 h-8 opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
                           <MoreVertical className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => handleRename(track.id, track.title)}>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleRename(track.id, track.title); }}>
                           <Edit className="mr-2 h-4 w-4" />
                           <span>Rename</span>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onDeleteTrack(track.id)} className="text-destructive">
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDeleteTrack(track.id); }} className="text-destructive">
                           <Trash2 className="mr-2 h-4 w-4" />
                           <span>Delete</span>
                         </DropdownMenuItem>
@@ -108,5 +109,3 @@ export default function TrackList({
     </Collapsible>
   );
 }
-
-    
