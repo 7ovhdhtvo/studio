@@ -1,246 +1,207 @@
-
 "use client";
 
+import { useState, useEffect, useRef } from 'react';
+import Header from '@/components/stagehand/header';
+import PlaybackControls from '@/components/stagehand/playback-controls';
+import WaveformDisplay from '@/components/stagehand/waveform-display';
+import SpeedControl from '@/components/stagehand/speed-control';
+import VolumeControl from '@/components/stagehand/volume-control';
+import MetronomeControl from '@/components/stagehand/metronome-control';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
-import { Folder as FolderIcon, Music, ChevronDown, ChevronsUpDown, MoreHorizontal, Edit, Copy, Trash2, FolderPlus, ChevronLeft, ChevronRight } from 'lucide-react';
-import ImportDialog from './import-dialog';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
-import { useState } from 'react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
-import NewProjectDialog from './new-project-dialog';
+import { ZoomIn, ZoomOut, Music } from 'lucide-react';
+import ImportDialog from '@/components/stagehand/import-dialog';
 
-export type Track = {
-  type: 'track';
-  id: number;
+export type AutomationPoint = {
+  time: number;
+  value: number;
+};
+
+export type OpenControlPanel = 'volume' | 'speed' | 'metronome' | null;
+
+type TrackInfo = {
   title: string;
-  originalFilename: string;
   artist: string;
-  duration: string;
+  duration: number;
 };
 
-export type Folder = {
-  type: 'folder';
-  id: number;
-  name: string;
-  children: TrackItem[];
-};
-
-export type TrackItem = Track | Folder;
-
-type TrackListProps = {
-  isOpen: boolean;
-  onToggle: () => void;
-  projects: string[];
-  currentProject: string;
-  onSelectProject: (project: string) => void;
-  onNewProject: (name: string) => boolean;
-  onDeleteProject: (projectName: string) => void;
-  onAddFolder: () => void;
-  onImportTrack: (file: File) => void;
-  tracks: TrackItem[];
-  selectedTrack: Track | null;
-  onSelectTrack: (track: Track) => void;
-  onDeleteItem: (itemId: number) => void;
-  onRenameItem: (itemId: number, newName: string) => void;
-};
-
-const ProjectSelector = ({ projects, currentProject, onSelectProject, onNewProject, onDeleteProject }: Pick<TrackListProps, 'projects' | 'currentProject' | 'onSelectProject' | 'onNewProject' | 'onDeleteProject'>) => {
-  const [isOpen, setIsOpen] = useState(false);
+export default function Home() {
+  const [trackInfo, setTrackInfo] = useState<TrackInfo | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [showVolumeAutomation, setShowVolumeAutomation] = useState(true);
+  const [showSpeedAutomation, setShowSpeedAutomation] = useState(false);
+  const [zoom, setZoom] = useState(1); // 1 = 100%
+  const [speed, setSpeed] = useState(100); // Global speed in %
+  const [openControlPanel, setOpenControlPanel] = useState<OpenControlPanel>(null);
   
+  const [audioSrc, setAudioSrc] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+
+  useEffect(() => {
+    const requestWakeLock = async () => {
+      if ('wakeLock' in navigator) {
+        try {
+          wakeLockRef.current = await navigator.wakeLock.request('screen');
+        } catch (err) {
+          console.warn(`Failed to acquire wake lock: ${err}`);
+        }
+      }
+    };
+
+    const releaseWakeLock = async () => {
+      if (wakeLockRef.current) {
+        try {
+          await wakeLockRef.current.release();
+          wakeLockRef.current = null;
+        } catch (err) {
+          console.warn(`Failed to release wake lock: ${err}`);
+        }
+      }
+    };
+    
+    if (isPlaying) {
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isPlaying) {
+        requestWakeLock();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      releaseWakeLock();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isPlaying]);
+  
+  useEffect(() => {
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.play().catch(e => console.error("Playback failed", e));
+      } else {
+        audioRef.current.pause();
+      }
+    }
+  }, [isPlaying]);
+
+  useEffect(() => {
+    if (audioRef.current && audioSrc) {
+      audioRef.current.src = audioSrc;
+      if (isPlaying) {
+        audioRef.current.play().catch(e => console.error("Playback failed", e));
+      }
+    }
+  }, [audioSrc]);
+
+
+  const [volumePoints, setVolumePoints] = useState<AutomationPoint[]>([
+    { time: 2.5, value: 80 },
+    { time: 5.0, value: 50 },
+  ]);
+  const [speedPoints, setSpeedPoints] = useState<AutomationPoint[]>([
+    { time: 3.2, value: 75 },
+    { time: 6.8, value: 125 },
+  ]);
+
+  const handleToggleControlPanel = (panel: OpenControlPanel) => {
+    setOpenControlPanel(prev => (prev === panel ? null : panel));
+  };
+
+  const handleImportTrack = (file: File) => {
+    const audioUrl = URL.createObjectURL(file);
+    const audio = new Audio(audioUrl);
+    
+    // Clean up previous object URL if it exists
+    if (audioSrc) {
+      URL.revokeObjectURL(audioSrc);
+    }
+    
+    audio.addEventListener('loadedmetadata', () => {
+      setTrackInfo({
+        title: file.name.replace(/\.[^/.]+$/, ""),
+        artist: 'Unknown Artist',
+        duration: audio.duration,
+      });
+      setAudioSrc(audioUrl);
+      setIsPlaying(false);
+    });
+  };
+  
+  const handleZoomIn = () => setZoom(prev => Math.min(prev * 1.5, 20));
+  const handleZoomOut = () => setZoom(prev => Math.max(prev / 1.5, 1));
+
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={isOpen}
-          className="w-full justify-between"
-        >
-          {currentProject || "Select project..."}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-         <div className="p-1">
-            {projects.map(project => (
-              <div key={project} className="flex items-center group">
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start flex-1"
-                  onClick={() => {
-                    onSelectProject(project);
-                    setIsOpen(false);
-                  }}
-                >
-                  {project}
+    <div className="flex h-screen w-full flex-col bg-background text-foreground">
+      <audio ref={audioRef} onEnded={() => setIsPlaying(false)} />
+      <Header />
+      <main className="flex-1 overflow-y-auto p-6 lg:p-8">
+        {!trackInfo ? (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <Music className="w-24 h-24 text-muted-foreground mb-4" />
+            <h2 className="text-2xl font-bold tracking-tight mb-2">No Track Loaded</h2>
+            <p className="text-muted-foreground mb-6">Import an audio file to get started.</p>
+            <ImportDialog onImportTrack={handleImportTrack} />
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <div className="flex justify-between items-start">
+              <div className="space-y-4">
+                <h2 className="text-2xl font-bold tracking-tight">
+                  {trackInfo.title}
+                </h2>
+                <p className="text-muted-foreground">{trackInfo.artist}</p>
+              </div>
+               <div className="flex items-center gap-2">
+                <ImportDialog onImportTrack={handleImportTrack} />
+                <Button variant="outline" size="icon" onClick={handleZoomOut}>
+                  <ZoomOut className="w-4 h-4" />
                 </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-7 w-7 opacity-0 group-hover:opacity-100"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteProject(project);
-                    setIsOpen(false);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4 text-destructive" />
+                <Button variant="outline" size="icon" onClick={handleZoomIn}>
+                  <ZoomIn className="w-4 h-4" />
                 </Button>
               </div>
-            ))}
-         </div>
-         <div className="p-1 border-t">
-            <NewProjectDialog onNewProject={onNewProject} />
-         </div>
-      </PopoverContent>
-    </Popover>
-  )
-}
-
-const TrackActions = ({ item, onDelete, onRename }: { item: TrackItem, onDelete: () => void, onRename: () => void }) => {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto shrink-0">
-          <MoreHorizontal className="h-4 w-4" />
-          <span className="sr-only">Track actions</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent>
-        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onRename(); }}>
-          <Edit className="mr-2 h-4 w-4" />
-          <span>Rename</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-          <Copy className="mr-2 h-4 w-4" />
-          <span>Copy</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onDelete(); }} className="text-destructive">
-          <Trash2 className="mr-2 h-4 w-4" />
-          <span>Delete</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
-
-const TrackNode = ({ item, selectedTrack, onSelectTrack, level = 0, onDeleteItem, onRenameItem }: { item: TrackItem, selectedTrack: Track | null, onSelectTrack: (track: Track) => void, level?: number, onDeleteItem: (id: number) => void, onRenameItem: (id: number, newName: string) => void }) => {
-  
-  const handleDelete = () => {
-    if (confirm(`Are you sure you want to delete "${item.type === 'track' ? item.title : item.name}"?`)) {
-      onDeleteItem(item.id);
-    }
-  }
-
-  const handleRename = () => {
-    const currentName = item.type === 'track' ? item.title : item.name;
-    const newName = prompt("Enter new name:", currentName);
-    if (newName && newName !== currentName) {
-      onRenameItem(item.id, newName);
-    }
-  }
-
-  if (item.type === 'folder') {
-    return (
-      <Collapsible defaultOpen>
-        <div 
-            className="flex items-center w-full text-left text-sm font-semibold py-1.5 hover:bg-accent rounded-md px-2 group"
-            style={{ paddingLeft: `${12 + level * 16}px` }}
-        >
-            <CollapsibleTrigger asChild>
-                <button className="flex items-center flex-1 text-left">
-                    <ChevronDown className="h-4 w-4 mr-3 shrink-0 transition-transform duration-200 data-[state=open]:rotate-0 data-[state=closed]:-rotate-90"/>
-                    <FolderIcon className="mr-3 h-4 w-4 flex-shrink-0" />
-                    <span>{item.name}</span>
-                </button>
-            </CollapsibleTrigger>
-            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                <TrackActions item={item} onDelete={handleDelete} onRename={handleRename} />
             </div>
-        </div>
-        <CollapsibleContent className="py-1">
-          {item.children.map(child => (
-            <TrackNode key={child.id} item={child} selectedTrack={selectedTrack} onSelectTrack={onSelectTrack} level={level + 1} onDeleteItem={onDeleteItem} onRenameItem={onRenameItem} />
-          ))}
-        </CollapsibleContent>
-      </Collapsible>
-    )
-  }
 
-  // item.type === 'track'
-  return (
-    <div
-      className={cn(
-        "flex items-center w-full justify-start h-auto py-1.5 px-2 rounded-md group",
-        selectedTrack?.id === item.id ? "bg-accent" : "hover:bg-accent"
-      )}
-      style={{ paddingLeft: `${12 + level * 16}px` }}
-    >
-      <Button
-        variant="ghost"
-        className="flex-1 justify-start h-auto p-0 bg-transparent hover:bg-transparent"
-        onClick={() => onSelectTrack(item)}
-      >
-        <Music className="mr-3 h-4 w-4 flex-shrink-0" />
-        <div className="flex flex-col truncate text-left">
-          <span className="font-medium leading-tight">{item.title}</span>
-          <span className="text-xs text-muted-foreground">{item.originalFilename} - {item.duration}</span>
-        </div>
-      </Button>
-       <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-         <TrackActions item={item} onDelete={handleDelete} onRename={handleRename} />
-       </div>
-    </div>
-  )
-}
+            <WaveformDisplay 
+              isPlaying={isPlaying} 
+              showVolumeAutomation={showVolumeAutomation}
+              showSpeedAutomation={showSpeedAutomation}
+              durationInSeconds={trackInfo.duration}
+              zoom={zoom}
+            />
+            <PlaybackControls isPlaying={isPlaying} setIsPlaying={setIsPlaying} />
 
-export default function TrackList(props: TrackListProps) {
-  const { tracks, selectedTrack, onSelectTrack, isOpen, onToggle, onAddFolder, onImportTrack, onDeleteItem, onRenameItem, ...projectSelectorProps } = props;
-  
-  return (
-    <aside className={cn(
-      "flex flex-col border-r bg-secondary/50 transition-all duration-300 ease-in-out relative",
-      isOpen ? "w-80" : "w-0"
-    )}>
-      <div className={cn(
-        "absolute top-1/2 -right-4 z-10 transition-opacity",
-        !isOpen && "right-[-38px]"
-      )}>
-        <Button size="icon" variant="outline" onClick={onToggle} className="rounded-full h-8 w-8">
-            {isOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-        </Button>
-      </div>
-
-      <div className={cn("flex flex-col h-full transition-opacity duration-100", isOpen ? "opacity-100" : "opacity-0 invisible")}>
-        <div className="p-4 space-y-4">
-          <ProjectSelector {...projectSelectorProps} />
-          <div className="flex gap-2">
-              <ImportDialog onImportTrack={onImportTrack} />
-              <Button variant="outline" onClick={onAddFolder} className="w-full">
-                <FolderPlus className="mr-2 h-4 w-4" />
-                Add Folder
-              </Button>
+            <div className="flex justify-center items-start gap-4 pt-4 flex-wrap">
+              <VolumeControl 
+                isOpen={openControlPanel === 'volume'}
+                onToggle={() => handleToggleControlPanel('volume')}
+                showAutomation={showVolumeAutomation}
+                onToggleAutomation={setShowVolumeAutomation}
+                automationPoints={volumePoints}
+              />
+              <SpeedControl 
+                isOpen={openControlPanel === 'speed'}
+                onToggle={() => handleToggleControlPanel('speed')}
+                speed={speed}
+                onSpeedChange={setSpeed}
+                showAutomation={showSpeedAutomation}
+                onToggleAutomation={setShowSpeedAutomation}
+                automationPoints={speedPoints}
+              />
+              <MetronomeControl 
+                isOpen={openControlPanel === 'metronome'}
+                onToggle={() => handleToggleControlPanel('metronome')}
+                speed={speed} 
+              />
+            </div>
           </div>
-        </div>
-        <ScrollArea className="flex-1 pr-2">
-          <nav className="p-2 space-y-1">
-            {tracks.map((item) => (
-              <TrackNode key={item.id} item={item} selectedTrack={selectedTrack} onSelectTrack={onSelectTrack} onDeleteItem={onDeleteItem} onRenameItem={onRenameItem} />
-            ))}
-          </nav>
-        </ScrollArea>
-        <div className="p-4 border-t">
-          <p className="text-xs text-muted-foreground text-center">
-            Stagehand v1.0.0
-          </p>
-        </div>
-      </div>
-    </aside>
+        )}
+      </main>
+    </div>
   );
 }
-
-    
