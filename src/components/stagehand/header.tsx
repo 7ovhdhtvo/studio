@@ -41,7 +41,7 @@ export default function Header() {
     <header className="flex h-16 items-center justify-between border-b bg-card px-6 lg:px-8 flex-shrink-0">
       <div className="flex items-center gap-4">
         <h1 className="text-xl font-bold tracking-wider">
-          STAGEHAND
+          AD PLAYBACK
         </h1>
       </div>
       <div className="flex items-center gap-4">
