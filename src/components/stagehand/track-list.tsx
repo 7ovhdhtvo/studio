@@ -1,207 +1,112 @@
+
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
-import Header from '@/components/stagehand/header';
-import PlaybackControls from '@/components/stagehand/playback-controls';
-import WaveformDisplay from '@/components/stagehand/waveform-display';
-import SpeedControl from '@/components/stagehand/speed-control';
-import VolumeControl from '@/components/stagehand/volume-control';
-import MetronomeControl from '@/components/stagehand/metronome-control';
-import { Button } from '@/components/ui/button';
-import { ZoomIn, ZoomOut, Music } from 'lucide-react';
-import ImportDialog from '@/components/stagehand/import-dialog';
+import type { AudioTrack } from "@/lib/local-db";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { Button } from "@/components/ui/button";
+import { Folder, Music, Trash2, Edit, MoreVertical } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "../ui/scroll-area";
 
-export type AutomationPoint = {
-  time: number;
-  value: number;
+
+type TrackListProps = {
+  tracks: AudioTrack[];
+  activeTrackId?: number;
+  onSelectTrack: (track: AudioTrack) => void;
+  onDeleteTrack: (id: number) => void;
+  onRenameTrack: (id: number, newTitle: string) => void;
 };
 
-export type OpenControlPanel = 'volume' | 'speed' | 'metronome' | null;
+export default function TrackList({ 
+    tracks, 
+    activeTrackId, 
+    onSelectTrack, 
+    onDeleteTrack,
+    onRenameTrack 
+}: TrackListProps) {
 
-type TrackInfo = {
-  title: string;
-  artist: string;
-  duration: number;
-};
-
-export default function Home() {
-  const [trackInfo, setTrackInfo] = useState<TrackInfo | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [showVolumeAutomation, setShowVolumeAutomation] = useState(true);
-  const [showSpeedAutomation, setShowSpeedAutomation] = useState(false);
-  const [zoom, setZoom] = useState(1); // 1 = 100%
-  const [speed, setSpeed] = useState(100); // Global speed in %
-  const [openControlPanel, setOpenControlPanel] = useState<OpenControlPanel>(null);
-  
-  const [audioSrc, setAudioSrc] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
-
-  useEffect(() => {
-    const requestWakeLock = async () => {
-      if ('wakeLock' in navigator) {
-        try {
-          wakeLockRef.current = await navigator.wakeLock.request('screen');
-        } catch (err) {
-          console.warn(`Failed to acquire wake lock: ${err}`);
-        }
-      }
-    };
-
-    const releaseWakeLock = async () => {
-      if (wakeLockRef.current) {
-        try {
-          await wakeLockRef.current.release();
-          wakeLockRef.current = null;
-        } catch (err) {
-          console.warn(`Failed to release wake lock: ${err}`);
-        }
-      }
-    };
-    
-    if (isPlaying) {
-      requestWakeLock();
-    } else {
-      releaseWakeLock();
+  const handleRename = (id: number, currentTitle: string) => {
+    const newTitle = prompt("Enter new track title:", currentTitle);
+    if (newTitle && newTitle.trim() !== "") {
+        onRenameTrack(id, newTitle.trim());
     }
-    
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isPlaying) {
-        requestWakeLock();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      releaseWakeLock();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [isPlaying]);
-  
-  useEffect(() => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.play().catch(e => console.error("Playback failed", e));
-      } else {
-        audioRef.current.pause();
-      }
-    }
-  }, [isPlaying]);
-
-  useEffect(() => {
-    if (audioRef.current && audioSrc) {
-      audioRef.current.src = audioSrc;
-      if (isPlaying) {
-        audioRef.current.play().catch(e => console.error("Playback failed", e));
-      }
-    }
-  }, [audioSrc]);
-
-
-  const [volumePoints, setVolumePoints] = useState<AutomationPoint[]>([
-    { time: 2.5, value: 80 },
-    { time: 5.0, value: 50 },
-  ]);
-  const [speedPoints, setSpeedPoints] = useState<AutomationPoint[]>([
-    { time: 3.2, value: 75 },
-    { time: 6.8, value: 125 },
-  ]);
-
-  const handleToggleControlPanel = (panel: OpenControlPanel) => {
-    setOpenControlPanel(prev => (prev === panel ? null : panel));
   };
 
-  const handleImportTrack = (file: File) => {
-    const audioUrl = URL.createObjectURL(file);
-    const audio = new Audio(audioUrl);
-    
-    // Clean up previous object URL if it exists
-    if (audioSrc) {
-      URL.revokeObjectURL(audioSrc);
-    }
-    
-    audio.addEventListener('loadedmetadata', () => {
-      setTrackInfo({
-        title: file.name.replace(/\.[^/.]+$/, ""),
-        artist: 'Unknown Artist',
-        duration: audio.duration,
-      });
-      setAudioSrc(audioUrl);
-      setIsPlaying(false);
-    });
+  const formatDuration = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
   };
-  
-  const handleZoomIn = () => setZoom(prev => Math.min(prev * 1.5, 20));
-  const handleZoomOut = () => setZoom(prev => Math.max(prev / 1.5, 1));
 
   return (
-    <div className="flex h-screen w-full flex-col bg-background text-foreground">
-      <audio ref={audioRef} onEnded={() => setIsPlaying(false)} />
-      <Header />
-      <main className="flex-1 overflow-y-auto p-6 lg:p-8">
-        {!trackInfo ? (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <Music className="w-24 h-24 text-muted-foreground mb-4" />
-            <h2 className="text-2xl font-bold tracking-tight mb-2">No Track Loaded</h2>
-            <p className="text-muted-foreground mb-6">Import an audio file to get started.</p>
-            <ImportDialog onImportTrack={handleImportTrack} />
+    <Collapsible className="mb-6 border rounded-lg">
+      <CollapsibleTrigger asChild>
+        <Button variant="ghost" className="w-full flex justify-start items-center p-4 space-x-2">
+          <Folder className="w-5 h-5" />
+          <span className="font-semibold">Track Library</span>
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <ScrollArea className="h-64">
+          <div className="p-2 space-y-1">
+            {tracks.length > 0 ? (
+              tracks.map((track) => (
+                <div
+                  key={track.id}
+                  className={cn(
+                    "flex items-center justify-between p-2 rounded-md cursor-pointer group",
+                    activeTrackId === track.id
+                      ? "bg-primary/20 text-primary-foreground"
+                      : "hover:bg-accent"
+                  )}
+                >
+                  <div className="flex items-center gap-3 flex-1" onClick={() => onSelectTrack(track)}>
+                    <Music className="w-4 h-4 text-muted-foreground" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium leading-none truncate">{track.title}</p>
+                      <p className="text-xs text-muted-foreground truncate">{track.originalFilename}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-muted-foreground">{formatDuration(track.duration)}</span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="w-8 h-8 opacity-0 group-hover:opacity-100">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => handleRename(track.id, track.title)}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          <span>Rename</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onDeleteTrack(track.id)} className="text-destructive">
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          <span>Delete</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground text-center p-4">No tracks imported yet.</p>
+            )}
           </div>
-        ) : (
-          <div className="space-y-6">
-            <div className="flex justify-between items-start">
-              <div className="space-y-4">
-                <h2 className="text-2xl font-bold tracking-tight">
-                  {trackInfo.title}
-                </h2>
-                <p className="text-muted-foreground">{trackInfo.artist}</p>
-              </div>
-               <div className="flex items-center gap-2">
-                <ImportDialog onImportTrack={handleImportTrack} />
-                <Button variant="outline" size="icon" onClick={handleZoomOut}>
-                  <ZoomOut className="w-4 h-4" />
-                </Button>
-                <Button variant="outline" size="icon" onClick={handleZoomIn}>
-                  <ZoomIn className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-
-            <WaveformDisplay 
-              isPlaying={isPlaying} 
-              showVolumeAutomation={showVolumeAutomation}
-              showSpeedAutomation={showSpeedAutomation}
-              durationInSeconds={trackInfo.duration}
-              zoom={zoom}
-            />
-            <PlaybackControls isPlaying={isPlaying} setIsPlaying={setIsPlaying} />
-
-            <div className="flex justify-center items-start gap-4 pt-4 flex-wrap">
-              <VolumeControl 
-                isOpen={openControlPanel === 'volume'}
-                onToggle={() => handleToggleControlPanel('volume')}
-                showAutomation={showVolumeAutomation}
-                onToggleAutomation={setShowVolumeAutomation}
-                automationPoints={volumePoints}
-              />
-              <SpeedControl 
-                isOpen={openControlPanel === 'speed'}
-                onToggle={() => handleToggleControlPanel('speed')}
-                speed={speed}
-                onSpeedChange={setSpeed}
-                showAutomation={showSpeedAutomation}
-                onToggleAutomation={setShowSpeedAutomation}
-                automationPoints={speedPoints}
-              />
-              <MetronomeControl 
-                isOpen={openControlPanel === 'metronome'}
-                onToggle={() => handleToggleControlPanel('metronome')}
-                speed={speed} 
-              />
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
+        </ScrollArea>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
+
+    

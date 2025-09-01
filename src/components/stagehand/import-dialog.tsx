@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -35,55 +36,34 @@ export default function ImportDialog({ onImportTrack }: ImportDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="default" className="w-full">
+        <Button>
           <UploadCloud className="mr-2 h-4 w-4" />
-          Import Tracks
+          Import Track
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Import Audio</DialogTitle>
           <DialogDescription>
-            Add new audio tracks to your library from your computer or the cloud.
+            Add a new audio track from your computer.
           </DialogDescription>
         </DialogHeader>
-        <Tabs defaultValue="computer">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="computer">From Computer</TabsTrigger>
-            <TabsTrigger value="cloud">From Cloud</TabsTrigger>
-          </TabsList>
-          <TabsContent value="computer">
-            <div className="grid gap-4 py-4">
-              <div className="flex items-center justify-center w-full">
-                  <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer bg-secondary hover:bg-accent">
-                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                          <UploadCloud className="w-8 h-8 mb-4 text-muted-foreground" />
-                          <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                          <p className="text-xs text-muted-foreground">MP3, WAV, or FLAC</p>
-                      </div>
-                      <input id="dropzone-file" type="file" className="hidden" onChange={handleFileChange} accept="audio/*" />
-                  </label>
-              </div>
-            </div>
-          </TabsContent>
-          <TabsContent value="cloud">
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="link" className="text-right">
-                  Link
-                </Label>
-                <Input id="link" placeholder="https://example.com/audio.mp3" className="col-span-3" />
-              </div>
-               <p className="text-xs text-center text-muted-foreground pt-2">
-                Paste a link to an audio or video file.
-              </p>
-            </div>
-             <DialogFooter>
-              <Button type="submit">Import from Link</Button>
-            </DialogFooter>
-          </TabsContent>
-        </Tabs>
+        
+        <div className="grid gap-4 py-4">
+          <div className="flex items-center justify-center w-full">
+              <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer bg-secondary hover:bg-accent">
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                      <UploadCloud className="w-8 h-8 mb-4 text-muted-foreground" />
+                      <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                      <p className="text-xs text-muted-foreground">MP3, WAV, FLAC, M4A, etc.</p>
+                  </div>
+                  <input id="dropzone-file" type="file" className="hidden" onChange={handleFileChange} accept="audio/*" />
+              </label>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
 }
+
+    

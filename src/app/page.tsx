@@ -11,6 +11,10 @@ import MetronomeControl from '@/components/stagehand/metronome-control';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, Music } from 'lucide-react';
 import ImportDialog from '@/components/stagehand/import-dialog';
+import TrackList from '@/components/stagehand/track-list';
+import type { AudioTrack } from '@/lib/local-db';
+import { db } from '@/lib/local-db';
+
 
 export type AutomationPoint = {
   time: number;
@@ -19,14 +23,10 @@ export type AutomationPoint = {
 
 export type OpenControlPanel = 'volume' | 'speed' | 'metronome' | null;
 
-type TrackInfo = {
-  title: string;
-  artist: string;
-  duration: number;
-};
-
 export default function Home() {
-  const [trackInfo, setTrackInfo] = useState<TrackInfo | null>(null);
+  const [activeTrack, setActiveTrack] = useState<AudioTrack | null>(null);
+  const [tracks, setTracks] = useState<AudioTrack[]>([]);
+  
   const [isPlaying, setIsPlaying] = useState(false);
   const [showVolumeAutomation, setShowVolumeAutomation] = useState(true);
   const [showSpeedAutomation, setShowSpeedAutomation] = useState(false);
@@ -37,6 +37,14 @@ export default function Home() {
   const [audioSrc, setAudioSrc] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+
+  useEffect(() => {
+    const loadTracks = async () => {
+      const storedTracks = await db.tracks.toArray();
+      setTracks(storedTracks);
+    };
+    loadTracks();
+  }, []);
 
   useEffect(() => {
     const requestWakeLock = async () => {
@@ -91,13 +99,25 @@ export default function Home() {
   }, [isPlaying]);
 
   useEffect(() => {
-    if (audioRef.current && audioSrc) {
+    if (audioSrc && audioRef.current) {
       audioRef.current.src = audioSrc;
       if (isPlaying) {
         audioRef.current.play().catch(e => console.error("Playback failed", e));
       }
     }
   }, [audioSrc]);
+
+  useEffect(() => {
+    if (activeTrack?.blob) {
+      const url = URL.createObjectURL(activeTrack.blob);
+      setAudioSrc(url);
+      setIsPlaying(false);
+      
+      return () => {
+        URL.revokeObjectURL(url);
+      };
+    }
+  }, [activeTrack]);
 
 
   const [volumePoints, setVolumePoints] = useState<AutomationPoint[]>([
@@ -114,23 +134,43 @@ export default function Home() {
   };
 
   const handleImportTrack = (file: File) => {
-    const audioUrl = URL.createObjectURL(file);
-    const audio = new Audio(audioUrl);
-    
-    // Clean up previous object URL if it exists
-    if (audioSrc) {
-      URL.revokeObjectURL(audioSrc);
-    }
-    
-    audio.addEventListener('loadedmetadata', () => {
-      setTrackInfo({
+    const audio = new Audio(URL.createObjectURL(file));
+    audio.addEventListener('loadedmetadata', async () => {
+      const newTrack: Omit<AudioTrack, 'id'> = {
         title: file.name.replace(/\.[^/.]+$/, ""),
-        artist: 'Unknown Artist',
+        originalFilename: file.name,
         duration: audio.duration,
-      });
-      setAudioSrc(audioUrl);
-      setIsPlaying(false);
+        blob: file
+      };
+      const newId = await db.tracks.add(newTrack as AudioTrack);
+      const importedTrack = await db.tracks.get(newId);
+      if (importedTrack) {
+        setTracks(prev => [...prev, importedTrack]);
+      }
     });
+  };
+
+  const handleSelectTrack = (track: AudioTrack) => {
+    setActiveTrack(track);
+  };
+
+  const handleDeleteTrack = async (id: number) => {
+    if (window.confirm("Are you sure you want to delete this track?")) {
+      await db.tracks.delete(id);
+      setTracks(prev => prev.filter(t => t.id !== id));
+      if (activeTrack?.id === id) {
+        setActiveTrack(null);
+        setAudioSrc(null);
+      }
+    }
+  };
+
+  const handleRenameTrack = async (id: number, newTitle: string) => {
+    await db.tracks.update(id, { title: newTitle });
+    setTracks(prev => prev.map(t => (t.id === id ? { ...t, title: newTitle } : t)));
+    if (activeTrack?.id === id) {
+      setActiveTrack(prev => prev ? { ...prev, title: newTitle } : null);
+    }
   };
   
   const handleZoomIn = () => setZoom(prev => Math.min(prev * 1.5, 20));
@@ -141,21 +181,29 @@ export default function Home() {
       <audio ref={audioRef} onEnded={() => setIsPlaying(false)} />
       <Header />
       <main className="flex-1 overflow-y-auto p-6 lg:p-8">
-        {!trackInfo ? (
-          <div className="flex flex-col items-center justify-center h-full text-center">
+        <TrackList 
+          tracks={tracks}
+          activeTrackId={activeTrack?.id}
+          onSelectTrack={handleSelectTrack}
+          onDeleteTrack={handleDeleteTrack}
+          onRenameTrack={handleRenameTrack}
+        />
+
+        {!activeTrack ? (
+          <div className="flex flex-col items-center justify-center h-full text-center py-12">
             <Music className="w-24 h-24 text-muted-foreground mb-4" />
             <h2 className="text-2xl font-bold tracking-tight mb-2">No Track Loaded</h2>
-            <p className="text-muted-foreground mb-6">Import an audio file to get started.</p>
+            <p className="text-muted-foreground mb-6">Import a track or select one from your library.</p>
             <ImportDialog onImportTrack={handleImportTrack} />
           </div>
         ) : (
           <div className="space-y-6">
             <div className="flex justify-between items-start">
-              <div className="space-y-4">
+              <div className="space-y-1">
                 <h2 className="text-2xl font-bold tracking-tight">
-                  {trackInfo.title}
+                  {activeTrack.title}
                 </h2>
-                <p className="text-muted-foreground">{trackInfo.artist}</p>
+                <p className="text-sm text-muted-foreground">{activeTrack.originalFilename}</p>
               </div>
                <div className="flex items-center gap-2">
                 <ImportDialog onImportTrack={handleImportTrack} />
@@ -172,7 +220,7 @@ export default function Home() {
               isPlaying={isPlaying} 
               showVolumeAutomation={showVolumeAutomation}
               showSpeedAutomation={showSpeedAutomation}
-              durationInSeconds={trackInfo.duration}
+              durationInSeconds={activeTrack.duration}
               zoom={zoom}
             />
             <PlaybackControls isPlaying={isPlaying} setIsPlaying={setIsPlaying} />
@@ -206,3 +254,5 @@ export default function Home() {
     </div>
   );
 }
+
+    
