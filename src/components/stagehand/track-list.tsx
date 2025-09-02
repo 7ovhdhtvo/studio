@@ -87,17 +87,15 @@ export default function TrackList({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
-                        <DropdownMenuItem onClick={async (e) => { 
-                            e.stopPropagation(); 
-                            await new Promise(resolve => setTimeout(resolve, 50));
+                        <DropdownMenuItem onClick={(e) => { 
+                            e.stopPropagation();
                             handleRename(track.id, track.title); 
                         }}>
                           <Edit className="mr-2 h-4 w-4" />
                           <span>Rename</span>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={async (e) => { 
-                            e.stopPropagation(); 
-                            await new Promise(resolve => setTimeout(resolve, 50));
+                        <DropdownMenuItem onClick={(e) => { 
+                            e.stopPropagation();
                             onDeleteTrack(track.id); 
                         }} className="text-destructive">
                           <Trash2 className="mr-2 h-4 w-4" />
