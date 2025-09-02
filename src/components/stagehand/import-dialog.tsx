@@ -18,12 +18,23 @@ import { useRef, useState } from 'react';
 
 type ImportDialogProps = {
   onImportTrack: (file: File) => Promise<any>;
+  isOpen?: boolean;
+  onOpenChange?: (isOpen: boolean) => void;
+  trigger?: React.ReactNode;
 };
 
-export default function ImportDialog({ onImportTrack }: ImportDialogProps) {
+export default function ImportDialog({ 
+  onImportTrack,
+  isOpen: controlledIsOpen,
+  onOpenChange: setControlledIsOpen,
+  trigger
+ }: ImportDialogProps) {
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [isOpen, setIsOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isOpen = controlledIsOpen ?? internalIsOpen;
+  const setIsOpen = setControlledIsOpen ?? setInternalIsOpen;
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files.length > 0) {
@@ -44,12 +55,7 @@ export default function ImportDialog({ onImportTrack }: ImportDialogProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline">
-          <UploadCloud className="mr-2 h-4 w-4" />
-          Import Track
-        </Button>
-      </DialogTrigger>
+      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Import Audio Track</DialogTitle>
@@ -81,3 +87,12 @@ export default function ImportDialog({ onImportTrack }: ImportDialogProps) {
     </Dialog>
   );
 }
+
+ImportDialog.defaultProps = {
+  trigger: (
+    <Button variant="outline">
+      <UploadCloud className="mr-2 h-4 w-4" />
+      Import Track
+    </Button>
+  ),
+};

@@ -83,21 +83,17 @@ export function useAudioStorage() {
     }
   }, [refreshData]);
 
-  const createFolder = useCallback(async () => {
-    logger.log('useAudioStorage: Creating new folder.');
-    // Find a unique name
-    let folderName = "New Folder";
-    let counter = 1;
-    const existingNames = new Set(folders.map(f => f.name));
-    while (existingNames.has(folderName)) {
-      folderName = `New Folder (${counter})`;
-      counter++;
-    }
-    
-    await storageManager.createFolder(folderName);
+  const createFolder = useCallback(async (parentId: string) => {
+    logger.log('useAudioStorage: Creating new folder.', { parentId });
+    await storageManager.createFolder("New Folder", parentId);
     refreshData();
-    logger.log('useAudioStorage: New folder created.', { name: folderName });
-  }, [refreshData, folders]);
+  }, [refreshData]);
+  
+  const createProject = useCallback(async () => {
+    logger.log('useAudioStorage: Creating new project.');
+    await storageManager.createProject("New Project");
+    refreshData();
+  }, [refreshData]);
 
   const renameFolder = useCallback(async (id: string, newName: string) => {
     const success = await storageManager.renameFolder(id, newName);
@@ -117,7 +113,7 @@ export function useAudioStorage() {
     logger.log('useAudioStorage: emptyTrash function invoked.');
     await storageManager.emptyTrash();
     refreshData();
-  }, [refreshData, tracks]); 
+  }, [refreshData]); 
   
   const recoverTrack = useCallback(async (trackId: string) => {
     const success = await storageManager.recoverTrack(trackId);
@@ -139,6 +135,7 @@ export function useAudioStorage() {
     deleteFolder,
     renameTrack,
     createFolder,
+    createProject,
     renameFolder,
     moveTrackToFolder,
     emptyTrash,

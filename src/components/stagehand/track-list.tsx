@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Folder as FolderIcon, FolderPlus, Trash, Undo2 } from 'lucide-react';
+import { Folder as FolderIcon, FolderPlus, Trash, Undo2, Briefcase, Plus, Import } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '../ui/button';
@@ -10,6 +10,7 @@ import type { AudioFile, Folder } from '@/lib/storage-manager';
 import { useState, useMemo, type DragEvent, type MouseEvent, useEffect, useRef } from 'react';
 import { logger } from '@/lib/logger';
 import { Input } from '../ui/input';
+import ImportDialog from './import-dialog';
 
 const TRASH_FOLDER_ID = 'trash';
 
@@ -17,11 +18,14 @@ type TrackListProps = {
   tracks: AudioFile[];
   folders: Folder[];
   activeTrackId?: string | null;
+  activeProjectId: string | null;
   onSelectTrack: (track: AudioFile) => void;
+  onSelectProject: (projectId: string) => void;
   onDeleteTrack: (id: string) => void;
   onDeleteFolder: (id: string) => void;
   onRenameTrack: (id: string, newTitle: string) => void;
   onCreateFolder: () => Promise<void>;
+  onCreateProject: () => Promise<void>;
   onRenameFolder: (id: string, newName: string) => Promise<void>;
   onMoveTrackToFolder: (trackId: string, folderId: string | null) => Promise<void>;
   onEmptyTrash: () => Promise<void>;
@@ -92,11 +96,14 @@ export default function TrackList({
   tracks,
   folders,
   activeTrackId,
+  activeProjectId,
   onSelectTrack,
+  onSelectProject,
   onDeleteTrack,
   onDeleteFolder,
   onRenameTrack,
   onCreateFolder,
+  onCreateProject,
   onRenameFolder,
   onMoveTrackToFolder,
   onEmptyTrash,
@@ -106,6 +113,8 @@ export default function TrackList({
   const [draggingOverFolder, setDraggingOverFolder] = useState<string | null>(null);
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editingFolderName, setEditingFolderName] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [importTargetFolder, setImportTargetFolder] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -114,6 +123,12 @@ export default function TrackList({
       inputRef.current.select();
     }
   }, [editingFolderId]);
+  
+  const handleImportClick = (e: MouseEvent<HTMLButtonElement>, folderId: string | null) => {
+    e.stopPropagation();
+    setImportTargetFolder(folderId);
+    setIsImporting(true);
+  };
 
   const handleStartEditingFolder = (folder: Folder) => {
     setEditingFolderId(folder.id);
@@ -166,43 +181,54 @@ export default function TrackList({
     onEmptyTrash();
   };
 
-  const { rootTracks, folderTracks, trashTracks } = useMemo(() => {
+  const { rootTracks, projectMap, trashTracks } = useMemo(() => {
+    const projectMap = new Map<string, { project: Folder; folders: Folder[]; tracks: AudioFile[] }>();
     const rootTracks: AudioFile[] = [];
     const trashTracks: AudioFile[] = [];
-    const folderTracks: Map<string, AudioFile[]> = new Map();
+  
+    const projects = folders.filter(f => f.isProject);
+    projects.forEach(p => projectMap.set(p.id, { project: p, folders: [], tracks: [] }));
 
+    const normalFolders = folders.filter(f => !f.isProject && f.id !== TRASH_FOLDER_ID);
+    normalFolders.forEach(f => {
+      if (f.parentId && projectMap.has(f.parentId)) {
+        projectMap.get(f.parentId)!.folders.push(f);
+      }
+    });
+    
     for (const track of tracks) {
       if (track.folderId === TRASH_FOLDER_ID) {
         trashTracks.push(track);
       } else if (track.folderId) {
-        const tracksInFolder = folderTracks.get(track.folderId) || [];
-        tracksInFolder.push(track);
-        folderTracks.set(track.folderId, tracksInFolder);
+        const folder = folders.find(f => f.id === track.folderId);
+        if (folder?.parentId && projectMap.has(folder.parentId)) {
+            projectMap.get(folder.parentId)!.tracks.push(track);
+        } else if (folder?.isProject) {
+            projectMap.get(folder.id)!.tracks.push(track);
+        }
       } else {
         rootTracks.push(track);
       }
     }
-    return { rootTracks, folderTracks, trashTracks };
-  }, [tracks]);
-  
-  const userFolders = folders.filter(f => f.id !== TRASH_FOLDER_ID);
+    return { rootTracks, projectMap, trashTracks };
+  }, [tracks, folders]);
+
+  const projects = Array.from(projectMap.values());
 
   return (
     <>
-      <div className="p-2 border-b">
-        <Button variant="ghost" className="w-full justify-start" onClick={onCreateFolder}>
+      <div className="p-2 border-b flex items-center gap-2">
+        <Button variant="ghost" className="w-full justify-start" onClick={onCreateProject}>
+          <Briefcase className="mr-2 h-4 w-4" />
+          New Project
+        </Button>
+        <Button variant="ghost" className="w-full justify-start" onClick={onCreateFolder} disabled={!activeProjectId}>
           <FolderPlus className="mr-2 h-4 w-4" />
           New Folder
         </Button>
       </div>
       <ScrollArea className="flex-1">
-        <div 
-          className={cn("p-2 space-y-1 min-h-[50px]", draggingOverFolder === 'root' && 'bg-accent/50 rounded-md')}
-          onDrop={(e) => handleDrop(e, null)}
-          onDragOver={handleDragOver}
-          onDragEnter={() => setDraggingOverFolder('root')}
-          onDragLeave={() => setDraggingOverFolder(null)}
-        >
+        <div className="p-2 space-y-1 min-h-[50px]">
           {rootTracks.map((track) => (
             <TrackItem
               key={track.id}
@@ -215,71 +241,67 @@ export default function TrackList({
         </div>
         
         <Accordion type="multiple" className="w-full px-2">
-          {userFolders.map(folder => {
-            const isDraggableFolder = folder.id !== TRASH_FOLDER_ID;
+          {projects.map(({ project, folders: subFolders, tracks: projectTracks }) => {
+            const tracksInProjectFolders = projectTracks.filter(t => t.folderId && subFolders.some(f => f.id === t.folderId));
+            const tracksDirectlyInProject = projectTracks.filter(t => t.folderId === project.id);
             return (
-              <AccordionItem value={folder.id} key={folder.id} 
-                draggable={isDraggableFolder}
-                onDragStart={(e) => {
-                  if (isDraggableFolder) {
-                    e.dataTransfer.setData('folderId', folder.id);
-                    e.dataTransfer.effectAllowed = 'move';
-                  }
-                }}
-                className={cn("border-none", draggingOverFolder === folder.id && 'bg-accent/50 rounded-md')}
-                onDrop={(e) => {e.stopPropagation(); handleDrop(e, folder.id);}}
-                onDragOver={handleDragOver}
-                onDragEnter={(e) => { e.stopPropagation(); setDraggingOverFolder(folder.id); }}
-                onDragLeave={(e) => { e.stopPropagation(); setDraggingOverFolder(null); }}
+              <AccordionItem value={project.id} key={project.id}
+                className={cn("border rounded-md mb-2", activeProjectId === project.id ? "border-primary/50 bg-accent/50" : "border-border")}
+                onClick={() => onSelectProject(project.id)}
               >
-                 <div className="flex items-center group/trigger pr-2 hover:bg-accent/50 rounded-md">
-                    <AccordionTrigger className="hover:no-underline font-semibold text-base py-2 px-2 flex-initial">
-                        <div className="flex items-center gap-1">
-                          <FolderIcon className="w-5 h-5" />
-                        </div>
-                    </AccordionTrigger>
-                    <div 
-                      className="flex-1 text-left min-w-0 pl-2"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleStartEditingFolder(folder);
-                      }}
-                    >
-                      {editingFolderId === folder.id ? (
-                        <Input
-                          ref={inputRef}
-                          type="text"
-                          value={editingFolderName}
-                          onChange={(e) => setEditingFolderName(e.target.value)}
-                          onBlur={handleRenameFolder}
-                          onKeyDown={handleInputKeyDown}
-                          className="h-8 text-base"
-                          onClick={(e) => e.stopPropagation()} // Prevent accordion toggle
-                        />
-                      ) : (
-                        <span className="break-words">{folder.name}</span>
-                      )}
+                 <AccordionTrigger className="hover:no-underline font-semibold text-base py-2 px-2 flex-initial">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <Briefcase className="w-5 h-5" />
+                      <div className="flex-1 text-left min-w-0" onClick={(e) => {e.stopPropagation(); handleStartEditingFolder(project);}}>
+                        {editingFolderId === project.id ? (
+                          <Input ref={inputRef} type="text" value={editingFolderName} onChange={(e) => setEditingFolderName(e.target.value)} onBlur={handleRenameFolder} onKeyDown={handleInputKeyDown} className="h-8 text-base" onClick={(e) => e.stopPropagation()} />
+                        ) : ( <span className="break-words">{project.name}</span> )}
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => handleImportClick(e, project.id)}>
+                        <Plus className="w-4 h-4" />
+                      </Button>
                     </div>
-                 </div>
+                </AccordionTrigger>
                 <AccordionContent className="pb-0 pl-2">
-                  <div className="border-l-2 ml-2 pl-4 space-y-1 min-h-[40px]">
-                      {(folderTracks.get(folder.id) || []).map(track => (
-                          <TrackItem
-                          key={track.id}
-                          track={track}
-                          isActive={activeTrackId === track.id}
-                          onSelectTrack={onSelectTrack}
-                          onRecoverTrack={onRecoverTrack}
-                          />
-                      ))}
-                      {(folderTracks.get(folder.id) || []).length === 0 && (
-                          <p className="text-sm text-muted-foreground p-2">Drop tracks here</p>
-                      )}
-                  </div>
+                  {tracksDirectlyInProject.map(track => (
+                    <TrackItem key={track.id} track={track} isActive={activeTrackId === track.id} onSelectTrack={onSelectTrack} onRecoverTrack={onRecoverTrack} />
+                  ))}
+                  <Accordion type="multiple" className="w-full">
+                    {subFolders.map(folder => (
+                       <AccordionItem value={folder.id} key={folder.id} 
+                        draggable onDragStart={(e) => {e.dataTransfer.setData('folderId', folder.id); e.dataTransfer.effectAllowed = 'move';}}
+                        className={cn("border-none", draggingOverFolder === folder.id && 'bg-accent/50 rounded-md')}
+                        onDrop={(e) => {e.stopPropagation(); handleDrop(e, folder.id);}}
+                        onDragOver={handleDragOver}
+                        onDragEnter={(e) => { e.stopPropagation(); setDraggingOverFolder(folder.id); }}
+                        onDragLeave={(e) => { e.stopPropagation(); setDraggingOverFolder(null); }}
+                       >
+                         <div className="flex items-center group/trigger pr-2 hover:bg-accent/50 rounded-md">
+                            <AccordionTrigger className="flex-initial p-2">
+                                <div className="flex items-center gap-1">
+                                  <FolderIcon className="w-5 h-5" />
+                                </div>
+                            </AccordionTrigger>
+                            <div className="flex-1 text-left min-w-0 pl-2" onClick={(e) => {e.preventDefault(); e.stopPropagation(); handleStartEditingFolder(folder);}}>
+                              {editingFolderId === folder.id ? ( <Input ref={inputRef} type="text" value={editingFolderName} onChange={(e) => setEditingFolderName(e.target.value)} onBlur={handleRenameFolder} onKeyDown={handleInputKeyDown} className="h-8 text-base" onClick={(e) => e.stopPropagation()} /> ) : ( <span className="break-words">{folder.name}</span> )}
+                            </div>
+                         </div>
+                        <AccordionContent className="pb-0 pl-2">
+                          <div className="border-l-2 ml-2 pl-4 space-y-1 min-h-[40px]">
+                              {tracksInProjectFolders.filter(t => t.folderId === folder.id).map(track => (
+                                  <TrackItem key={track.id} track={track} isActive={activeTrackId === track.id} onSelectTrack={onSelectTrack} onRecoverTrack={onRecoverTrack} />
+                              ))}
+                              {tracksInProjectFolders.filter(t => t.folderId === folder.id).length === 0 && (
+                                  <p className="text-sm text-muted-foreground p-2">Drop tracks here</p>
+                              )}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
                 </AccordionContent>
               </AccordionItem>
-            )
+            );
           })}
           
           <AccordionItem 
@@ -324,6 +346,16 @@ export default function TrackList({
           </AccordionItem>
         </Accordion>
       </ScrollArea>
+      {isImporting && (
+          <ImportDialog
+            onImportTrack={(file) => {
+                onImportTrack(file, importTargetFolder);
+                setIsImporting(false);
+            }}
+            isOpen={isImporting}
+            onOpenChange={setIsImporting}
+          />
+      )}
     </>
   );
 }

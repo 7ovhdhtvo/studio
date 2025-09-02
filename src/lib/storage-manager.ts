@@ -18,6 +18,8 @@ export interface Folder {
   id: string;
   name: string;
   createdAt: number;
+  isProject: boolean;
+  parentId: string | null;
 }
 
 class StorageManager {
@@ -45,8 +47,15 @@ class StorageManager {
           id: TRASH_FOLDER_ID,
           name: 'Trash',
           createdAt: Date.now(),
+          isProject: false,
+          parentId: null,
         });
         this.persistFolders();
+      }
+
+      const projectsExist = Array.from(this.folders.values()).some(f => f.isProject);
+      if (!projectsExist) {
+        await this.createProject("my first project");
       }
       
       this.metadata.forEach(file => {
@@ -73,6 +82,17 @@ class StorageManager {
       };
       audio.src = window.URL.createObjectURL(file);
     });
+  }
+  
+  private getUniqueFolderName(baseName: string): string {
+    let name = baseName;
+    let counter = 1;
+    const existingNames = new Set(Array.from(this.folders.values()).map(f => f.name));
+    while (existingNames.has(name)) {
+      name = `${baseName} (${counter})`;
+      counter++;
+    }
+    return name;
   }
 
   async saveAudioFile(file: File, folderId: string | null): Promise<AudioFile> {
@@ -157,12 +177,20 @@ class StorageManager {
   }
 
   // FOLDER MANAGEMENT
-  async createFolder(name: string): Promise<Folder> {
+  async createFolder(name: string, parentId: string): Promise<Folder> {
     const id = `folder_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const newFolder: Folder = { id, name, createdAt: Date.now() };
+    const newFolder: Folder = { id, name: this.getUniqueFolderName(name), createdAt: Date.now(), isProject: false, parentId };
     this.folders.set(id, newFolder);
     this.persistFolders();
     return newFolder;
+  }
+
+  async createProject(name: string): Promise<Folder> {
+    const id = `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const newProject: Folder = { id, name: this.getUniqueFolderName(name), createdAt: Date.now(), isProject: true, parentId: null };
+    this.folders.set(id, newProject);
+    this.persistFolders();
+    return newProject;
   }
 
   async renameFolder(id: string, newName: string): Promise<boolean> {
@@ -187,6 +215,14 @@ class StorageManager {
     }
     logger.log(`StorageManager: Moved ${tracksInFolder.length} tracks to trash.`);
 
+    // If it's a project, also move subfolders to trash (by moving their tracks)
+    if (folder.isProject) {
+        const subFolders = Array.from(this.folders.values()).filter(f => f.parentId === id);
+        for(const subFolder of subFolders) {
+            await this.deleteFolder(subFolder.id);
+        }
+    }
+
     // Delete the folder itself
     this.folders.delete(id);
     this.persistFolders();
@@ -207,7 +243,7 @@ class StorageManager {
   
   async recoverTrack(trackId: string): Promise<boolean> {
     logger.log('StorageManager: Recovering track.', { trackId });
-    return this.moveTrackToFolder(trackId, null); // Move to root
+    return this.moveTrackToFolder(trackId, null); // Move to root for now
   }
   
   getAllTracks(): AudioFile[] {

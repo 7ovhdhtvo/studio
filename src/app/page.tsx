@@ -34,6 +34,7 @@ export default function Home() {
     renameTrack, 
     getAudioUrl,
     createFolder,
+    createProject,
     renameFolder,
     moveTrackToFolder,
     emptyTrash,
@@ -42,6 +43,7 @@ export default function Home() {
 
   const [activeTrack, setActiveTrack] = useState<AudioFile | null>(null);
   const [audioSrc, setAudioSrc] = useState<string | null>(null);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [showVolumeAutomation, setShowVolumeAutomation] = useState(true);
@@ -52,6 +54,15 @@ export default function Home() {
   
   const audioRef = useRef<HTMLAudioElement>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+
+  useEffect(() => {
+    if (!isLoading && folders.length > 0) {
+      const firstProject = folders.find(f => f.isProject);
+      if (firstProject && !activeProjectId) {
+        setActiveProjectId(firstProject.id);
+      }
+    }
+  }, [isLoading, folders, activeProjectId]);
 
   useEffect(() => {
     const requestWakeLock = async () => {
@@ -157,6 +168,14 @@ export default function Home() {
   const handleRecoverTrack = async (id: string) => {
     await recoverTrack(id);
   }
+  
+  const handleCreateFolder = async () => {
+    if (activeProjectId) {
+      await createFolder(activeProjectId);
+    } else {
+      console.warn("No active project selected to create a folder in.");
+    }
+  };
 
   return (
     <div className="flex h-screen w-full flex-col bg-background text-foreground">
@@ -172,11 +191,14 @@ export default function Home() {
             tracks={tracks}
             folders={folders}
             activeTrackId={activeTrack?.id}
+            activeProjectId={activeProjectId}
             onSelectTrack={handleSelectTrack}
+            onSelectProject={setActiveProjectId}
             onDeleteTrack={handleDeleteTrack}
             onDeleteFolder={deleteFolder}
             onRenameTrack={handleRenameTrack}
-            onCreateFolder={createFolder}
+            onCreateFolder={handleCreateFolder}
+            onCreateProject={createProject}
             onRenameFolder={renameFolder}
             onMoveTrackToFolder={moveTrackToFolder}
             onEmptyTrash={emptyTrash}
