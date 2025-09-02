@@ -1,4 +1,6 @@
 
+import { logger } from './logger';
+
 // Zentrale Storage-Verwaltung mit klarer Trennung von Concerns
 export interface AudioFile {
   id: string;
@@ -17,11 +19,13 @@ class StorageManager {
   
   // Initialisierung - Lade Metadaten aus LocalStorage
   async initialize() {
+    logger.log('StorageManager: Initializing...');
     try {
       const stored = localStorage.getItem('audio_metadata');
       if (stored) {
         const data = JSON.parse(stored);
         this.metadata = new Map(data);
+        logger.log(`StorageManager: Loaded ${this.metadata.size} tracks from localStorage.`);
         
         // Revoke old blob URLs on startup to prevent memory leaks
         this.metadata.forEach(file => {
@@ -31,9 +35,11 @@ class StorageManager {
           }
         });
         this.persistMetadata();
+      } else {
+        logger.log('StorageManager: No metadata found in localStorage.');
       }
     } catch (e) {
-      console.error('Failed to load metadata:', e);
+      logger.error('StorageManager: Failed to load metadata.', { error: e });
       this.metadata = new Map();
     }
   }
@@ -53,6 +59,7 @@ class StorageManager {
   // Speichere Audio-Datei
   async saveAudioFile(file: File): Promise<AudioFile> {
     const id = `audio_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    logger.log('StorageManager: Saving new audio file.', { name: file.name, assignedId: id });
     
     // Speichere Blob im Memory
     this.audioBlobs.set(id, file);
@@ -74,43 +81,59 @@ class StorageManager {
     this.persistMetadata();
     
     // Optional: Versuche OPFS zu nutzen (für größere Dateien)
-    this.saveToOPFS(id, file).catch(console.error);
+    this.saveToOPFS(id, file).catch(e => logger.error('StorageManager: OPFS save failed.', { error: e }));
     
+    logger.log('StorageManager: File saved successfully.');
     return audioFile;
   }
   
   // Lösche Audio-Datei
   async deleteAudioFile(id: string): Promise<boolean> {
+    logger.log('StorageManager: Attempting to delete file.', { id });
     try {
-      // Revoke Blob URL wenn vorhanden
       const file = this.metadata.get(id);
-      if (file?.blobUrl) {
+      if (!file) {
+        logger.error('StorageManager: Delete failed. File not found in metadata.', { id });
+        return false;
+      }
+
+      if (file.blobUrl) {
         URL.revokeObjectURL(file.blobUrl);
+        logger.log('StorageManager: Revoked blob URL.', { id });
       }
       
-      // Lösche aus allen Speichern
       this.audioBlobs.delete(id);
-      this.metadata.delete(id);
-      this.persistMetadata();
+      const deleted = this.metadata.delete(id);
       
-      // Versuche aus OPFS zu löschen
-      await this.deleteFromOPFS(id).catch(console.error);
-      
-      return true;
+      if (deleted) {
+        logger.log('StorageManager: Metadata entry deleted.', { id });
+        this.persistMetadata();
+        await this.deleteFromOPFS(id).catch(e => logger.error('StorageManager: OPFS delete failed.', { error: e }));
+        logger.log('StorageManager: Delete operation successful.', { id });
+        return true;
+      } else {
+        logger.error('StorageManager: Delete failed. Map.delete returned false.', { id });
+        return false;
+      }
     } catch (e) {
-      console.error('Delete failed:', e);
+      logger.error('StorageManager: Delete operation threw an exception.', { error: e });
       return false;
     }
   }
   
   // Umbenennen
   async renameAudioFile(id: string, newTitle: string): Promise<boolean> {
+    logger.log('StorageManager: Attempting to rename file.', { id, newTitle });
     const file = this.metadata.get(id);
-    if (!file) return false;
+    if (!file) {
+      logger.error('StorageManager: Rename failed. File not found.', { id });
+      return false;
+    }
     
     file.title = newTitle;
     this.metadata.set(id, file);
     this.persistMetadata();
+    logger.log('StorageManager: Rename successful.', { id });
     
     return true;
   }
@@ -120,42 +143,38 @@ class StorageManager {
     const file = this.metadata.get(id);
     if (!file) return null;
     
-    // Wenn Blob URL vorhanden, nutze diese
     if (file.blobUrl && file.blobUrl.startsWith('blob:')) return file.blobUrl;
     
-    // Versuche aus OPFS zu laden
     const blob = await this.loadFromOPFS(id).catch(() => null);
     if (blob) {
       const url = URL.createObjectURL(blob);
       file.blobUrl = url;
-      this.metadata.set(id, file); // No need to persist
+      this.metadata.set(id, file); // No need to persist for this temporary URL
       return url;
     }
     
-    // Fallback: Versuche aus Memory
     const memoryBlob = this.audioBlobs.get(id);
     if (memoryBlob) {
       const url = URL.createObjectURL(memoryBlob);
       file.blobUrl = url;
-      this.metadata.set(id, file); // No need to persist
+      this.metadata.set(id, file); // No need to persist for this temporary URL
       return url;
     }
     
     return null;
   }
   
-  // Hole alle Tracks
   getAllTracks(): AudioFile[] {
     return Array.from(this.metadata.values()).sort((a, b) => b.createdAt - a.createdAt);
   }
   
-  // Private Hilfsmethoden
   private persistMetadata() {
     try {
       const data = Array.from(this.metadata.entries());
       localStorage.setItem('audio_metadata', JSON.stringify(data));
+      logger.log(`StorageManager: Persisted ${data.length} metadata entries to localStorage.`);
     } catch (e) {
-      console.error('Failed to persist metadata:', e);
+      logger.error('StorageManager: Failed to persist metadata.', { error: e });
     }
   }
   
@@ -197,7 +216,4 @@ class StorageManager {
   }
 }
 
-// Singleton Export
 export const storageManager = new StorageManager();
-
-    

@@ -12,6 +12,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '../ui/button';
 import { cn } from '@/lib/utils';
 import type { AudioFile } from '@/lib/storage-manager';
+import { logger } from '@/lib/logger';
 
 type TrackListProps = {
   tracks: AudioFile[];
@@ -30,11 +31,26 @@ export default function TrackList({
 }: TrackListProps) {
 
   const handleRename = (id: string, currentTitle: string) => {
+    logger.log('TrackList: Rename action triggered.', { id, currentTitle });
     const newTitle = prompt('Enter new track title:', currentTitle);
     if (newTitle && newTitle.trim() !== '') {
+      logger.log('TrackList: New title provided.', { newTitle });
       onRenameTrack(id, newTitle.trim());
+    } else {
+      logger.log('TrackList: Rename cancelled by user.');
     }
   };
+
+  const handleDelete = (id: string) => {
+    logger.log('TrackList: Delete action triggered.', { id });
+    const confirmed = window.confirm('Are you sure you want to delete this track?');
+    if (confirmed) {
+      logger.log('TrackList: Deletion confirmed by user.');
+      onDeleteTrack(id);
+    } else {
+      logger.log('TrackList: Deletion cancelled by user.');
+    }
+  }
 
   return (
     <ScrollArea className="flex-1">
@@ -72,7 +88,7 @@ export default function TrackList({
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.stopPropagation();
-                    onDeleteTrack(track.id)
+                    handleDelete(track.id)
                   }}
                   className="text-destructive"
                 >

@@ -3,62 +3,66 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { storageManager, type AudioFile } from '@/lib/storage-manager';
+import { logger } from '@/lib/logger';
 
 export function useAudioStorage() {
   const [tracks, setTracks] = useState<AudioFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Initialisierung
+  const refreshTracks = useCallback(() => {
+      logger.log('useAudioStorage: Refreshing tracks from storageManager.');
+      const freshTracks = [...storageManager.getAllTracks()];
+      setTracks(freshTracks);
+      logger.log(`useAudioStorage: State updated with ${freshTracks.length} tracks.`);
+  }, []);
+
   useEffect(() => {
     const init = async () => {
+      logger.log('useAudioStorage: Initializing and loading tracks.');
       await storageManager.initialize();
-      setTracks(storageManager.getAllTracks());
+      refreshTracks();
       setIsLoading(false);
     };
     init();
-  }, []);
+  }, [refreshTracks]);
   
-  const refreshTracks = useCallback(() => {
-      // Create a NEW array from the storage manager's results
-      // This is crucial for React to detect a state change.
-      const freshTracks = [...storageManager.getAllTracks()];
-      setTracks(freshTracks);
-  }, []);
-
-  // Import Audio
   const importAudio = useCallback(async (file: File) => {
+    logger.log('useAudioStorage: Importing audio file.', { name: file.name });
     try {
       const audioFile = await storageManager.saveAudioFile(file);
-      refreshTracks(); // Use the new refresh function
+      refreshTracks();
+      logger.log('useAudioStorage: Import successful.', { id: audioFile.id });
       return { success: true, file: audioFile };
     } catch (error) {
-      console.error('Import failed:', error);
+      logger.error('useAudioStorage: Import failed.', { error });
       return { success: false, error };
     }
   }, [refreshTracks]);
   
-  // Delete Track
   const deleteTrack = useCallback(async (id: string) => {
-    const confirmed = window.confirm('Are you sure you want to delete this track?');
-    if (!confirmed) return false;
-    
+    logger.log('useAudioStorage: Deleting track.', { id });
     const success = await storageManager.deleteAudioFile(id);
     if (success) {
-      refreshTracks(); // Use the new refresh function
+      refreshTracks();
+      logger.log('useAudioStorage: Track deleted and list refreshed.');
+    } else {
+       logger.error('useAudioStorage: Track deletion failed in storageManager.');
     }
     return success;
   }, [refreshTracks]);
   
-  // Rename Track
   const renameTrack = useCallback(async (id: string, newTitle: string) => {
+    logger.log('useAudioStorage: Renaming track.', { id, newTitle });
     const success = await storageManager.renameAudioFile(id, newTitle);
     if (success) {
-      refreshTracks(); // Use the new refresh function
+      refreshTracks();
+      logger.log('useAudioStorage: Track renamed and list refreshed.');
+    } else {
+      logger.error('useAudioStorage: Track rename failed in storageManager.');
     }
     return success;
   }, [refreshTracks]);
   
-  // Get Audio URL
   const getAudioUrl = useCallback(async (id: string) => {
     return await storageManager.getAudioUrl(id);
   }, []);
@@ -70,8 +74,5 @@ export function useAudioStorage() {
     deleteTrack,
     renameTrack,
     getAudioUrl,
-    setTracks // Expose setTracks for the debug panel
   };
 }
-
-    
