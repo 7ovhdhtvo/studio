@@ -155,25 +155,48 @@ export default function Home() {
   };
 
   const handleDeleteTrack = async (id: number) => {
+    console.log("Delete triggered for ID:", id);
     if (window.confirm("Are you sure you want to delete this track?")) {
-      await db.tracks.delete(id);
-      
-      if (activeTrack?.id === id) {
-        setActiveTrack(null);
+      try {
+        console.log("Deleting from DB...");
+        await db.tracks.delete(id);
+        console.log("DB delete successful");
+        
+        if (activeTrack?.id === id) {
+          setActiveTrack(null);
+          setAudioSrc(null);
+        }
+        
+        console.log("Force-reloading tracks from DB...");
+        await loadTracksFromDb();
+        console.log("Track reload successful.");
+
+      } catch (error) {
+        console.error("Delete failed:", error);
       }
-      
-      await loadTracksFromDb();
+    } else {
+       console.log("Delete cancelled by user.");
     }
   };
 
   const handleRenameTrack = async (id: number, newTitle: string) => {
-    await db.tracks.update(id, { title: newTitle });
-    
-    if (activeTrack?.id === id) {
-      setActiveTrack(prev => prev ? { ...prev, title: newTitle } : null);
-    }
+    console.log(`Rename triggered for ID: ${id} with new title: "${newTitle}"`);
+    try {
+      console.log("Updating DB...");
+      await db.tracks.update(id, { title: newTitle });
+      console.log("DB update successful");
+      
+      if (activeTrack?.id === id) {
+        setActiveTrack(prev => prev ? { ...prev, title: newTitle } : null);
+      }
 
-    await loadTracksFromDb();
+      console.log("Force-reloading tracks from DB...");
+      await loadTracksFromDb();
+      console.log("Track reload successful.");
+      
+    } catch(error) {
+        console.error("Rename failed:", error);
+    }
   };
   
   const handleZoomIn = () => setZoom(prev => Math.min(prev * 1.5, 20));
