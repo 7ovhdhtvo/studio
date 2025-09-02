@@ -13,13 +13,15 @@ import { Button } from '../ui/button';
 import { cn } from '@/lib/utils';
 import type { AudioFile } from '@/lib/storage-manager';
 import { logger } from '@/lib/logger';
+import { useState } from 'react';
+import RenameDialog from './rename-dialog';
 
 type TrackListProps = {
   tracks: AudioFile[];
   activeTrackId?: string | null;
   onSelectTrack: (track: AudioFile) => void;
   onDeleteTrack: (id: string) => void;
-  onRenameTrack: (id: string, currentTitle: string) => void;
+  onRenameTrack: (id: string, newTitle: string) => void;
 };
 
 export default function TrackList({
@@ -29,57 +31,71 @@ export default function TrackList({
   onDeleteTrack,
   onRenameTrack,
 }: TrackListProps) {
+  const [renamingTrack, setRenamingTrack] = useState<AudioFile | null>(null);
+
+  const handleRenameSave = (id: string, newTitle: string) => {
+    onRenameTrack(id, newTitle);
+    setRenamingTrack(null);
+  };
+
 
   return (
-    <ScrollArea className="flex-1">
-      <div className="p-2 space-y-1">
-        {tracks.map((track) => (
-          <div
-            key={track.id}
-            onClick={() => onSelectTrack(track)}
-            className={cn(
-              "flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-accent",
-              activeTrackId === track.id && "bg-accent"
-            )}
-          >
-            <div className="flex-1 overflow-hidden">
-              <p className="font-medium truncate">{track.title}</p>
-              <p className="text-sm text-muted-foreground truncate">
-                {track.originalName}
-              </p>
-            </div>
+    <>
+      <ScrollArea className="flex-1">
+        <div className="p-2 space-y-1">
+          {tracks.map((track) => (
+            <div
+              key={track.id}
+              onClick={() => onSelectTrack(track)}
+              className={cn(
+                "flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-accent",
+                activeTrackId === track.id && "bg-accent"
+              )}
+            >
+              <div className="flex-1 overflow-hidden">
+                <p className="font-medium truncate">{track.title}</p>
+                <p className="text-sm text-muted-foreground truncate">
+                  {track.originalName}
+                </p>
+              </div>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={(e) => {
-                    e.stopPropagation();
-                    logger.log('TrackList: Rename action triggered.', { id: track.id, currentTitle: track.title });
-                    onRenameTrack(track.id, track.title);
-                }}>
-                  <Edit className="mr-2 h-4 w-4" />
-                  <span>Rename</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    logger.log('TrackList: Delete action triggered.', { id: track.id });
-                    onDeleteTrack(track.id)
-                  }}
-                  className="text-destructive"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  <span>Delete</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        ))}
-      </div>
-    </ScrollArea>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={(e) => {
+                      e.stopPropagation();
+                      logger.log('TrackList: Rename action triggered.', { id: track.id, currentTitle: track.title });
+                      setRenamingTrack(track);
+                  }}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    <span>Rename</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      logger.log('TrackList: Delete action triggered.', { id: track.id });
+                      onDeleteTrack(track.id);
+                    }}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    <span>Delete</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+      <RenameDialog 
+        track={renamingTrack}
+        onSave={handleRenameSave}
+        onClose={() => setRenamingTrack(null)}
+      />
+    </>
   );
 }

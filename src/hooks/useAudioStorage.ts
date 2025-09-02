@@ -11,7 +11,6 @@ export function useAudioStorage() {
   
   const refreshTracks = useCallback(() => {
       logger.log('useAudioStorage: Refreshing tracks from storageManager.');
-      // By creating a new array, we ensure React detects the change and re-renders.
       const freshTracks = [...storageManager.getAllTracks()];
       setTracks(freshTracks);
       logger.log(`useAudioStorage: State updated with ${freshTracks.length} tracks.`);
@@ -52,11 +51,13 @@ export function useAudioStorage() {
     return success;
   }, [refreshTracks]);
   
-  const renameTrack = useCallback(async (id: string, currentTitle: string) => {
-    logger.log('useAudioStorage: Renaming track.', { id, currentTitle });
+  const renameTrack = useCallback(async (id: string, newTitle: string) => {
+    logger.log('useAudioStorage: Renaming track.', { id, newTitle });
     
-    // Platzhalter-Logik: Hängt "(edited)" an den Titel an, statt einen Prompt zu zeigen.
-    const newTitle = `${currentTitle} (edited)`;
+    if (!newTitle || newTitle.trim().length === 0) {
+      logger.error('useAudioStorage: Rename failed. New title is empty.');
+      return false;
+    }
 
     const success = await storageManager.renameAudioFile(id, newTitle.trim());
     if (success) {
