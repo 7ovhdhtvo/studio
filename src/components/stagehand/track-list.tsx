@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Folder as FolderIcon, FolderPlus, Trash, Undo2, Briefcase, Plus, Import } from 'lucide-react';
+import { Folder as FolderIcon, FolderPlus, Trash, Undo2, Briefcase, Plus, Import, Clapperboard } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '../ui/button';
@@ -252,7 +252,7 @@ export default function TrackList({
                  <div className="flex items-center pr-2">
                     <AccordionTrigger className="hover:no-underline font-semibold text-base py-2 px-2 flex-1">
                         <div className="flex items-center gap-2 min-w-0">
-                          <Briefcase className="w-5 h-5" />
+                          <Clapperboard className="w-5 h-5" />
                           <div className="flex-1 text-left min-w-0" onClick={(e) => {e.stopPropagation(); handleStartEditingFolder(project);}}>
                             {editingFolderId === project.id ? (
                               <Input ref={inputRef} type="text" value={editingFolderName} onChange={(e) => setEditingFolderName(e.target.value)} onBlur={handleRenameFolder} onKeyDown={handleInputKeyDown} className="h-8 text-base" onClick={(e) => e.stopPropagation()} />
