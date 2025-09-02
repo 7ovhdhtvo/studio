@@ -174,6 +174,26 @@ class StorageManager {
     return true;
   }
 
+  async deleteFolder(id: string): Promise<boolean> {
+    const folder = this.folders.get(id);
+    if (!folder || id === TRASH_FOLDER_ID) return false;
+
+    logger.log('StorageManager: Deleting folder.', { id, name: folder.name });
+
+    // Move all tracks in the folder to trash
+    const tracksInFolder = this.getAllTracks().filter(t => t.folderId === id);
+    for (const track of tracksInFolder) {
+      await this.moveTrackToFolder(track.id, TRASH_FOLDER_ID);
+    }
+    logger.log(`StorageManager: Moved ${tracksInFolder.length} tracks to trash.`);
+
+    // Delete the folder itself
+    this.folders.delete(id);
+    this.persistFolders();
+    logger.log('StorageManager: Folder deleted.', { id });
+    return true;
+  }
+
   async moveTrackToFolder(trackId: string, folderId: string | null): Promise<boolean> {
     const track = this.metadata.get(trackId);
     if (!track) return false;

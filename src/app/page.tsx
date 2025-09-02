@@ -29,7 +29,8 @@ export default function Home() {
     folders,
     isLoading, 
     importAudio, 
-    deleteTrack, 
+    deleteTrack,
+    deleteFolder,
     renameTrack, 
     getAudioUrl,
     createFolder,
@@ -173,12 +174,14 @@ export default function Home() {
             activeTrackId={activeTrack?.id}
             onSelectTrack={handleSelectTrack}
             onDeleteTrack={handleDeleteTrack}
+            onDeleteFolder={deleteFolder}
             onRenameTrack={handleRenameTrack}
             onCreateFolder={createFolder}
             onRenameFolder={renameFolder}
             onMoveTrackToFolder={moveTrackToFolder}
             onEmptyTrash={emptyTrash}
             onRecoverTrack={handleRecoverTrack}
+            onImportTrack={importAudio}
           />
         </div>
 

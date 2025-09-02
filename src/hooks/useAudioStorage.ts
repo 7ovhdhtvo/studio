@@ -53,6 +53,18 @@ export function useAudioStorage() {
     }
     return success;
   }, [refreshData]);
+
+  const deleteFolder = useCallback(async (id: string) => {
+    logger.log('useAudioStorage: Deleting folder.', { id });
+    const success = await storageManager.deleteFolder(id);
+    if (success) {
+      refreshData();
+      logger.log('useAudioStorage: Folder deleted and list refreshed.');
+    } else {
+      logger.error('useAudioStorage: Deleting folder failed.');
+    }
+    return success;
+  }, [refreshData]);
   
   const renameTrack = useCallback(async (id: string, newTitle: string) => {
     logger.log('useAudioStorage: Renaming track.', { id, newTitle });
@@ -124,6 +136,7 @@ export function useAudioStorage() {
     isLoading,
     importAudio,
     deleteTrack,
+    deleteFolder,
     renameTrack,
     createFolder,
     renameFolder,
