@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Folder as FolderIcon, FolderPlus, Trash, Undo2, Briefcase, Plus, Import, Clapperboard } from 'lucide-react';
+import { Folder as FolderIcon, FolderPlus, Trash, Undo2, Briefcase, Plus, Import, Clapperboard, ChevronDown } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '../ui/button';
@@ -245,75 +245,78 @@ export default function TrackList({
           ))}
         </div>
         
-        <Accordion type="multiple" className="w-full px-2">
+        <div className="w-full px-2">
           {projects.map(({ project, folders: subFolders, tracks: projectTracks }) => {
+            const isActiveProject = project.id === activeProjectId;
             const tracksInProjectFolders = projectTracks.filter(t => t.folderId && subFolders.some(f => f.id === t.folderId));
             const tracksDirectlyInProject = projectTracks.filter(t => t.folderId === project.id);
             return (
-              <AccordionItem value={project.id} key={project.id}
-                className={cn("border rounded-md mb-2", activeProjectId === project.id ? "border-primary/50 bg-accent/50" : "border-border")}
-                onClick={() => onSelectProject(project.id)}
+              <div key={project.id}
+                className={cn("border rounded-md mb-2", isActiveProject ? "border-primary/50 bg-accent/50" : "border-border")}
               >
-                 <div className="flex items-center group/trigger pr-2 hover:bg-accent/50 rounded-md">
-                    <AccordionTrigger className="flex-initial p-2">
-                      <div className="flex items-center gap-1">
-                        <Clapperboard className="w-5 h-5" />
-                      </div>
-                    </AccordionTrigger>
+                 <div className="flex items-center group/trigger p-2 hover:bg-accent/50 rounded-md" onClick={() => onSelectProject(project.id)}>
+                    <div className="flex items-center gap-1">
+                      <Clapperboard className="w-5 h-5" />
+                    </div>
                     <div className="flex-1 text-left min-w-0 font-semibold text-base pl-2" onClick={(e) => {e.stopPropagation(); handleStartEditingFolder(project);}}>
                       {editingFolderId === project.id ? (
                         <Input ref={inputRef} type="text" value={editingFolderName} onChange={(e) => setEditingFolderName(e.target.value)} onBlur={handleRenameFolder} onKeyDown={handleInputKeyDown} className="h-8 text-base" onClick={(e) => e.stopPropagation()} />
-                      ) : ( <span className="break-words">{project.name}</span> )}
+                      ) : ( <span className="break-words min-w-0">{project.name}</span> )}
                     </div>
                  </div>
-                <AccordionContent className="pb-0 pl-2">
-                  <div className="p-2">
-                    <Button variant="outline" className="w-full" onClick={() => openImportDialog(project.id)}>
-                      <Import className="mr-2 h-4 w-4" />
-                      Import Tracks
-                    </Button>
-                  </div>
-                  {tracksDirectlyInProject.map(track => (
-                    <TrackItem key={track.id} track={track} isActive={activeTrackId === track.id} onSelectTrack={onSelectTrack} onRecoverTrack={onRecoverTrack} />
-                  ))}
-                  <Accordion type="multiple" className="w-full">
-                    {subFolders.map(folder => (
-                       <AccordionItem value={folder.id} key={folder.id} 
-                        draggable onDragStart={(e) => {e.dataTransfer.setData('folderId', folder.id); e.dataTransfer.effectAllowed = 'move';}}
-                        className={cn("border-none", draggingOverFolder === folder.id && 'bg-accent/50 rounded-md')}
-                        onDrop={(e) => {e.stopPropagation(); handleDrop(e, folder.id);}}
-                        onDragOver={handleDragOver}
-                        onDragEnter={(e) => { e.stopPropagation(); setDraggingOverFolder(folder.id); }}
-                        onDragLeave={(e) => { e.stopPropagation(); setDraggingOverFolder(null); }}
-                       >
-                         <div className="flex items-center group/trigger pr-2 hover:bg-accent/50 rounded-md">
-                            <AccordionTrigger className="flex-initial p-2">
-                                <div className="flex items-center gap-1">
-                                  <FolderIcon className="w-5 h-5" />
-                                </div>
-                            </AccordionTrigger>
-                            <div className="flex-1 text-left min-w-0 pl-2" onClick={(e) => {e.preventDefault(); e.stopPropagation(); handleStartEditingFolder(folder);}}>
-                              {editingFolderId === folder.id ? ( <Input ref={inputRef} type="text" value={editingFolderName} onChange={(e) => setEditingFolderName(e.target.value)} onBlur={handleRenameFolder} onKeyDown={handleInputKeyDown} className="h-8 text-base" onClick={(e) => e.stopPropagation()} /> ) : ( <span className="break-words">{folder.name}</span> )}
-                            </div>
-                         </div>
-                        <AccordionContent className="pb-0 pl-2">
-                          <div className="border-l-2 ml-2 pl-4 space-y-1 min-h-[40px]">
-                              {tracksInProjectFolders.filter(t => t.folderId === folder.id).map(track => (
-                                  <TrackItem key={track.id} track={track} isActive={activeTrackId === track.id} onSelectTrack={onSelectTrack} onRecoverTrack={onRecoverTrack} />
-                              ))}
-                              {tracksInProjectFolders.filter(t => t.folderId === folder.id).length === 0 && (
-                                  <p className="text-sm text-muted-foreground p-2">Drop tracks here</p>
-                              )}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
+                {isActiveProject && (
+                  <div className="pb-0 pl-2">
+                    <div className="p-2">
+                      <Button variant="outline" className="w-full" onClick={() => openImportDialog(project.id)}>
+                        <Import className="mr-2 h-4 w-4" />
+                        Import Tracks
+                      </Button>
+                    </div>
+                    {tracksDirectlyInProject.map(track => (
+                      <TrackItem key={track.id} track={track} isActive={activeTrackId === track.id} onSelectTrack={onSelectTrack} onRecoverTrack={onRecoverTrack} />
                     ))}
-                  </Accordion>
-                </AccordionContent>
-              </AccordionItem>
+                    <Accordion type="multiple" className="w-full">
+                      {subFolders.map(folder => (
+                         <AccordionItem value={folder.id} key={folder.id} 
+                          draggable onDragStart={(e) => {e.dataTransfer.setData('folderId', folder.id); e.dataTransfer.effectAllowed = 'move';}}
+                          className={cn("border-none", draggingOverFolder === folder.id && 'bg-accent/50 rounded-md')}
+                          onDrop={(e) => {e.stopPropagation(); handleDrop(e, folder.id);}}
+                          onDragOver={handleDragOver}
+                          onDragEnter={(e) => { e.stopPropagation(); setDraggingOverFolder(folder.id); }}
+                          onDragLeave={(e) => { e.stopPropagation(); setDraggingOverFolder(null); }}
+                         >
+                           <div className="flex items-center group/trigger pr-2 hover:bg-accent/50 rounded-md">
+                              <AccordionTrigger className="flex-initial p-2">
+                                  <div className="flex items-center gap-1">
+                                    <FolderIcon className="w-5 h-5" />
+                                    <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
+                                  </div>
+                              </AccordionTrigger>
+                              <div className="flex-1 text-left min-w-0 pl-2" onClick={(e) => {e.preventDefault(); e.stopPropagation(); handleStartEditingFolder(folder);}}>
+                                {editingFolderId === folder.id ? ( <Input ref={inputRef} type="text" value={editingFolderName} onChange={(e) => setEditingFolderName(e.target.value)} onBlur={handleRenameFolder} onKeyDown={handleInputKeyDown} className="h-8 text-base" onClick={(e) => e.stopPropagation()} /> ) : ( <span className="break-words min-w-0">{folder.name}</span> )}
+                              </div>
+                           </div>
+                          <AccordionContent className="pb-0 pl-2">
+                            <div className="border-l-2 ml-2 pl-4 space-y-1 min-h-[40px]">
+                                {tracksInProjectFolders.filter(t => t.folderId === folder.id).map(track => (
+                                    <TrackItem key={track.id} track={track} isActive={activeTrackId === track.id} onSelectTrack={onSelectTrack} onRecoverTrack={onRecoverTrack} />
+                                ))}
+                                {tracksInProjectFolders.filter(t => t.folderId === folder.id).length === 0 && (
+                                    <p className="text-sm text-muted-foreground p-2">Drop tracks here</p>
+                                )}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                  </div>
+                )}
+              </div>
             );
           })}
-          
+        </div>
+        
+        <Accordion type="multiple" className="w-full px-2">
           <AccordionItem 
             value={TRASH_FOLDER_ID} 
             className="border-none"
