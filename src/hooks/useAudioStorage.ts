@@ -11,6 +11,7 @@ export function useAudioStorage() {
   
   const refreshTracks = useCallback(() => {
       logger.log('useAudioStorage: Refreshing tracks from storageManager.');
+      // By creating a new array, we ensure React detects the change and re-renders.
       const freshTracks = [...storageManager.getAllTracks()];
       setTracks(freshTracks);
       logger.log(`useAudioStorage: State updated with ${freshTracks.length} tracks.`);
@@ -41,6 +42,12 @@ export function useAudioStorage() {
   
   const deleteTrack = useCallback(async (id: string) => {
     logger.log('useAudioStorage: Deleting track.', { id });
+    const confirmed = window.confirm('Are you sure you want to delete this track?');
+    if (!confirmed) {
+      logger.log('useAudioStorage: Deletion cancelled by user.');
+      return false;
+    }
+    
     const success = await storageManager.deleteAudioFile(id);
     if (success) {
       refreshTracks();
@@ -51,9 +58,16 @@ export function useAudioStorage() {
     return success;
   }, [refreshTracks]);
   
-  const renameTrack = useCallback(async (id: string, newTitle: string) => {
-    logger.log('useAudioStorage: Renaming track.', { id, newTitle });
-    const success = await storageManager.renameAudioFile(id, newTitle);
+  const renameTrack = useCallback(async (id: string, currentTitle: string) => {
+    logger.log('useAudioStorage: Renaming track.', { id, currentTitle });
+    const newTitle = prompt('Enter new track title:', currentTitle);
+    
+    if (!newTitle || newTitle.trim() === '') {
+      logger.log('useAudioStorage: Rename cancelled by user.');
+      return false;
+    }
+
+    const success = await storageManager.renameAudioFile(id, newTitle.trim());
     if (success) {
       refreshTracks();
       logger.log('useAudioStorage: Track renamed and list refreshed.');

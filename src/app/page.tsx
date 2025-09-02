@@ -135,8 +135,8 @@ export default function Home() {
     }
   }
 
-  const handleRenameTrack = async (id: string, newTitle: string) => {
-    await renameTrack(id, newTitle);
+  const handleRenameTrack = async (id: string, currentTitle: string) => {
+    await renameTrack(id, currentTitle);
   }
 
   return (

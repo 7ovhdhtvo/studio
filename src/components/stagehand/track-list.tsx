@@ -19,7 +19,7 @@ type TrackListProps = {
   activeTrackId?: string | null;
   onSelectTrack: (track: AudioFile) => void;
   onDeleteTrack: (id: string) => void;
-  onRenameTrack: (id: string, newTitle: string) => void;
+  onRenameTrack: (id: string, currentTitle: string) => void;
 };
 
 export default function TrackList({
@@ -29,28 +29,6 @@ export default function TrackList({
   onDeleteTrack,
   onRenameTrack,
 }: TrackListProps) {
-
-  const handleRename = (id: string, currentTitle: string) => {
-    logger.log('TrackList: Rename action triggered.', { id, currentTitle });
-    const newTitle = prompt('Enter new track title:', currentTitle);
-    if (newTitle && newTitle.trim() !== '') {
-      logger.log('TrackList: New title provided.', { newTitle });
-      onRenameTrack(id, newTitle.trim());
-    } else {
-      logger.log('TrackList: Rename cancelled by user.');
-    }
-  };
-
-  const handleDelete = (id: string) => {
-    logger.log('TrackList: Delete action triggered.', { id });
-    const confirmed = window.confirm('Are you sure you want to delete this track?');
-    if (confirmed) {
-      logger.log('TrackList: Deletion confirmed by user.');
-      onDeleteTrack(id);
-    } else {
-      logger.log('TrackList: Deletion cancelled by user.');
-    }
-  }
 
   return (
     <ScrollArea className="flex-1">
@@ -80,7 +58,8 @@ export default function TrackList({
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={(e) => {
                     e.stopPropagation();
-                    handleRename(track.id, track.title);
+                    logger.log('TrackList: Rename action triggered.', { id: track.id, currentTitle: track.title });
+                    onRenameTrack(track.id, track.title);
                 }}>
                   <Edit className="mr-2 h-4 w-4" />
                   <span>Rename</span>
@@ -88,7 +67,8 @@ export default function TrackList({
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleDelete(track.id)
+                    logger.log('TrackList: Delete action triggered.', { id: track.id });
+                    onDeleteTrack(track.id)
                   }}
                   className="text-destructive"
                 >
