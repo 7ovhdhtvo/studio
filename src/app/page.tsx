@@ -184,6 +184,12 @@ export default function Home() {
       setActiveProjectId(newProjectId);
     }
   }
+  
+  const handleBackToStart = () => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0;
+    }
+  }
 
   return (
     <div className="flex h-screen w-full flex-col bg-background text-foreground">
@@ -247,7 +253,11 @@ export default function Home() {
               durationInSeconds={activeTrack?.duration ?? 180}
               zoom={zoom}
             />
-            <PlaybackControls isPlaying={isPlaying} setIsPlaying={setIsPlaying} />
+            <PlaybackControls 
+              isPlaying={isPlaying} 
+              setIsPlaying={setIsPlaying}
+              onBackToStart={handleBackToStart} 
+            />
 
             <div className="flex justify-center items-start gap-4 pt-4 flex-wrap">
               <VolumeControl 
