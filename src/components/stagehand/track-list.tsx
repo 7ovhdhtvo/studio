@@ -124,8 +124,7 @@ export default function TrackList({
     }
   }, [editingFolderId]);
   
-  const handleImportClick = (e: MouseEvent<HTMLButtonElement>, folderId: string | null) => {
-    e.stopPropagation();
+  const openImportDialog = (folderId: string | null) => {
     setImportTargetFolder(folderId);
     setIsImporting(true);
   };
@@ -213,7 +212,13 @@ export default function TrackList({
     return { rootTracks, projectMap, trashTracks };
   }, [tracks, folders]);
 
-  const projects = Array.from(projectMap.values());
+  const projects = useMemo(() => {
+    return Array.from(projectMap.values()).sort((a, b) => {
+      if (a.project.id === activeProjectId) return -1;
+      if (b.project.id === activeProjectId) return 1;
+      return a.project.name.localeCompare(b.project.name);
+    });
+  }, [projectMap, activeProjectId]);
 
   return (
     <>
@@ -249,22 +254,25 @@ export default function TrackList({
                 className={cn("border rounded-md mb-2", activeProjectId === project.id ? "border-primary/50 bg-accent/50" : "border-border")}
                 onClick={() => onSelectProject(project.id)}
               >
-                 <div className="flex items-center pr-2">
-                    <AccordionTrigger className="hover:no-underline font-semibold text-base py-2 px-2 flex-1">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Clapperboard className="w-5 h-5" />
-                          <div className="flex-1 text-left min-w-0" onClick={(e) => {e.stopPropagation(); handleStartEditingFolder(project);}}>
-                            {editingFolderId === project.id ? (
-                              <Input ref={inputRef} type="text" value={editingFolderName} onChange={(e) => setEditingFolderName(e.target.value)} onBlur={handleRenameFolder} onKeyDown={handleInputKeyDown} className="h-8 text-base" onClick={(e) => e.stopPropagation()} />
-                            ) : ( <span className="break-words">{project.name}</span> )}
-                          </div>
-                        </div>
+                 <div className="flex items-center group/trigger pr-2 hover:bg-accent/50 rounded-md">
+                    <AccordionTrigger className="flex-initial p-2">
+                      <div className="flex items-center gap-1">
+                        <Clapperboard className="w-5 h-5" />
+                      </div>
                     </AccordionTrigger>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => handleImportClick(e, project.id)}>
-                        <Plus className="w-4 h-4" />
-                    </Button>
+                    <div className="flex-1 text-left min-w-0 font-semibold text-base pl-2" onClick={(e) => {e.stopPropagation(); handleStartEditingFolder(project);}}>
+                      {editingFolderId === project.id ? (
+                        <Input ref={inputRef} type="text" value={editingFolderName} onChange={(e) => setEditingFolderName(e.target.value)} onBlur={handleRenameFolder} onKeyDown={handleInputKeyDown} className="h-8 text-base" onClick={(e) => e.stopPropagation()} />
+                      ) : ( <span className="break-words">{project.name}</span> )}
+                    </div>
                  </div>
                 <AccordionContent className="pb-0 pl-2">
+                  <div className="p-2">
+                    <Button variant="outline" className="w-full" onClick={() => openImportDialog(project.id)}>
+                      <Import className="mr-2 h-4 w-4" />
+                      Import Tracks
+                    </Button>
+                  </div>
                   {tracksDirectlyInProject.map(track => (
                     <TrackItem key={track.id} track={track} isActive={activeTrackId === track.id} onSelectTrack={onSelectTrack} onRecoverTrack={onRecoverTrack} />
                   ))}
