@@ -105,8 +105,15 @@ class StorageManager {
   }
 
   async emptyTrash(): Promise<void> {
-    logger.log('StorageManager: Emptying trash.');
+    logger.log('StorageManager: emptyTrash method started.');
     const tracksInTrash = this.getAllTracks().filter(t => t.folderId === TRASH_FOLDER_ID);
+    logger.log(`StorageManager: Found ${tracksInTrash.length} tracks in trash.`);
+
+    if (tracksInTrash.length === 0) {
+      logger.log('StorageManager: Trash is already empty. Nothing to do.');
+      return;
+    }
+
     for (const track of tracksInTrash) {
       const file = this.metadata.get(track.id);
       if (file?.blobUrl) {
@@ -114,9 +121,10 @@ class StorageManager {
       }
       this.audioBlobs.delete(track.id);
       this.metadata.delete(track.id);
+      logger.log('StorageManager: Permanently deleted track.', { id: track.id });
     }
     this.persistMetadata();
-    logger.log(`StorageManager: Emptied ${tracksInTrash.length} items from trash.`);
+    logger.log(`StorageManager: Emptied ${tracksInTrash.length} items from trash. Persisted metadata.`);
   }
   
   async renameAudioFile(id: string, newTitle: string): Promise<boolean> {

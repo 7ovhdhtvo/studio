@@ -94,11 +94,15 @@ export function useAudioStorage() {
   }, [refreshData]);
 
   const emptyTrash = useCallback(async () => {
+    logger.log('useAudioStorage: emptyTrash function invoked.');
     if (window.confirm("Are you sure you want to permanently empty the trash? This cannot be undone.")) {
+      logger.log('useAudioStorage: User confirmed emptying trash.');
       await storageManager.emptyTrash();
       refreshData();
+    } else {
+      logger.log('useAudioStorage: User cancelled emptying trash.');
     }
-  }, [refreshData]);
+  }, [refreshData, tracks]); // Correctly add 'tracks' dependency
   
   const recoverTrack = useCallback(async (trackId: string) => {
     const success = await storageManager.recoverTrack(trackId);
