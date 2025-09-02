@@ -10,6 +10,10 @@ import VolumeControl from '@/components/stagehand/volume-control';
 import MetronomeControl from '@/components/stagehand/metronome-control';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut } from 'lucide-react';
+import ImportDialog from '@/components/stagehand/import-dialog';
+import TrackList from '@/components/stagehand/track-list';
+import { useAudioStorage } from '@/hooks/useAudioStorage';
+import type { AudioFile } from '@/lib/storage-manager';
 
 export type AutomationPoint = {
   time: number;
@@ -19,6 +23,10 @@ export type AutomationPoint = {
 export type OpenControlPanel = 'volume' | 'speed' | 'metronome' | null;
 
 export default function Home() {
+  const { tracks, isLoading, importAudio, deleteTrack, renameTrack, getAudioUrl } = useAudioStorage();
+  const [activeTrack, setActiveTrack] = useState<AudioFile | null>(null);
+  const [audioSrc, setAudioSrc] = useState<string | null>(null);
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [showVolumeAutomation, setShowVolumeAutomation] = useState(true);
   const [showSpeedAutomation, setShowSpeedAutomation] = useState(false);
@@ -81,6 +89,19 @@ export default function Home() {
     }
   }, [isPlaying]);
 
+  useEffect(() => {
+    if (audioRef.current && audioSrc) {
+      audioRef.current.src = audioSrc;
+      if (isPlaying) {
+        audioRef.current.play().catch(e => console.error("Playback failed", e));
+      }
+    } else if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+    }
+  }, [audioSrc]);
+
+
   const [volumePoints, setVolumePoints] = useState<AutomationPoint[]>([
     { time: 2.5, value: 80 },
     { time: 5.0, value: 50 },
@@ -97,66 +118,93 @@ export default function Home() {
   const handleZoomIn = () => setZoom(prev => Math.min(prev * 1.5, 20));
   const handleZoomOut = () => setZoom(prev => Math.max(prev / 1.5, 1));
 
-  const dummyTrack = {
-    title: "No Track Loaded",
-    originalFilename: "Import a track to begin",
-    duration: 180, // 3 minutes for placeholder
+  const handleSelectTrack = async (track: AudioFile) => {
+    setIsPlaying(false);
+    setActiveTrack(track);
+    const url = await getAudioUrl(track.id);
+    setAudioSrc(url);
   };
+
+  const handleDeleteTrack = async (id: string) => {
+    await deleteTrack(id);
+    if (activeTrack?.id === id) {
+      setActiveTrack(null);
+      setAudioSrc(null);
+    }
+  }
 
   return (
     <div className="flex h-screen w-full flex-col bg-background text-foreground">
       <audio ref={audioRef} onEnded={() => setIsPlaying(false)} />
       <Header />
-      <main className="flex-1 overflow-y-auto p-6 lg:p-8">
-        <div className="space-y-6">
-          <div className="flex justify-between items-start">
-            <div className="space-y-1">
-              <h2 className="text-2xl font-bold tracking-tight">
-                {dummyTrack.title}
-              </h2>
-              <p className="text-sm text-muted-foreground">{dummyTrack.originalFilename}</p>
-            </div>
-             <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" onClick={handleZoomOut}>
-                <ZoomOut className="w-4 h-4" />
-              </Button>
-              <Button variant="outline" size="icon" onClick={handleZoomIn}>
-                <ZoomIn className="w-4 h-4" />
-              </Button>
-            </div>
+      <main className="grid flex-1 grid-cols-1 md:grid-cols-[300px_1fr] lg:grid-cols-[350px_1fr]">
+        <div className="flex flex-col border-r bg-card">
+          <div className="p-4 flex justify-between items-center">
+            <h2 className="text-lg font-semibold">Track Library</h2>
+            <ImportDialog onImportTrack={importAudio} />
           </div>
-
-          <WaveformDisplay 
-            isPlaying={isPlaying} 
-            showVolumeAutomation={showVolumeAutomation}
-            showSpeedAutomation={showSpeedAutomation}
-            durationInSeconds={dummyTrack.duration}
-            zoom={zoom}
+          <TrackList 
+            tracks={tracks}
+            activeTrackId={activeTrack?.id}
+            onSelectTrack={handleSelectTrack}
+            onDeleteTrack={handleDeleteTrack}
+            onRenameTrack={renameTrack}
           />
-          <PlaybackControls isPlaying={isPlaying} setIsPlaying={setIsPlaying} />
+        </div>
 
-          <div className="flex justify-center items-start gap-4 pt-4 flex-wrap">
-            <VolumeControl 
-              isOpen={openControlPanel === 'volume'}
-              onToggle={() => handleToggleControlPanel('volume')}
-              showAutomation={showVolumeAutomation}
-              onToggleAutomation={setShowVolumeAutomation}
-              automationPoints={volumePoints}
+        <div className="flex flex-col overflow-y-auto p-6 lg:p-8">
+          <div className="space-y-6">
+            <div className="flex justify-between items-start">
+              <div className="space-y-1">
+                <h2 className="text-2xl font-bold tracking-tight">
+                  {activeTrack?.title ?? "No Track Loaded"}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {activeTrack?.originalName ?? "Import or select a track to begin"}
+                </p>
+              </div>
+               <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" onClick={handleZoomOut}>
+                  <ZoomOut className="w-4 h-4" />
+                </Button>
+                <Button variant="outline" size="icon" onClick={handleZoomIn}>
+                  <ZoomIn className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            <WaveformDisplay 
+              isPlaying={isPlaying} 
+              showVolumeAutomation={showVolumeAutomation}
+              showSpeedAutomation={showSpeedAutomation}
+              durationInSeconds={activeTrack?.duration ?? 180}
+              zoom={zoom}
             />
-            <SpeedControl 
-              isOpen={openControlPanel === 'speed'}
-              onToggle={() => handleToggleControlPanel('speed')}
-              speed={speed}
-              onSpeedChange={setSpeed}
-              showAutomation={showSpeedAutomation}
-              onToggleAutomation={setShowSpeedAutomation}
-              automationPoints={speedPoints}
-            />
-            <MetronomeControl 
-              isOpen={openControlPanel === 'metronome'}
-              onToggle={() => handleToggleControlPanel('metronome')}
-              speed={speed} 
-            />
+            <PlaybackControls isPlaying={isPlaying} setIsPlaying={setIsPlaying} />
+
+            <div className="flex justify-center items-start gap-4 pt-4 flex-wrap">
+              <VolumeControl 
+                isOpen={openControlPanel === 'volume'}
+                onToggle={() => handleToggleControlPanel('volume')}
+                showAutomation={showVolumeAutomation}
+                onToggleAutomation={setShowVolumeAutomation}
+                automationPoints={volumePoints}
+              />
+              <SpeedControl 
+                isOpen={openControlPanel === 'speed'}
+                onToggle={() => handleToggleControlPanel('speed')}
+                speed={speed}
+                onSpeedChange={setSpeed}
+                showAutomation={showSpeedAutomation}
+                onToggleAutomation={setShowSpeedAutomation}
+                automationPoints={speedPoints}
+              />
+              <MetronomeControl 
+                isOpen={openControlPanel === 'metronome'}
+                onToggle={() => handleToggleControlPanel('metronome')}
+                speed={speed} 
+              />
+            </div>
           </div>
         </div>
       </main>
