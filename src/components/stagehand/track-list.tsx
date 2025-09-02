@@ -30,6 +30,7 @@ type TrackListProps = {
   onMoveTrackToFolder: (trackId: string, folderId: string | null) => Promise<void>;
   onEmptyTrash: () => Promise<void>;
   onRecoverTrack: (id: string) => Promise<void>;
+  onRecoverFolder: (id: string) => Promise<void>;
   onImportTrack: (file: File, folderId: string | null) => void;
 };
 
@@ -82,7 +83,7 @@ const TrackItem = ({
          <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 flex-shrink-0 opacity-0 group-hover:opacity-100"
+            className="h-8 w-8 flex-shrink-0"
             onClick={(e) => { e.stopPropagation(); onRecoverTrack(track.id); }}
         >
             <Undo2 className="h-4 w-4" />
@@ -108,6 +109,7 @@ export default function TrackList({
   onMoveTrackToFolder,
   onEmptyTrash,
   onRecoverTrack,
+  onRecoverFolder,
   onImportTrack,
 }: TrackListProps) {
   const [draggingOverFolder, setDraggingOverFolder] = useState<string | null>(null);
@@ -180,26 +182,38 @@ export default function TrackList({
     onEmptyTrash();
   };
 
-  const { rootTracks, projectMap, trashTracks } = useMemo(() => {
+    const { rootTracks, projectMap, trashRootFolders, trashTracks } = useMemo(() => {
     const projectMap = new Map<string, { project: Folder; folders: Folder[]; tracks: AudioFile[] }>();
     const rootTracks: AudioFile[] = [];
-    const trashTracks: AudioFile[] = [];
-  
-    const projects = folders.filter(f => f.isProject);
-    projects.forEach(p => projectMap.set(p.id, { project: p, folders: [], tracks: [] }));
-
-    const normalFolders = folders.filter(f => !f.isProject && f.id !== TRASH_FOLDER_ID);
-    normalFolders.forEach(f => {
-      if (f.parentId && projectMap.has(f.parentId)) {
-        projectMap.get(f.parentId)!.folders.push(f);
-      }
-    });
     
-    for (const track of tracks) {
-      if (track.folderId === TRASH_FOLDER_ID) {
-        trashTracks.push(track);
-      } else if (track.folderId) {
-        const folder = folders.find(f => f.id === track.folderId);
+    // Trash contents
+    const trashRootFolders: Folder[] = [];
+    const trashTracks: AudioFile[] = [];
+
+    const liveFolders = folders.filter(f => f.parentId !== TRASH_FOLDER_ID && f.id !== TRASH_FOLDER_ID);
+    const trashedFolders = folders.filter(f => f.parentId === TRASH_FOLDER_ID);
+    const trashedRootProjects = trashedFolders.filter(f => f.isProject);
+    const trashedSubFolders = trashedFolders.filter(f => !f.isProject);
+
+    const liveTracks = tracks.filter(t => t.folderId !== TRASH_FOLDER_ID);
+    const directTrashTracks = tracks.filter(t => t.folderId === TRASH_FOLDER_ID);
+
+    trashRootFolders.push(...trashedRootProjects);
+
+    // Populate projectMap with live projects
+    liveFolders.filter(f => f.isProject).forEach(p => {
+      projectMap.set(p.id, { project: p, folders: [], tracks: [] });
+    });
+
+    // Populate subfolders within projects
+    liveFolders.filter(f => !f.isProject && f.parentId && projectMap.has(f.parentId)).forEach(f => {
+      projectMap.get(f.parentId)!.folders.push(f);
+    });
+
+    // Distribute live tracks
+    for (const track of liveTracks) {
+      if (track.folderId) {
+        const folder = liveFolders.find(f => f.id === track.folderId);
         if (folder?.parentId && projectMap.has(folder.parentId)) {
             projectMap.get(folder.parentId)!.tracks.push(track);
         } else if (folder?.isProject) {
@@ -209,7 +223,8 @@ export default function TrackList({
         rootTracks.push(track);
       }
     }
-    return { rootTracks, projectMap, trashTracks };
+
+    return { rootTracks, projectMap, trashRootFolders: [...trashedRootProjects, ...trashedSubFolders.filter(f => !f.originalParentId || !folders.some(p => p.id === f.originalParentId))], trashTracks: directTrashTracks };
   }, [tracks, folders]);
 
   const projects = useMemo(() => {
@@ -219,6 +234,31 @@ export default function TrackList({
       return a.project.name.localeCompare(b.project.name);
     });
   }, [projectMap, activeProjectId]);
+
+  const renderTrashFolder = (folder: Folder) => {
+    const subFolders = folders.filter(f => f.parentId === folder.id);
+    const tracksInFolder = tracks.filter(t => t.folderId === folder.id);
+    return (
+       <div key={folder.id} className="ml-4 pl-4 border-l-2 space-y-1">
+         <div className="flex items-center justify-between p-2 rounded-md group opacity-70">
+            <div className="flex items-center gap-2">
+                <FolderIcon className="w-5 h-5"/>
+                <span className="break-words min-w-0">{folder.name}</span>
+            </div>
+            <Button
+                variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0"
+                onClick={(e) => { e.stopPropagation(); onRecoverFolder(folder.id); }}>
+                <Undo2 className="h-4 w-4" />
+            </Button>
+        </div>
+        {subFolders.map(renderTrashFolder)}
+        {tracksInFolder.map(track => (
+            <TrackItem key={track.id} track={track} isActive={false} onSelectTrack={() => {}} onRecoverTrack={onRecoverTrack} />
+        ))}
+       </div>
+    );
+  };
+
 
   return (
     <>
@@ -252,6 +292,8 @@ export default function TrackList({
             const tracksDirectlyInProject = projectTracks.filter(t => t.folderId === project.id);
             return (
               <div key={project.id}
+                draggable
+                onDragStart={(e) => {e.dataTransfer.setData('folderId', project.id); e.dataTransfer.effectAllowed = 'move';}}
                 className={cn("border rounded-md mb-2", isActiveProject ? "border-primary/50 bg-accent/50" : "border-border")}
               >
                  <div className="flex items-center group/trigger p-2 hover:bg-accent/50 rounded-md" onClick={() => onSelectProject(project.id)}>
@@ -278,12 +320,7 @@ export default function TrackList({
                     <Accordion type="multiple" className="w-full">
                       {subFolders.map(folder => (
                          <AccordionItem value={folder.id} key={folder.id} 
-                          draggable onDragStart={(e) => {e.dataTransfer.setData('folderId', folder.id); e.dataTransfer.effectAllowed = 'move';}}
                           className={cn("border-none", draggingOverFolder === folder.id && 'bg-accent/50 rounded-md')}
-                          onDrop={(e) => {e.stopPropagation(); handleDrop(e, folder.id);}}
-                          onDragOver={handleDragOver}
-                          onDragEnter={(e) => { e.stopPropagation(); setDraggingOverFolder(folder.id); }}
-                          onDragLeave={(e) => { e.stopPropagation(); setDraggingOverFolder(null); }}
                          >
                            <div className="flex items-center group/trigger pr-2 hover:bg-accent/50 rounded-md">
                               <AccordionTrigger className="flex-initial p-2">
@@ -292,11 +329,20 @@ export default function TrackList({
                                     <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
                                   </div>
                               </AccordionTrigger>
-                              <div className="flex-1 text-left min-w-0 pl-2" onClick={(e) => {e.preventDefault(); e.stopPropagation(); handleStartEditingFolder(folder);}}>
+                              <div className="flex-1 text-left min-w-0 pl-2" 
+                                draggable 
+                                onDragStart={(e) => {e.stopPropagation(); e.dataTransfer.setData('folderId', folder.id); e.dataTransfer.effectAllowed = 'move';}}
+                                onClick={(e) => {e.preventDefault(); e.stopPropagation(); handleStartEditingFolder(folder);}}
+                              >
                                 {editingFolderId === folder.id ? ( <Input ref={inputRef} type="text" value={editingFolderName} onChange={(e) => setEditingFolderName(e.target.value)} onBlur={handleRenameFolder} onKeyDown={handleInputKeyDown} className="h-8 text-base" onClick={(e) => e.stopPropagation()} /> ) : ( <span className="break-words min-w-0">{folder.name}</span> )}
                               </div>
                            </div>
-                          <AccordionContent className="pb-0 pl-2">
+                          <AccordionContent className="pb-0 pl-2"
+                            onDrop={(e) => {e.stopPropagation(); handleDrop(e, folder.id);}}
+                            onDragOver={handleDragOver}
+                            onDragEnter={(e) => { e.stopPropagation(); setDraggingOverFolder(folder.id); }}
+                            onDragLeave={(e) => { e.stopPropagation(); setDraggingOverFolder(null); }}
+                          >
                             <div className="border-l-2 ml-2 pl-4 space-y-1 min-h-[40px]">
                                 {tracksInProjectFolders.filter(t => t.folderId === folder.id).map(track => (
                                     <TrackItem key={track.id} track={track} isActive={activeTrackId === track.id} onSelectTrack={onSelectTrack} onRecoverTrack={onRecoverTrack} />
@@ -337,11 +383,12 @@ export default function TrackList({
                 size="sm" 
                 className="w-full mb-2" 
                 onClick={handleEmptyTrashClick} 
-                disabled={trashTracks.length === 0}
+                disabled={trashTracks.length === 0 && trashRootFolders.length === 0}
               >
                 Empty Trash
               </Button>
-               <div className="border-l-2 ml-2 pl-4 space-y-1">
+               <div className="space-y-1">
+                {trashRootFolders.map(renderTrashFolder)}
                 {trashTracks.map(track => (
                     <TrackItem
                     key={track.id}
@@ -351,7 +398,7 @@ export default function TrackList({
                     onRecoverTrack={onRecoverTrack}
                     />
                 ))}
-                {trashTracks.length === 0 && (
+                {trashTracks.length === 0 && trashRootFolders.length === 0 && (
                     <p className="text-sm text-muted-foreground p-2">Trash is empty</p>
                 )}
                </div>

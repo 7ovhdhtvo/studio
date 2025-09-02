@@ -20,6 +20,7 @@ export interface Folder {
   createdAt: number;
   isProject: boolean;
   parentId: string | null;
+  originalParentId?: string | null; // Used for recovery
 }
 
 class StorageManager {
@@ -119,32 +120,37 @@ class StorageManager {
     return audioFile;
   }
   
-  // Moves a file to the trash folder
   async deleteAudioFile(id: string): Promise<boolean> {
     return this.moveTrackToFolder(id, TRASH_FOLDER_ID);
   }
 
   async emptyTrash(): Promise<void> {
     logger.log('StorageManager: emptyTrash method started.');
-    const tracksInTrash = this.getAllTracks().filter(t => t.folderId === TRASH_FOLDER_ID);
-    logger.log(`StorageManager: Found ${tracksInTrash.length} tracks in trash.`);
+    const itemsInTrash = [
+        ...Array.from(this.metadata.values()).filter(t => t.folderId === TRASH_FOLDER_ID),
+        ...Array.from(this.folders.values()).filter(f => f.parentId === TRASH_FOLDER_ID)
+    ];
 
-    if (tracksInTrash.length === 0) {
-      logger.log('StorageManager: Trash is already empty. Nothing to do.');
-      return;
-    }
-
-    for (const track of tracksInTrash) {
-      const file = this.metadata.get(track.id);
-      if (file?.blobUrl) {
-        URL.revokeObjectURL(file.blobUrl);
-      }
-      this.audioBlobs.delete(track.id);
-      this.metadata.delete(track.id);
-      logger.log('StorageManager: Permanently deleted track.', { id: track.id });
+    for (const item of itemsInTrash) {
+        if ('blobUrl' in item) { // It's a track
+            const file = this.metadata.get(item.id);
+            if (file?.blobUrl) {
+                URL.revokeObjectURL(file.blobUrl);
+            }
+            this.audioBlobs.delete(item.id);
+            this.metadata.delete(item.id);
+        } else { // It's a folder
+            const tracksInFolder = this.getAllTracks().filter(t => t.folderId === item.id);
+            for(const track of tracksInFolder) {
+              this.audioBlobs.delete(track.id);
+              this.metadata.delete(track.id);
+            }
+            this.folders.delete(item.id);
+        }
     }
     this.persistMetadata();
-    logger.log(`StorageManager: Emptied ${tracksInTrash.length} items from trash. Persisted metadata.`);
+    this.persistFolders();
+    logger.log(`StorageManager: Emptied ${itemsInTrash.length} items from trash.`);
   }
   
   async renameAudioFile(id: string, newTitle: string): Promise<boolean> {
@@ -203,37 +209,21 @@ class StorageManager {
   }
 
   async deleteFolder(id: string): Promise<boolean> {
-    const folder = this.folders.get(id);
-    if (!folder || id === TRASH_FOLDER_ID) return false;
+      const folder = this.folders.get(id);
+      if (!folder || id === TRASH_FOLDER_ID) return false;
 
-    logger.log('StorageManager: Deleting folder.', { id, name: folder.name });
-
-    // Move all tracks in the folder to trash
-    const tracksInFolder = this.getAllTracks().filter(t => t.folderId === id);
-    for (const track of tracksInFolder) {
-      await this.moveTrackToFolder(track.id, TRASH_FOLDER_ID);
-    }
-    logger.log(`StorageManager: Moved ${tracksInFolder.length} tracks to trash.`);
-
-    // If it's a project, also move subfolders to trash (by moving their tracks)
-    if (folder.isProject) {
-        const subFolders = Array.from(this.folders.values()).filter(f => f.parentId === id);
-        for(const subFolder of subFolders) {
-            await this.deleteFolder(subFolder.id);
-        }
-    }
-
-    // Delete the folder itself
-    this.folders.delete(id);
-    this.persistFolders();
-    logger.log('StorageManager: Folder deleted.', { id });
-    return true;
+      folder.originalParentId = folder.parentId;
+      folder.parentId = TRASH_FOLDER_ID;
+      this.folders.set(id, folder);
+      this.persistFolders();
+      logger.log('StorageManager: Moved folder to trash.', { id });
+      return true;
   }
 
   async moveTrackToFolder(trackId: string, folderId: string | null): Promise<boolean> {
     const track = this.metadata.get(trackId);
     if (!track) return false;
-    if (folderId && !this.folders.has(folderId)) return false;
+    if (folderId && !this.folders.has(folderId) && folderId !== TRASH_FOLDER_ID) return false;
     
     track.folderId = folderId;
     this.metadata.set(trackId, track);
@@ -243,7 +233,21 @@ class StorageManager {
   
   async recoverTrack(trackId: string): Promise<boolean> {
     logger.log('StorageManager: Recovering track.', { trackId });
-    return this.moveTrackToFolder(trackId, null); // Move to root for now
+    return this.moveTrackToFolder(trackId, null);
+  }
+
+  async recoverFolder(folderId: string): Promise<boolean> {
+    const folder = this.folders.get(folderId);
+    if (!folder || folder.parentId !== TRASH_FOLDER_ID) return false;
+
+    // Check if original parent still exists, otherwise recover to root
+    const parentExists = folder.originalParentId && this.folders.has(folder.originalParentId);
+    folder.parentId = parentExists ? folder.originalParentId : null;
+    delete folder.originalParentId;
+
+    this.folders.set(folderId, folder);
+    this.persistFolders();
+    return true;
   }
   
   getAllTracks(): AudioFile[] {
@@ -256,7 +260,13 @@ class StorageManager {
   
   private persistMetadata() {
     try {
-      const data = Array.from(this.metadata.entries());
+      // Create a temporary object without blobUrl before serializing
+      const serializableMetadata = new Map<string, AudioFile>();
+      this.metadata.forEach((value, key) => {
+          const { blobUrl, ...rest } = value;
+          serializableMetadata.set(key, rest);
+      });
+      const data = Array.from(serializableMetadata.entries());
       localStorage.setItem('audio_metadata', JSON.stringify(data));
     } catch (e) {
       logger.error('StorageManager: Failed to persist metadata.', { error: e });
