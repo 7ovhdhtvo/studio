@@ -135,6 +135,10 @@ export default function Home() {
     }
   }
 
+  const handleRenameTrack = async (id: string, newTitle: string) => {
+    await renameTrack(id, newTitle);
+  }
+
   // TEMPORARY DEBUG FUNCTION
   const handleForceRefresh = () => {
     const freshTracks = storageManager.getAllTracks();
@@ -156,7 +160,7 @@ export default function Home() {
             activeTrackId={activeTrack?.id}
             onSelectTrack={handleSelectTrack}
             onDeleteTrack={handleDeleteTrack}
-            onRenameTrack={renameTrack}
+            onRenameTrack={handleRenameTrack}
           />
         </div>
 
@@ -231,5 +235,3 @@ export default function Home() {
     </div>
   );
 }
-
-    

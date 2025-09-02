@@ -61,13 +61,19 @@ export default function TrackList({
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                <DropdownMenuItem onClick={() => handleRename(track.id, track.title)}>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={(e) => {
+                    e.stopPropagation();
+                    handleRename(track.id, track.title);
+                }}>
                   <Edit className="mr-2 h-4 w-4" />
                   <span>Rename</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={() => onDeleteTrack(track.id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteTrack(track.id)
+                  }}
                   className="text-destructive"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
