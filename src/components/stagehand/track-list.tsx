@@ -249,19 +249,21 @@ export default function TrackList({
                 className={cn("border rounded-md mb-2", activeProjectId === project.id ? "border-primary/50 bg-accent/50" : "border-border")}
                 onClick={() => onSelectProject(project.id)}
               >
-                 <AccordionTrigger className="hover:no-underline font-semibold text-base py-2 px-2 flex-initial">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <Briefcase className="w-5 h-5" />
-                      <div className="flex-1 text-left min-w-0" onClick={(e) => {e.stopPropagation(); handleStartEditingFolder(project);}}>
-                        {editingFolderId === project.id ? (
-                          <Input ref={inputRef} type="text" value={editingFolderName} onChange={(e) => setEditingFolderName(e.target.value)} onBlur={handleRenameFolder} onKeyDown={handleInputKeyDown} className="h-8 text-base" onClick={(e) => e.stopPropagation()} />
-                        ) : ( <span className="break-words">{project.name}</span> )}
-                      </div>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => handleImportClick(e, project.id)}>
+                 <div className="flex items-center pr-2">
+                    <AccordionTrigger className="hover:no-underline font-semibold text-base py-2 px-2 flex-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Briefcase className="w-5 h-5" />
+                          <div className="flex-1 text-left min-w-0" onClick={(e) => {e.stopPropagation(); handleStartEditingFolder(project);}}>
+                            {editingFolderId === project.id ? (
+                              <Input ref={inputRef} type="text" value={editingFolderName} onChange={(e) => setEditingFolderName(e.target.value)} onBlur={handleRenameFolder} onKeyDown={handleInputKeyDown} className="h-8 text-base" onClick={(e) => e.stopPropagation()} />
+                            ) : ( <span className="break-words">{project.name}</span> )}
+                          </div>
+                        </div>
+                    </AccordionTrigger>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => handleImportClick(e, project.id)}>
                         <Plus className="w-4 h-4" />
-                      </Button>
-                    </div>
-                </AccordionTrigger>
+                    </Button>
+                 </div>
                 <AccordionContent className="pb-0 pl-2">
                   {tracksDirectlyInProject.map(track => (
                     <TrackItem key={track.id} track={track} isActive={activeTrackId === track.id} onSelectTrack={onSelectTrack} onRecoverTrack={onRecoverTrack} />
