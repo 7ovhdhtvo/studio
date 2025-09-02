@@ -38,12 +38,13 @@ export default function Home() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
+  const loadTracksFromDb = async () => {
+    const storedTracks = await db.tracks.toArray();
+    setTracks(storedTracks);
+  };
+
   useEffect(() => {
-    const loadTracks = async () => {
-      const storedTracks = await db.tracks.toArray();
-      setTracks(storedTracks);
-    };
-    loadTracks();
+    loadTracksFromDb();
   }, []);
 
   useEffect(() => {
@@ -116,6 +117,8 @@ export default function Home() {
       return () => {
         URL.revokeObjectURL(url);
       };
+    } else {
+      setAudioSrc(null);
     }
   }, [activeTrack]);
 
@@ -142,11 +145,8 @@ export default function Home() {
         duration: audio.duration,
         blob: file
       };
-      const newId = await db.tracks.add(newTrack as AudioTrack);
-      const importedTrack = await db.tracks.get(newId);
-      if (importedTrack) {
-        setTracks(prev => [...prev, importedTrack]);
-      }
+      await db.tracks.add(newTrack as AudioTrack);
+      await loadTracksFromDb();
     });
   };
 
@@ -157,20 +157,23 @@ export default function Home() {
   const handleDeleteTrack = async (id: number) => {
     if (window.confirm("Are you sure you want to delete this track?")) {
       await db.tracks.delete(id);
-      setTracks(prev => prev.filter(t => t.id !== id));
+      
       if (activeTrack?.id === id) {
         setActiveTrack(null);
-        setAudioSrc(null);
       }
+      
+      await loadTracksFromDb();
     }
   };
 
   const handleRenameTrack = async (id: number, newTitle: string) => {
     await db.tracks.update(id, { title: newTitle });
-    setTracks(prev => prev.map(t => (t.id === id ? { ...t, title: newTitle } : t)));
+    
     if (activeTrack?.id === id) {
       setActiveTrack(prev => prev ? { ...prev, title: newTitle } : null);
     }
+
+    await loadTracksFromDb();
   };
   
   const handleZoomIn = () => setZoom(prev => Math.min(prev * 1.5, 20));
@@ -254,5 +257,3 @@ export default function Home() {
     </div>
   );
 }
-
-    
