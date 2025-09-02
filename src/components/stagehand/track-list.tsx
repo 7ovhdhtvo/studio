@@ -233,34 +233,34 @@ export default function TrackList({
                 onDragLeave={(e) => { e.stopPropagation(); setDraggingOverFolder(null); }}
               >
                  <div className="flex items-center group/trigger pr-2 hover:bg-accent/50 rounded-md">
-                    <AccordionTrigger className="hover:no-underline font-semibold text-base py-2 px-2 flex-1">
-                        <div className="flex items-center gap-2 w-full">
+                    <AccordionTrigger className="hover:no-underline font-semibold text-base py-2 px-2 flex-initial">
+                        <div className="flex items-center gap-1">
                           <FolderIcon className="w-5 h-5" />
-                          <div 
-                            className="flex-1 text-left min-w-0"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleStartEditingFolder(folder);
-                            }}
-                          >
-                            {editingFolderId === folder.id ? (
-                              <Input
-                                ref={inputRef}
-                                type="text"
-                                value={editingFolderName}
-                                onChange={(e) => setEditingFolderName(e.target.value)}
-                                onBlur={handleRenameFolder}
-                                onKeyDown={handleInputKeyDown}
-                                className="h-8 text-base"
-                                onClick={(e) => e.stopPropagation()} // Prevent accordion toggle
-                              />
-                            ) : (
-                              <span className="break-words">{folder.name}</span>
-                            )}
-                          </div>
                         </div>
                     </AccordionTrigger>
+                    <div 
+                      className="flex-1 text-left min-w-0 pl-2"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleStartEditingFolder(folder);
+                      }}
+                    >
+                      {editingFolderId === folder.id ? (
+                        <Input
+                          ref={inputRef}
+                          type="text"
+                          value={editingFolderName}
+                          onChange={(e) => setEditingFolderName(e.target.value)}
+                          onBlur={handleRenameFolder}
+                          onKeyDown={handleInputKeyDown}
+                          className="h-8 text-base"
+                          onClick={(e) => e.stopPropagation()} // Prevent accordion toggle
+                        />
+                      ) : (
+                        <span className="break-words">{folder.name}</span>
+                      )}
+                    </div>
                  </div>
                 <AccordionContent className="pb-0 pl-2">
                   <div className="border-l-2 ml-2 pl-4 space-y-1 min-h-[40px]">
