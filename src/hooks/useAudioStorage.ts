@@ -72,12 +72,20 @@ export function useAudioStorage() {
   }, [refreshData]);
 
   const createFolder = useCallback(async () => {
-    const folderName = prompt("Enter folder name:");
-    if (folderName && folderName.trim()) {
-      await storageManager.createFolder(folderName.trim());
-      refreshData();
+    logger.log('useAudioStorage: Creating new folder.');
+    // Find a unique name
+    let folderName = "New Folder";
+    let counter = 1;
+    const existingNames = new Set(folders.map(f => f.name));
+    while (existingNames.has(folderName)) {
+      folderName = `New Folder (${counter})`;
+      counter++;
     }
-  }, [refreshData]);
+    
+    await storageManager.createFolder(folderName);
+    refreshData();
+    logger.log('useAudioStorage: New folder created.', { name: folderName });
+  }, [refreshData, folders]);
 
   const renameFolder = useCallback(async (id: string, newName: string) => {
     const success = await storageManager.renameFolder(id, newName);
