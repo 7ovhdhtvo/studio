@@ -42,12 +42,6 @@ export function useAudioStorage() {
   
   const deleteTrack = useCallback(async (id: string) => {
     logger.log('useAudioStorage: Deleting track.', { id });
-    const confirmed = window.confirm('Are you sure you want to delete this track?');
-    if (!confirmed) {
-      logger.log('useAudioStorage: Deletion cancelled by user.');
-      return false;
-    }
-    
     const success = await storageManager.deleteAudioFile(id);
     if (success) {
       refreshTracks();
@@ -60,12 +54,9 @@ export function useAudioStorage() {
   
   const renameTrack = useCallback(async (id: string, currentTitle: string) => {
     logger.log('useAudioStorage: Renaming track.', { id, currentTitle });
-    const newTitle = prompt('Enter new track title:', currentTitle);
     
-    if (!newTitle || newTitle.trim() === '') {
-      logger.log('useAudioStorage: Rename cancelled by user.');
-      return false;
-    }
+    // Platzhalter-Logik: Hängt "(edited)" an den Titel an, statt einen Prompt zu zeigen.
+    const newTitle = `${currentTitle} (edited)`;
 
     const success = await storageManager.renameAudioFile(id, newTitle.trim());
     if (success) {
