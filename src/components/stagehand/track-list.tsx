@@ -1,117 +1,68 @@
-
-"use client";
-
-import type { AudioTrack } from "@/lib/local-db";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { Button } from "@/components/ui/button";
-import { Folder, Music, Trash2, Edit, MoreVertical } from "lucide-react";
-import { cn } from "@/lib/utils";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { ScrollArea } from "../ui/scroll-area";
-
-
-type TrackListProps = {
-  tracks: AudioTrack[];
-  activeTrackId?: number;
-  onSelectTrack: (track: AudioTrack) => void;
-  onDeleteTrack: (id: number) => void;
-  onRenameTrack: (id: number, newTitle: string) => void;
-};
-
-export default function TrackList({ 
-    tracks, 
-    activeTrackId, 
-    onSelectTrack, 
-    onDeleteTrack,
-    onRenameTrack 
-}: TrackListProps) {
-
-  const handleRename = (id: number, currentTitle: string) => {
-    const newTitle = prompt("Enter new track title:", currentTitle);
-    if (newTitle && newTitle.trim() !== "") {
-        onRenameTrack(id, newTitle.trim());
-    }
-  };
-
-  const formatDuration = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
-  };
-
-  return (
-    <Collapsible className="mb-6 border rounded-lg">
-      <CollapsibleTrigger asChild>
-        <Button variant="ghost" className="w-full flex justify-start items-center p-4 space-x-2">
-          <Folder className="w-5 h-5" />
-          <span className="font-semibold">Track Library</span>
-        </Button>
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <ScrollArea className="h-64">
-          <div className="p-2 space-y-1">
-            {tracks.length > 0 ? (
-              tracks.map((track) => (
-                <div
-                  key={track.id}
-                  onClick={() => onSelectTrack(track)}
-                  className={cn(
-                    "flex items-center justify-between p-2 rounded-md cursor-pointer group",
-                    activeTrackId === track.id
-                      ? "bg-primary/20 text-primary-foreground"
-                      : "hover:bg-accent"
-                  )}
-                >
-                  <div className="flex items-center gap-3 flex-1">
-                    <Music className="w-4 h-4 text-muted-foreground" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium leading-none truncate">{track.title}</p>
-                      <p className="text-xs text-muted-foreground truncate">{track.originalFilename}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-muted-foreground">{formatDuration(track.duration)}</span>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="w-8 h-8 opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem onClick={(e) => { 
-                            e.stopPropagation();
-                            handleRename(track.id, track.title); 
-                        }}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          <span>Rename</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={(e) => { 
-                            e.stopPropagation();
-                            onDeleteTrack(track.id); 
-                        }} className="text-destructive">
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          <span>Delete</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground text-center p-4">No tracks imported yet.</p>
-            )}
-          </div>
-        </ScrollArea>
-      </CollapsibleContent>
-    </Collapsible>
-  );
+{
+  "name": "nextn",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack -p 9002",
+    "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
+    "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@genkit-ai/googleai": "^1.14.1",
+    "@genkit-ai/next": "^1.14.1",
+    "@hookform/resolvers": "^4.1.3",
+    "@radix-ui/react-accordion": "^1.2.3",
+    "@radix-ui/react-alert-dialog": "^1.1.6",
+    "@radix-ui/react-avatar": "^1.1.3",
+    "@radix-ui/react-checkbox": "^1.1.4",
+    "@radix-ui/react-collapsible": "^1.1.11",
+    "@radix-ui/react-dialog": "^1.1.6",
+    "@radix-ui/react-dropdown-menu": "^2.1.6",
+    "@radix-ui/react-label": "^2.1.2",
+    "@radix-ui/react-menubar": "^1.1.6",
+    "@radix-ui/react-popover": "^1.1.6",
+    "@radix-ui/react-progress": "^1.1.2",
+    "@radix-ui/react-radio-group": "^1.2.3",
+    "@radix-ui/react-scroll-area": "^1.2.3",
+    "@radix-ui/react-select": "^2.1.6",
+    "@radix-ui/react-separator": "^1.1.2",
+    "@radix-ui/react-slider": "^1.2.3",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-switch": "^1.1.3",
+    "@radix-ui/react-tabs": "^1.1.3",
+    "@radix-ui/react-toast": "^1.2.6",
+    "@radix-ui/react-tooltip": "^1.1.8",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^3.6.0",
+    "dotenv": "^16.5.0",
+    "embla-carousel-react": "^8.6.0",
+    "firebase": "^11.9.1",
+    "genkit": "^1.14.1",
+    "lucide-react": "^0.475.0",
+    "next": "15.3.3",
+    "next-themes": "^0.3.0",
+    "patch-package": "^8.0.0",
+    "react": "^18.3.1",
+    "react-day-picker": "^8.10.1",
+    "react-dom": "^18.3.1",
+    "react-hook-form": "^7.54.2",
+    "recharts": "^2.15.1",
+    "tailwind-merge": "^3.0.1",
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "genkit-cli": "^1.14.1",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5"
+  }
 }
