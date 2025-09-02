@@ -7,9 +7,9 @@ import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '../ui/button';
 import { cn } from '@/lib/utils';
 import type { AudioFile, Folder } from '@/lib/storage-manager';
-import { useState, useMemo, type DragEvent, type MouseEvent } from 'react';
-import RenameDialog from './rename-dialog';
+import { useState, useMemo, type DragEvent, type MouseEvent, useEffect, useRef } from 'react';
 import { logger } from '@/lib/logger';
+import { Input } from '../ui/input';
 
 const TRASH_FOLDER_ID = 'trash';
 
@@ -103,12 +103,38 @@ export default function TrackList({
   onRecoverTrack,
   onImportTrack,
 }: TrackListProps) {
-  const [renamingTrack, setRenamingTrack] = useState<AudioFile | null>(null);
   const [draggingOverFolder, setDraggingOverFolder] = useState<string | null>(null);
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
+  const [editingFolderName, setEditingFolderName] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleRenameSave = (id: string, newTitle: string) => {
-    onRenameTrack(id, newTitle);
-    setRenamingTrack(null);
+  useEffect(() => {
+    if (editingFolderId && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editingFolderId]);
+
+  const handleStartEditingFolder = (folder: Folder) => {
+    setEditingFolderId(folder.id);
+    setEditingFolderName(folder.name);
+  };
+
+  const handleRenameFolder = () => {
+    if (editingFolderId && editingFolderName.trim()) {
+      onRenameFolder(editingFolderId, editingFolderName.trim());
+    }
+    setEditingFolderId(null);
+    setEditingFolderName('');
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleRenameFolder();
+    } else if (e.key === 'Escape') {
+      setEditingFolderId(null);
+      setEditingFolderName('');
+    }
   };
   
   const handleDrop = (e: DragEvent<HTMLDivElement>, folderId: string | null) => {
@@ -208,11 +234,31 @@ export default function TrackList({
               >
                  <div className="flex items-center group/trigger pr-2 hover:bg-accent/50 rounded-md">
                     <AccordionTrigger className="hover:no-underline font-semibold text-base py-2 px-2 flex-1">
-                        <div className="flex items-center gap-2">
-                        <FolderIcon className="w-5 h-5" />
-                        <div className="flex-1 text-left min-w-0">
-                            <span className="break-words">{folder.name}</span>
-                        </div>
+                        <div className="flex items-center gap-2 w-full">
+                          <FolderIcon className="w-5 h-5" />
+                          <div 
+                            className="flex-1 text-left min-w-0"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleStartEditingFolder(folder);
+                            }}
+                          >
+                            {editingFolderId === folder.id ? (
+                              <Input
+                                ref={inputRef}
+                                type="text"
+                                value={editingFolderName}
+                                onChange={(e) => setEditingFolderName(e.target.value)}
+                                onBlur={handleRenameFolder}
+                                onKeyDown={handleInputKeyDown}
+                                className="h-8 text-base"
+                                onClick={(e) => e.stopPropagation()} // Prevent accordion toggle
+                              />
+                            ) : (
+                              <span className="break-words">{folder.name}</span>
+                            )}
+                          </div>
                         </div>
                     </AccordionTrigger>
                  </div>
@@ -278,11 +324,6 @@ export default function TrackList({
           </AccordionItem>
         </Accordion>
       </ScrollArea>
-      <RenameDialog 
-        track={renamingTrack}
-        onSave={handleRenameSave}
-        onClose={() => setRenamingTrack(null)}
-      />
     </>
   );
 }
