@@ -186,45 +186,52 @@ export default function TrackList({
     const projectMap = new Map<string, { project: Folder; folders: Folder[]; tracks: AudioFile[] }>();
     const rootTracks: AudioFile[] = [];
     
-    // Trash contents
     const trashRootFolders: Folder[] = [];
     const trashTracks: AudioFile[] = [];
 
     const liveFolders = folders.filter(f => f.parentId !== TRASH_FOLDER_ID && f.id !== TRASH_FOLDER_ID);
-    const trashedFolders = folders.filter(f => f.parentId === TRASH_FOLDER_ID);
-    const trashedRootProjects = trashedFolders.filter(f => f.isProject);
-    const trashedSubFolders = trashedFolders.filter(f => !f.isProject);
+    const trashedItems = folders.filter(f => f.parentId === TRASH_FOLDER_ID || f.id === TRASH_FOLDER_ID);
+    const trashedFolderIds = new Set(trashedItems.map(f => f.id));
 
-    const liveTracks = tracks.filter(t => t.folderId !== TRASH_FOLDER_ID);
-    const directTrashTracks = tracks.filter(t => t.folderId === TRASH_FOLDER_ID);
+    const getFullTrashHierarchy = (folderId: string): Folder[] => {
+      const children = folders.filter(f => f.parentId === folderId);
+      return children.flatMap(child => [child, ...getFullTrashHierarchy(child.id)]);
+    };
+    
+    const allTrashedFolders = getFullTrashHierarchy(TRASH_FOLDER_ID);
+    allTrashedFolders.forEach(f => trashedFolderIds.add(f.id));
 
-    trashRootFolders.push(...trashedRootProjects);
-
-    // Populate projectMap with live projects
     liveFolders.filter(f => f.isProject).forEach(p => {
       projectMap.set(p.id, { project: p, folders: [], tracks: [] });
     });
 
-    // Populate subfolders within projects
     liveFolders.filter(f => !f.isProject && f.parentId && projectMap.has(f.parentId)).forEach(f => {
       projectMap.get(f.parentId)!.folders.push(f);
     });
 
-    // Distribute live tracks
+    const liveTracks = tracks.filter(t => !trashedFolderIds.has(t.folderId || ''));
+
     for (const track of liveTracks) {
       if (track.folderId) {
         const folder = liveFolders.find(f => f.id === track.folderId);
-        if (folder?.parentId && projectMap.has(folder.parentId)) {
-            projectMap.get(folder.parentId)!.tracks.push(track);
-        } else if (folder?.isProject) {
-            projectMap.get(folder.id)!.tracks.push(track);
+        if (folder) {
+          const parentProject = folder.isProject ? folder : liveFolders.find(f => f.id === folder.parentId);
+          if (parentProject && projectMap.has(parentProject.id)) {
+            projectMap.get(parentProject.id)!.tracks.push(track);
+          } else {
+             rootTracks.push(track);
+          }
         }
       } else {
         rootTracks.push(track);
       }
     }
+    
+    trashRootFolders.push(...folders.filter(f => f.parentId === TRASH_FOLDER_ID));
+    trashTracks.push(...tracks.filter(t => t.folderId === TRASH_FOLDER_ID));
 
-    return { rootTracks, projectMap, trashRootFolders: [...trashedRootProjects, ...trashedSubFolders.filter(f => !f.originalParentId || !folders.some(p => p.id === f.originalParentId))], trashTracks: directTrashTracks };
+
+    return { rootTracks, projectMap, trashRootFolders, trashTracks };
   }, [tracks, folders]);
 
   const projects = useMemo(() => {
@@ -241,8 +248,8 @@ export default function TrackList({
     return (
        <div key={folder.id} className="ml-4 pl-4 border-l-2 space-y-1">
          <div className="flex items-center justify-between p-2 rounded-md group opacity-70">
-            <div className="flex items-center gap-2">
-                <FolderIcon className="w-5 h-5"/>
+            <div className="flex items-center gap-2 min-w-0">
+                <FolderIcon className="w-5 h-5 flex-shrink-0"/>
                 <span className="break-words min-w-0">{folder.name}</span>
             </div>
             <Button

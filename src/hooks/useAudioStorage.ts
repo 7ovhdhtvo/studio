@@ -91,8 +91,9 @@ export function useAudioStorage() {
   
   const createProject = useCallback(async () => {
     logger.log('useAudioStorage: Creating new project.');
-    await storageManager.createProject("New Project");
+    const newProject = await storageManager.createProject("New Project");
     refreshData();
+    return newProject.id;
   }, [refreshData]);
 
   const renameFolder = useCallback(async (id: string, newName: string) => {

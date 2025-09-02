@@ -39,6 +39,7 @@ export default function Home() {
     moveTrackToFolder,
     emptyTrash,
     recoverTrack,
+    recoverFolder,
   } = useAudioStorage();
 
   const [activeTrack, setActiveTrack] = useState<AudioFile | null>(null);
@@ -176,6 +177,13 @@ export default function Home() {
       console.warn("No active project selected to create a folder in.");
     }
   };
+  
+  const handleCreateProject = async () => {
+    const newProjectId = await createProject();
+    if (newProjectId) {
+      setActiveProjectId(newProjectId);
+    }
+  }
 
   return (
     <div className="flex h-screen w-full flex-col bg-background text-foreground">
@@ -198,11 +206,12 @@ export default function Home() {
             onDeleteFolder={deleteFolder}
             onRenameTrack={handleRenameTrack}
             onCreateFolder={handleCreateFolder}
-            onCreateProject={createProject}
+            onCreateProject={handleCreateProject}
             onRenameFolder={renameFolder}
             onMoveTrackToFolder={moveTrackToFolder}
             onEmptyTrash={emptyTrash}
             onRecoverTrack={handleRecoverTrack}
+            onRecoverFolder={recoverFolder}
             onImportTrack={importAudio}
           />
         </div>

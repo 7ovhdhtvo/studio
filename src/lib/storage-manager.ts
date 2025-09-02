@@ -126,31 +126,43 @@ class StorageManager {
 
   async emptyTrash(): Promise<void> {
     logger.log('StorageManager: emptyTrash method started.');
-    const itemsInTrash = [
-        ...Array.from(this.metadata.values()).filter(t => t.folderId === TRASH_FOLDER_ID),
-        ...Array.from(this.folders.values()).filter(f => f.parentId === TRASH_FOLDER_ID)
-    ];
-
-    for (const item of itemsInTrash) {
-        if ('blobUrl' in item) { // It's a track
-            const file = this.metadata.get(item.id);
-            if (file?.blobUrl) {
-                URL.revokeObjectURL(file.blobUrl);
-            }
-            this.audioBlobs.delete(item.id);
-            this.metadata.delete(item.id);
-        } else { // It's a folder
-            const tracksInFolder = this.getAllTracks().filter(t => t.folderId === item.id);
-            for(const track of tracksInFolder) {
-              this.audioBlobs.delete(track.id);
-              this.metadata.delete(track.id);
-            }
-            this.folders.delete(item.id);
-        }
+    
+    const getDescendants = (folderId: string): { files: string[], folders: string[] } => {
+      let files: string[] = [];
+      let folders: string[] = [];
+      const children = Array.from(this.folders.values()).filter(f => f.parentId === folderId);
+      for (const child of children) {
+        folders.push(child.id);
+        const descendants = getDescendants(child.id);
+        files.push(...descendants.files);
+        folders.push(...descendants.folders);
+      }
+      const folderFiles = Array.from(this.metadata.values()).filter(t => t.folderId === folderId).map(t => t.id);
+      files.push(...folderFiles);
+      return { files, folders };
     }
+
+    const trashDescendants = getDescendants(TRASH_FOLDER_ID);
+    const trashedFolders = Array.from(this.folders.values()).filter(f => f.parentId === TRASH_FOLDER_ID).map(f => f.id);
+    const allFoldersToDelete = [...trashDescendants.folders, ...trashedFolders];
+    const allFilesToDelete = [...trashDescendants.files];
+
+    for (const fileId of allFilesToDelete) {
+      const file = this.metadata.get(fileId);
+      if (file?.blobUrl) {
+          URL.revokeObjectURL(file.blobUrl);
+      }
+      this.audioBlobs.delete(fileId);
+      this.metadata.delete(fileId);
+    }
+    
+    for (const folderId of allFoldersToDelete) {
+      this.folders.delete(folderId);
+    }
+
     this.persistMetadata();
     this.persistFolders();
-    logger.log(`StorageManager: Emptied ${itemsInTrash.length} items from trash.`);
+    logger.log(`StorageManager: Emptied trash.`);
   }
   
   async renameAudioFile(id: string, newTitle: string): Promise<boolean> {
@@ -232,6 +244,9 @@ class StorageManager {
   }
   
   async recoverTrack(trackId: string): Promise<boolean> {
+    const track = this.metadata.get(trackId);
+    if (!track || track.folderId !== TRASH_FOLDER_ID) return false;
+    
     logger.log('StorageManager: Recovering track.', { trackId });
     return this.moveTrackToFolder(trackId, null);
   }
@@ -243,6 +258,12 @@ class StorageManager {
     // Check if original parent still exists, otherwise recover to root
     const parentExists = folder.originalParentId && this.folders.has(folder.originalParentId);
     folder.parentId = parentExists ? folder.originalParentId : null;
+    
+    // If it's a project, it should be a root item.
+    if (folder.isProject) {
+      folder.parentId = null;
+    }
+    
     delete folder.originalParentId;
 
     this.folders.set(folderId, folder);
