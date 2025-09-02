@@ -13,7 +13,7 @@ import { ZoomIn, ZoomOut } from 'lucide-react';
 import ImportDialog from '@/components/stagehand/import-dialog';
 import TrackList from '@/components/stagehand/track-list';
 import { useAudioStorage } from '@/hooks/useAudioStorage';
-import type { AudioFile } from '@/lib/storage-manager';
+import type { AudioFile, Folder } from '@/lib/storage-manager';
 import DebugConsole from '@/components/stagehand/debug-console';
 
 export type AutomationPoint = {
@@ -24,7 +24,20 @@ export type AutomationPoint = {
 export type OpenControlPanel = 'volume' | 'speed' | 'metronome' | null;
 
 export default function Home() {
-  const { tracks, isLoading, importAudio, deleteTrack, renameTrack, getAudioUrl } = useAudioStorage();
+  const { 
+    tracks, 
+    folders,
+    isLoading, 
+    importAudio, 
+    deleteTrack, 
+    renameTrack, 
+    getAudioUrl,
+    createFolder,
+    renameFolder,
+    moveTrackToFolder,
+    emptyTrash,
+  } = useAudioStorage();
+
   const [activeTrack, setActiveTrack] = useState<AudioFile | null>(null);
   const [audioSrc, setAudioSrc] = useState<string | null>(null);
 
@@ -145,16 +158,21 @@ export default function Home() {
       <Header />
       <main className="grid flex-1 grid-cols-1 md:grid-cols-[300px_1fr] lg:grid-cols-[350px_1fr]">
         <div className="flex flex-col border-r bg-card">
-          <div className="p-4 flex justify-between items-center">
+          <div className="p-4 flex justify-between items-center border-b">
             <h2 className="text-lg font-semibold">Track Library</h2>
-            <ImportDialog onImportTrack={importAudio} />
+            <ImportDialog onImportTrack={(file) => importAudio(file, null)} />
           </div>
           <TrackList 
             tracks={tracks}
+            folders={folders}
             activeTrackId={activeTrack?.id}
             onSelectTrack={handleSelectTrack}
             onDeleteTrack={handleDeleteTrack}
             onRenameTrack={handleRenameTrack}
+            onCreateFolder={createFolder}
+            onRenameFolder={renameFolder}
+            onMoveTrackToFolder={moveTrackToFolder}
+            onEmptyTrash={emptyTrash}
           />
         </div>
 
