@@ -14,6 +14,7 @@ import ImportDialog from '@/components/stagehand/import-dialog';
 import TrackList from '@/components/stagehand/track-list';
 import { useAudioStorage } from '@/hooks/useAudioStorage';
 import type { AudioFile } from '@/lib/storage-manager';
+import { storageManager } from '@/lib/storage-manager';
 
 export type AutomationPoint = {
   time: number;
@@ -23,7 +24,7 @@ export type AutomationPoint = {
 export type OpenControlPanel = 'volume' | 'speed' | 'metronome' | null;
 
 export default function Home() {
-  const { tracks, isLoading, importAudio, deleteTrack, renameTrack, getAudioUrl } = useAudioStorage();
+  const { tracks, isLoading, importAudio, deleteTrack, renameTrack, getAudioUrl, setTracks } = useAudioStorage();
   const [activeTrack, setActiveTrack] = useState<AudioFile | null>(null);
   const [audioSrc, setAudioSrc] = useState<string | null>(null);
 
@@ -92,6 +93,7 @@ export default function Home() {
   useEffect(() => {
     if (audioRef.current && audioSrc) {
       audioRef.current.src = audioSrc;
+      audioRef.current.load(); // Ensure the new source is loaded
       if (isPlaying) {
         audioRef.current.play().catch(e => console.error("Playback failed", e));
       }
@@ -133,6 +135,12 @@ export default function Home() {
     }
   }
 
+  // TEMPORARY DEBUG FUNCTION
+  const handleForceRefresh = () => {
+    const freshTracks = storageManager.getAllTracks();
+    setTracks(freshTracks);
+  }
+
   return (
     <div className="flex h-screen w-full flex-col bg-background text-foreground">
       <audio ref={audioRef} onEnded={() => setIsPlaying(false)} />
@@ -153,6 +161,18 @@ export default function Home() {
         </div>
 
         <div className="flex flex-col overflow-y-auto p-6 lg:p-8">
+          
+          {/* ================== TEMPORARY DEBUG PANEL ================== */}
+          <div className="bg-destructive/10 border border-destructive text-destructive-foreground p-4 rounded-lg mb-6">
+            <h3 className="font-bold text-lg mb-2">Debug Panel</h3>
+            <p className="text-sm mb-2">This panel shows the raw 'tracks' state. It MUST update immediately after a delete/rename action.</p>
+            <Button onClick={handleForceRefresh} size="sm" variant="destructive">Force Refresh from Storage</Button>
+            <pre className="mt-2 bg-background/50 p-2 rounded text-xs overflow-auto max-h-40">
+              {JSON.stringify(tracks, null, 2)}
+            </pre>
+          </div>
+          {/* ========================================================== */}
+
           <div className="space-y-6">
             <div className="flex justify-between items-start">
               <div className="space-y-1">
@@ -211,3 +231,5 @@ export default function Home() {
     </div>
   );
 }
+
+    

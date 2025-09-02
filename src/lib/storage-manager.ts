@@ -128,7 +128,7 @@ class StorageManager {
     if (blob) {
       const url = URL.createObjectURL(blob);
       file.blobUrl = url;
-      this.metadata.set(id, file);
+      this.metadata.set(id, file); // No need to persist
       return url;
     }
     
@@ -137,7 +137,7 @@ class StorageManager {
     if (memoryBlob) {
       const url = URL.createObjectURL(memoryBlob);
       file.blobUrl = url;
-      this.metadata.set(id, file); // No need to persist metadata here for performance
+      this.metadata.set(id, file); // No need to persist
       return url;
     }
     
@@ -199,3 +199,5 @@ class StorageManager {
 
 // Singleton Export
 export const storageManager = new StorageManager();
+
+    
