@@ -177,6 +177,11 @@ class StorageManager {
     return true;
   }
   
+  async recoverTrack(trackId: string): Promise<boolean> {
+    logger.log('StorageManager: Recovering track.', { trackId });
+    return this.moveTrackToFolder(trackId, null); // Move to root
+  }
+  
   getAllTracks(): AudioFile[] {
     return Array.from(this.metadata.values()).sort((a, b) => a.title.localeCompare(b.title));
   }

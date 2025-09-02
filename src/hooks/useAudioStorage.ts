@@ -100,6 +100,13 @@ export function useAudioStorage() {
     }
   }, [refreshData]);
   
+  const recoverTrack = useCallback(async (trackId: string) => {
+    const success = await storageManager.recoverTrack(trackId);
+    if (success) {
+      refreshData();
+    }
+  }, [refreshData]);
+  
   const getAudioUrl = useCallback(async (id: string) => {
     return await storageManager.getAudioUrl(id);
   }, []);
@@ -115,6 +122,7 @@ export function useAudioStorage() {
     renameFolder,
     moveTrackToFolder,
     emptyTrash,
+    recoverTrack,
     getAudioUrl,
   };
 }

@@ -7,13 +7,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Edit, MoreVertical, Trash2, Folder as FolderIcon, FolderPlus, Trash, CornerDownRight } from 'lucide-react';
+import { Edit, MoreVertical, Trash2, Folder as FolderIcon, FolderPlus, Trash, CornerDownRight, Undo2 } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '../ui/button';
 import { cn } from '@/lib/utils';
 import type { AudioFile, Folder } from '@/lib/storage-manager';
-import { logger } from '@/lib/logger';
 import { useState, useMemo, type DragEvent } from 'react';
 import RenameDialog from './rename-dialog';
 
@@ -30,6 +29,7 @@ type TrackListProps = {
   onRenameFolder: (id: string, newName: string) => Promise<void>;
   onMoveTrackToFolder: (trackId: string, folderId: string | null) => Promise<void>;
   onEmptyTrash: () => Promise<void>;
+  onRecoverTrack: (id: string) => Promise<void>;
 };
 
 const TrackItem = ({
@@ -38,33 +38,59 @@ const TrackItem = ({
   onSelectTrack,
   setRenamingTrack,
   onDeleteTrack,
+  onRecoverTrack,
 }: {
   track: AudioFile;
   isActive: boolean;
   onSelectTrack: (track: AudioFile) => void;
   setRenamingTrack: (track: AudioFile) => void;
   onDeleteTrack: (id: string) => void;
+  onRecoverTrack: (id: string) => void;
 }) => {
+  const isTrashed = track.folderId === TRASH_FOLDER_ID;
+
   const handleDragStart = (e: DragEvent<HTMLDivElement>) => {
+    if (isTrashed) {
+      e.preventDefault();
+      return;
+    }
     e.dataTransfer.setData('trackId', track.id);
     e.dataTransfer.effectAllowed = 'move';
   };
 
+  const handleClick = () => {
+    if (!isTrashed) {
+      onSelectTrack(track);
+    }
+  };
+
   return (
     <div
-      draggable
+      draggable={!isTrashed}
       onDragStart={handleDragStart}
-      onClick={() => onSelectTrack(track)}
+      onClick={handleClick}
       className={cn(
-        "flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-accent group",
-        isActive && "bg-accent"
+        "flex items-center justify-between p-2 rounded-md group",
+        !isTrashed && "cursor-pointer hover:bg-accent",
+        isActive && !isTrashed && "bg-accent",
+        isTrashed && "opacity-70"
       )}
     >
       <div className="flex-1 overflow-hidden">
         <p className="font-medium truncate">{track.title}</p>
         <p className="text-sm text-muted-foreground truncate">{track.originalName}</p>
       </div>
-      {track.folderId !== TRASH_FOLDER_ID && (
+      
+      {isTrashed ? (
+         <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 flex-shrink-0 opacity-0 group-hover:opacity-100"
+            onClick={(e) => { e.stopPropagation(); onRecoverTrack(track.id); }}
+        >
+            <Undo2 className="h-4 w-4" />
+        </Button>
+      ) : (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
@@ -104,6 +130,7 @@ export default function TrackList({
   onRenameFolder,
   onMoveTrackToFolder,
   onEmptyTrash,
+  onRecoverTrack,
 }: TrackListProps) {
   const [renamingTrack, setRenamingTrack] = useState<AudioFile | null>(null);
   const [draggingOverFolder, setDraggingOverFolder] = useState<string | null>(null);
@@ -158,7 +185,7 @@ export default function TrackList({
       </div>
       <ScrollArea className="flex-1">
         <div 
-          className={cn("p-2 space-y-1", draggingOverFolder === 'root' && 'bg-accent/50 rounded-md')}
+          className={cn("p-2 space-y-1 min-h-[50px]", draggingOverFolder === 'root' && 'bg-accent/50 rounded-md')}
           onDrop={(e) => handleDrop(e, null)}
           onDragOver={handleDragOver}
           onDragEnter={() => setDraggingOverFolder('root')}
@@ -172,6 +199,7 @@ export default function TrackList({
               onSelectTrack={onSelectTrack}
               setRenamingTrack={setRenamingTrack}
               onDeleteTrack={onDeleteTrack}
+              onRecoverTrack={onRecoverTrack}
             />
           ))}
         </div>
@@ -192,7 +220,7 @@ export default function TrackList({
                 </div>
               </AccordionTrigger>
               <AccordionContent className="pb-0 pl-2">
-                 <div className="border-l-2 ml-2 pl-4 space-y-1">
+                 <div className="border-l-2 ml-2 pl-4 space-y-1 min-h-[40px]">
                     {(folderTracks.get(folder.id) || []).map(track => (
                         <TrackItem
                         key={track.id}
@@ -201,6 +229,7 @@ export default function TrackList({
                         onSelectTrack={onSelectTrack}
                         setRenamingTrack={setRenamingTrack}
                         onDeleteTrack={onDeleteTrack}
+                        onRecoverTrack={onRecoverTrack}
                         />
                     ))}
                     {(folderTracks.get(folder.id) || []).length === 0 && (
@@ -231,6 +260,7 @@ export default function TrackList({
                     onSelectTrack={onSelectTrack}
                     setRenamingTrack={setRenamingTrack}
                     onDeleteTrack={onDeleteTrack}
+                    onRecoverTrack={onRecoverTrack}
                     />
                 ))}
                 {trashTracks.length === 0 && (

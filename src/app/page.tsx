@@ -36,6 +36,7 @@ export default function Home() {
     renameFolder,
     moveTrackToFolder,
     emptyTrash,
+    recoverTrack,
   } = useAudioStorage();
 
   const [activeTrack, setActiveTrack] = useState<AudioFile | null>(null);
@@ -151,6 +152,10 @@ export default function Home() {
   const handleRenameTrack = async (id: string, newTitle: string) => {
     await renameTrack(id, newTitle);
   }
+  
+  const handleRecoverTrack = async (id: string) => {
+    await recoverTrack(id);
+  }
 
   return (
     <div className="flex h-screen w-full flex-col bg-background text-foreground">
@@ -173,6 +178,7 @@ export default function Home() {
             onRenameFolder={renameFolder}
             onMoveTrackToFolder={moveTrackToFolder}
             onEmptyTrash={emptyTrash}
+            onRecoverTrack={handleRecoverTrack}
           />
         </div>
 
