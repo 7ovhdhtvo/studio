@@ -13,8 +13,9 @@ import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '../ui/button';
 import { cn } from '@/lib/utils';
 import type { AudioFile, Folder } from '@/lib/storage-manager';
-import { useState, useMemo, type DragEvent } from 'react';
+import { useState, useMemo, type DragEvent, type MouseEvent } from 'react';
 import RenameDialog from './rename-dialog';
+import { logger } from '@/lib/logger';
 
 const TRASH_FOLDER_ID = 'trash';
 
@@ -64,6 +65,18 @@ const TrackItem = ({
     }
   };
 
+  const handleDeleteClick = (e: MouseEvent) => {
+    e.stopPropagation();
+    logger.log('TrackList: Delete action triggered.', { id: track.id });
+    onDeleteTrack(track.id);
+  };
+
+  const handleRenameClick = (e: MouseEvent) => {
+    e.stopPropagation();
+    logger.log('TrackList: Rename action triggered.', { id: track.id, currentTitle: track.title });
+    setRenamingTrack(track);
+  };
+
   return (
     <div
       draggable={!isTrashed}
@@ -98,17 +111,11 @@ const TrackItem = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={(e) => {
-              e.stopPropagation();
-              setRenamingTrack(track);
-            }}>
+            <DropdownMenuItem onClick={handleRenameClick}>
               <Edit className="mr-2 h-4 w-4" />
               <span>Rename</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={(e) => {
-              e.stopPropagation();
-              onDeleteTrack(track.id);
-            }} className="text-destructive">
+            <DropdownMenuItem onClick={handleDeleteClick} className="text-destructive">
               <Trash2 className="mr-2 h-4 w-4" />
               <span>Move to Trash</span>
             </DropdownMenuItem>
@@ -152,6 +159,12 @@ export default function TrackList({
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+  };
+  
+  const handleEmptyTrashClick = (e: MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    logger.log('TrackList: Empty Trash button clicked.');
+    onEmptyTrash();
   };
 
   const { rootTracks, folderTracks, trashTracks } = useMemo(() => {
@@ -248,7 +261,13 @@ export default function TrackList({
               </div>
             </AccordionTrigger>
             <AccordionContent className="pb-0 pl-2">
-              <Button variant="outline" size="sm" className="w-full mb-2" onClick={onEmptyTrash} disabled={trashTracks.length === 0}>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full mb-2" 
+                onClick={handleEmptyTrashClick} 
+                disabled={trashTracks.length === 0}
+              >
                 Empty Trash
               </Button>
                <div className="border-l-2 ml-2 pl-4 space-y-1">
