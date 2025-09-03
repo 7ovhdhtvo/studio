@@ -7,7 +7,6 @@ import { useRef, type MouseEvent, type RefObject } from 'react';
 import TimeRuler from './time-ruler';
 import type { AutomationPoint } from '@/lib/storage-manager';
 import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, Dot, Tooltip } from 'recharts';
-import { logger } from '@/lib/logger';
 
 const CustomDot = (props: any) => {
     const { cx, cy, stroke, payload, onMouseDown, onMouseUp, onDoubleClick } = props;
@@ -72,7 +71,6 @@ type WaveformDisplayProps = {
   onAutomationPointsChange: (points: AutomationPoint[]) => void;
   onAutomationDragStart: () => void;
   onAutomationDragEnd: () => void;
-  showMockup?: boolean;
 };
 
 const ChannelWaveform = ({ data, progress, isStereo }: { data: number[], progress: number, isStereo: boolean }) => {
@@ -112,37 +110,33 @@ export default function WaveformDisplay({
   onAutomationPointsChange,
   onAutomationDragStart,
   onAutomationDragEnd,
-  showMockup
 }: WaveformDisplayProps) {
   const waveformInteractionRef = useRef<HTMLDivElement>(null);
   const isMouseDownRef = useRef(false);
   const draggingPointIdRef = useRef<string | null>(null);
 
   const getChartData = (points: AutomationPoint[], baseline: number) => {
-    logger.log('getChartData called', { points, baseline, duration: durationInSeconds });
     if (durationInSeconds === 0) return [];
     
-    let data = [];
     if (points.length === 0) {
-        logger.log("No points, creating baseline data.");
-        data.push({ time: 0, value: baseline, isAutomationPoint: false });
-        data.push({ time: durationInSeconds, value: baseline, isAutomationPoint: false });
-    } else {
-        logger.log("Points exist, creating data from points.");
-        const sortedPoints = [...points].sort((a, b) => a.time - b.time);
-        
-        if (sortedPoints[0].time > 0) {
-            data.push({ time: 0, value: sortedPoints[0].value, isAutomationPoint: false });
-        }
-        
-        sortedPoints.forEach(p => data.push({ ...p, isAutomationPoint: true }));
-        
-        const lastPoint = sortedPoints[sortedPoints.length - 1];
-        if (lastPoint.time < durationInSeconds) {
-            data.push({ time: durationInSeconds, value: lastPoint.value, isAutomationPoint: false });
-        }
+        return [
+            { time: 0, value: baseline, isAutomationPoint: false },
+            { time: durationInSeconds, value: baseline, isAutomationPoint: false }
+        ];
     }
-    logger.log("Final chartData:", data);
+    
+    const sortedPoints = [...points].sort((a, b) => a.time - b.time);
+    const data = sortedPoints.map(p => ({ ...p, isAutomationPoint: true }));
+
+    if (sortedPoints[0].time > 0) {
+        data.unshift({ time: 0, value: sortedPoints[0].value, isAutomationPoint: false });
+    }
+    
+    const lastPoint = sortedPoints[sortedPoints.length - 1];
+    if (lastPoint.time < durationInSeconds) {
+        data.push({ time: durationInSeconds, value: lastPoint.value, isAutomationPoint: false });
+    }
+    
     return data;
   };
   
@@ -157,10 +151,7 @@ export default function WaveformDisplay({
   };
   
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
-    if (showVolumeAutomation) {
-      // Clicks are handled by recharts, do nothing here to allow event pass-through
-      return;
-    }
+    if (showVolumeAutomation) return;
     isMouseDownRef.current = true;
     onScrubStart();
     handleInteraction(e);
@@ -178,7 +169,6 @@ export default function WaveformDisplay({
         onScrubEnd();
     }
     if (draggingPointIdRef.current) {
-        logger.log("handleMouseUpAndLeave: Dragging ended for point:", draggingPointIdRef.current);
         draggingPointIdRef.current = null;
         onAutomationDragEnd();
     }
@@ -186,10 +176,8 @@ export default function WaveformDisplay({
 
   const handlePointMouseDown = (payload: any) => {
       if (!payload || !payload.id) {
-        logger.error("handlePointMouseDown: No valid payload or id found.");
         return;
       }
-      logger.log("handlePointMouseDown triggered with payload:", payload);
       onAutomationDragStart();
       draggingPointIdRef.current = payload.id;
   };
@@ -206,7 +194,6 @@ export default function WaveformDisplay({
       if (!container || !e?.activeCoordinate) return;
       
       if (draggingPointIdRef.current) {
-          logger.log("handleChartMouseMove: Dragging point", draggingPointIdRef.current, "event:", e);
           const rect = container.getBoundingClientRect();
           const { x, y } = e.activeCoordinate;
           const newTime = Math.max(0, Math.min(durationInSeconds, (x / rect.width) * durationInSeconds));
@@ -220,33 +207,19 @@ export default function WaveformDisplay({
   };
 
   const handleChartClick = (e: any) => {
-    logger.log("handleChartClick triggered. Event object:", e);
     const container = waveformInteractionRef.current;
-    if (draggingPointIdRef.current) {
-        logger.log("handleChartClick: Aborted. A point is currently being dragged.");
-        return;
-    }
     
-    // Prevent creating points if clicking on an existing one
-    if (e && e.activePayload && e.activePayload.some((p: any) => p.payload.isAutomationPoint)) {
-        logger.log("handleChartClick: Aborted. Click was on an existing point handle.");
-        return;
-    }
-    
-    if (!e || !e.activeCoordinate || e.chartY === undefined || !container) {
-        logger.log("handleChartClick: Aborted. Missing coordinate data in event.", {
-            activeCoordinate: e?.activeCoordinate,
-            activeLabel: e?.activeLabel,
-            chartY: e?.chartY,
-        });
-        return;
+    if (e && e.activePayload && e.activePayload.length > 0 && e.activeDot) {
+      return;
     }
 
-    const { chartY, activeCoordinate } = e;
+    if (!e || !e.activeCoordinate || !container) {
+      return;
+    }
+
     const chartRect = container.getBoundingClientRect();
-
-    const clickTime = (activeCoordinate.x / chartRect.width) * durationInSeconds;
-    const yValue = Math.max(0, Math.min(100, (1 - (chartY / chartRect.height)) * 100));
+    const clickTime = (e.activeCoordinate.x / chartRect.width) * durationInSeconds;
+    const yValue = Math.max(0, Math.min(100, (1 - (e.chartY / chartRect.height)) * 100));
     
     const newPoint: AutomationPoint = {
         id: `point_${Date.now()}`,
@@ -255,7 +228,6 @@ export default function WaveformDisplay({
         name: `${automationPoints.length + 1}`
     };
 
-    logger.log("handleChartClick: Creating new point:", newPoint);
     const newPoints = [...automationPoints, newPoint].sort((a,b) => a.time - b.time);
     onAutomationPointsChange(newPoints);
     onAutomationDragEnd();
@@ -312,7 +284,7 @@ export default function WaveformDisplay({
             "absolute inset-0",
             showVolumeAutomation ? "pointer-events-auto" : "pointer-events-none"
           )}>
-              {(showVolumeAutomation || showMockup) && durationInSeconds > 0 && (
+              {showVolumeAutomation && durationInSeconds > 0 && (
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart
                           data={chartData}
@@ -332,7 +304,6 @@ export default function WaveformDisplay({
                               strokeWidth={2}
                               dot={<CustomDot onMouseDown={handlePointMouseDown} onMouseUp={handleMouseUpAndLeave} onDoubleClick={handlePointDoubleClick} />}
                               isAnimationActive={false}
-                              activeDot={{ r: 8 }}
                           />
                       </LineChart>
                   </ResponsiveContainer>
@@ -351,6 +322,3 @@ export default function WaveformDisplay({
     </div>
   );
 }
-
-    
-
