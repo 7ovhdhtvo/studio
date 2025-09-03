@@ -140,15 +140,27 @@ export default function Home() {
     };
   }, [isPlaying]);
   
+  // Effect for loading new audio source
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (audio && audioSrc) {
+      if (audio.src !== audioSrc) {
+        audio.src = audioSrc;
+        audio.load();
+        if (isPlaying) {
+          audio.play().catch(e => console.error("Playback failed on new src", e));
+        }
+      }
+    } else if (audio && !audioSrc) {
+      audio.src = "";
+    }
+  }, [audioSrc, isPlaying]);
+
+  // Effect for handling play/pause
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-  
-    if (audioSrc && audio.src !== audioSrc) {
-      audio.src = audioSrc;
-      audio.load();
-    }
-  
+    
     if (isPlaying && audioSrc) {
       audio.play().catch(e => console.error("Playback failed", e));
     } else {
