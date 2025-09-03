@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,7 +7,6 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from "@/components/ui/badge";
 import { LineChart, Volume2, VolumeX, Minus } from 'lucide-react';
-import { useState } from 'react';
 import { Button } from '../ui/button';
 
 type AutomationPoint = {
@@ -17,13 +17,22 @@ type AutomationPoint = {
 type VolumeControlProps = {
   isOpen: boolean;
   onToggle: () => void;
+  volume: number;
+  onVolumeChange: (value: number) => void;
   showAutomation: boolean;
   onToggleAutomation: (value: boolean) => void;
   automationPoints: AutomationPoint[];
 };
 
-export default function VolumeControl({ isOpen, onToggle, showAutomation, onToggleAutomation, automationPoints }: VolumeControlProps) {
-  const [volume, setVolume] = useState(75);
+export default function VolumeControl({ 
+  isOpen, 
+  onToggle, 
+  volume,
+  onVolumeChange,
+  showAutomation, 
+  onToggleAutomation, 
+  automationPoints 
+}: VolumeControlProps) {
 
   if (!isOpen) {
     return (
@@ -53,10 +62,10 @@ export default function VolumeControl({ isOpen, onToggle, showAutomation, onTogg
               <div className="flex items-center gap-4">
                   <Slider
                       id="volume-slider"
-                      defaultValue={[75]}
+                      value={[volume]}
                       max={100}
                       step={1}
-                      onValueChange={(value) => setVolume(value[0])}
+                      onValueChange={(value) => onVolumeChange(value[0])}
                   />
                   <span className="text-sm font-mono w-12 text-center bg-secondary py-1 rounded-md">{volume}</span>
               </div>

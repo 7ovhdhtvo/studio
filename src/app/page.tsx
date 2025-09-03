@@ -7,7 +7,6 @@ import PlaybackControls from '@/components/stagehand/playback-controls';
 import WaveformDisplay from '@/components/stagehand/waveform-display';
 import SpeedControl from '@/components/stagehand/speed-control';
 import VolumeControl from '@/components/stagehand/volume-control';
-import MetronomeControl from '@/components/stagehand/metronome-control';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut } from 'lucide-react';
 import ImportDialog from '@/components/stagehand/import-dialog';
@@ -19,6 +18,7 @@ import { logger } from '@/lib/logger';
 import { generateWaveformData, type WaveformData } from '@/lib/waveform';
 import { storageManager } from '@/lib/storage-manager';
 import { cn } from '@/lib/utils';
+import MetronomeControl from '@/components/stagehand/metronome-control';
 
 export type AutomationPoint = {
   time: number;
@@ -58,6 +58,7 @@ export default function Home() {
   const [showSpeedAutomation, setShowSpeedAutomation] = useState(false);
   const [zoom, setZoom] = useState(1); // 1 = 100%
   const [speed, setSpeed] = useState(100); // Global speed in %
+  const [volume, setVolume] = useState(75); // Global volume in % (0-100)
   const [openControlPanel, setOpenControlPanel] = useState<OpenControlPanel>(null);
   const [progress, setProgress] = useState(0); // Progress in percentage
   
@@ -134,6 +135,12 @@ export default function Home() {
     }
   }, [isLooping]);
 
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = volume / 100;
+    }
+  }, [volume]);
+
   const regenerateWaveform = useCallback(async (track: AudioFile, currentZoom: number) => {
     try {
       const audioBlob = await storageManager.getAudioBlob(track.id);
@@ -148,7 +155,7 @@ export default function Home() {
 
   // Center on playhead when zooming
   useEffect(() => {
-    if (waveformContainerRef.current) {
+    if (waveformContainerRef.current && progress > 0) {
       const scrollContainer = waveformContainerRef.current;
       const totalWidth = scrollContainer.scrollWidth;
       const playheadPosition = (progress / 100) * totalWidth;
@@ -394,6 +401,8 @@ export default function Home() {
               <VolumeControl 
                 isOpen={openControlPanel === 'volume'}
                 onToggle={() => handleToggleControlPanel('volume')}
+                volume={volume}
+                onVolumeChange={setVolume}
                 showAutomation={showVolumeAutomation}
                 onToggleAutomation={setShowVolumeAutomation}
                 automationPoints={volumePoints}
