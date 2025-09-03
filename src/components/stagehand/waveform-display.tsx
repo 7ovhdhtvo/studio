@@ -230,7 +230,7 @@ export default function WaveformDisplay({
   const handleChartClick = (e: any) => {
     if (draggingPointIdRef.current || !e?.activeCoordinate) return;
 
-    if (e.activePayload && e.activePayload.length > 0) {
+    if (e.activePayload && e.activePayload.length > 0 && e.viewBox) {
         const chartY = e.chartY;
         const clickTime = e.activeLabel;
         const yValue = Math.max(0, Math.min(100, (1 - ((chartY - e.viewBox.y) / e.viewBox.height)) * 100));
@@ -330,3 +330,4 @@ export default function WaveformDisplay({
     </div>
   );
 }
+
