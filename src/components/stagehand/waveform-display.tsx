@@ -11,10 +11,12 @@ import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, Dot, Tooltip } from
 const CustomDot = (props: any) => {
     const { cx, cy, stroke, payload, onMouseDown, onMouseUp, onDoubleClick } = props;
 
+    // Only render the dot if it's a user-defined automation point
     if (!payload.isAutomationPoint) {
         return null;
     }
     
+    // Hitbox to make grabbing easier on mobile
     const hitboxSize = 24;
 
     return (
@@ -25,6 +27,7 @@ const CustomDot = (props: any) => {
             onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(payload); }}
             className="cursor-grab active:cursor-grabbing"
         >
+            {/* Transparent hitbox */}
             <rect 
                 x={-hitboxSize / 2} 
                 y={-hitboxSize / 2} 
@@ -32,6 +35,7 @@ const CustomDot = (props: any) => {
                 height={hitboxSize} 
                 fill="transparent"
             />
+            {/* Visual representation of the dot */}
             <circle r="6" fill={stroke} />
             <circle r="3" fill="hsl(var(--card))" />
         </g>
@@ -71,7 +75,7 @@ type WaveformDisplayProps = {
   onAutomationPointsChange: (points: AutomationPoint[]) => void;
   onAutomationDragStart: () => void;
   onAutomationDragEnd: () => void;
-  onDeletePoint: (id: string) => void;
+  showMockup?: boolean;
 };
 
 const ChannelWaveform = ({ data, progress, isStereo }: { data: number[], progress: number, isStereo: boolean }) => {
@@ -111,7 +115,7 @@ export default function WaveformDisplay({
   onAutomationPointsChange,
   onAutomationDragStart,
   onAutomationDragEnd,
-  onDeletePoint,
+  showMockup
 }: WaveformDisplayProps) {
   const waveformInteractionRef = useRef<HTMLDivElement>(null);
   const isMouseDownRef = useRef(false);
@@ -123,17 +127,21 @@ export default function WaveformDisplay({
     
     let data = [];
     if (points.length === 0) {
+        // Create a flat line at the baseline volume if no points exist
         data.push({ time: 0, value: baseline, isAutomationPoint: false });
         data.push({ time: durationInSeconds, value: baseline, isAutomationPoint: false });
     } else {
         const sortedPoints = [...points].sort((a, b) => a.time - b.time);
         
+        // Line from start to the first point
         if (sortedPoints[0].time > 0) {
             data.push({ time: 0, value: sortedPoints[0].value, isAutomationPoint: false });
         }
         
+        // Add all user-defined points
         sortedPoints.forEach(p => data.push({ ...p, isAutomationPoint: true }));
         
+        // Line from the last point to the end
         const lastPoint = sortedPoints[sortedPoints.length - 1];
         if (lastPoint.time < durationInSeconds) {
             data.push({ time: durationInSeconds, value: lastPoint.value, isAutomationPoint: false });
@@ -154,6 +162,7 @@ export default function WaveformDisplay({
   
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
     if (showVolumeAutomation) {
+      // Only allow dragging the baseline if NO points exist
       if (automationPoints.length === 0) {
         isDraggingBaselineRef.current = true;
         onAutomationDragStart();
@@ -188,6 +197,13 @@ export default function WaveformDisplay({
       onAutomationDragStart();
       draggingPointIdRef.current = payload.id;
   };
+
+  const handlePointDoubleClick = (payload: any) => {
+    if (payload && payload.id) {
+        const newPoints = automationPoints.filter(p => p.id !== payload.id);
+        onAutomationPointsChange(newPoints);
+    }
+  }
   
   const handleChartMouseMove = (e: any) => {
       const container = waveformInteractionRef.current;
@@ -210,12 +226,6 @@ export default function WaveformDisplay({
           onMasterVolumeChange(newVolume);
       }
   };
-  
-  const handlePointDoubleClick = (payload: any) => {
-    if (payload && payload.id) {
-        onDeletePoint(payload.id);
-    }
-  }
 
   const handleChartClick = (e: any) => {
     if (draggingPointIdRef.current || !showVolumeAutomation || !e?.activeCoordinate || !e?.activeLabel || !e.viewBox) return;
@@ -285,7 +295,7 @@ export default function WaveformDisplay({
             )}
             
             <div className={cn("absolute inset-0", !showVolumeAutomation && "pointer-events-none")}>
-                {showVolumeAutomation && durationInSeconds > 0 && (
+                {(showVolumeAutomation || showMockup) && durationInSeconds > 0 && (
                      <ResponsiveContainer width="100%" height="100%">
                         <LineChart
                             data={chartData}
@@ -295,7 +305,7 @@ export default function WaveformDisplay({
                         >
                             <XAxis type="number" dataKey="time" domain={[0, durationInSeconds]} hide />
                             <YAxis type="number" dataKey="value" domain={[0, 100]} hide />
-                            <Tooltip content={<CustomTooltip />} />
+                            <Tooltip content={<CustomTooltip />} isAnimationActive={false} />
                             <Line 
                                 type="linear" 
                                 dataKey="value" 
@@ -303,6 +313,7 @@ export default function WaveformDisplay({
                                 strokeWidth={2}
                                 dot={<CustomDot onMouseDown={handlePointMouseDown} onMouseUp={handleMouseUpAndLeave} onDoubleClick={handlePointDoubleClick} />}
                                 isAnimationActive={false}
+                                activeDot={false}
                             />
                         </LineChart>
                     </ResponsiveContainer>
@@ -322,4 +333,3 @@ export default function WaveformDisplay({
     </div>
   );
 }
-
