@@ -241,6 +241,13 @@ export default function Home() {
         setProgress(0);
     }
   };
+  
+  const handleScrubEnd = () => {
+    isScrubbingRef.current = false;
+    if (isPlaying) {
+      startProgressLoop();
+    }
+  };
 
   return (
     <div className="flex h-screen w-full flex-col bg-background text-foreground">
@@ -306,7 +313,7 @@ export default function Home() {
               onProgressChange={handleProgressChange}
               isPlaying={isPlaying}
               onScrubStart={() => isScrubbingRef.current = true}
-              onScrubEnd={() => isScrubbingRef.current = false}
+              onScrubEnd={handleScrubEnd}
             />
             <PlaybackControls 
               isPlaying={isPlaying} 
@@ -345,3 +352,5 @@ export default function Home() {
     </div>
   );
 }
+
+    
