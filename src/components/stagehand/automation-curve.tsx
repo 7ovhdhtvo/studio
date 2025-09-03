@@ -13,8 +13,7 @@ type AutomationCurveProps = {
   onPointsChange: (newPoints: AutomationPoint[]) => void;
   onDragStart: () => void;
   onDragEnd: () => void;
-  baselineValue: number;
-  onBaselineChange: (newValue: number) => void;
+  baselineValue: number; // Master volume
 };
 
 export default function AutomationCurve({
@@ -27,11 +26,9 @@ export default function AutomationCurve({
   onDragStart,
   onDragEnd,
   baselineValue,
-  onBaselineChange,
 }: AutomationCurveProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [draggingPointId, setDraggingPointId] = useState<string | null>(null);
-  const [isDraggingBaseline, setIsDraggingBaseline] = useState(false);
 
   const valueToY = useCallback((value: number) => maxHeight - (value / 100) * maxHeight, [maxHeight]);
   const timeToX = useCallback((time: number) => (time / duration) * 100, [duration]);
@@ -46,32 +43,26 @@ export default function AutomationCurve({
   }, []);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!svgRef.current) return;
+    if (!svgRef.current || !draggingPointId) return;
     const { x, y, svgWidth } = getSVGCoordinates(e);
 
-    if (draggingPointId) {
-      const newTime = xToTime(x, svgWidth);
-      const newValue = yToValue(y);
-      const updatedPoints = points.map(p =>
-        p.id === draggingPointId ? { ...p, time: newTime, value: newValue } : p
-      );
-      onPointsChange(updatedPoints);
-    } else if (isDraggingBaseline) {
-      const newValue = yToValue(y);
-      onBaselineChange(newValue);
-    }
-  }, [draggingPointId, isDraggingBaseline, points, onPointsChange, getSVGCoordinates, xToTime, yToValue, onBaselineChange]);
+    const newTime = xToTime(x, svgWidth);
+    const newValue = yToValue(y);
+    const updatedPoints = points.map(p =>
+      p.id === draggingPointId ? { ...p, time: newTime, value: newValue } : p
+    );
+    onPointsChange(updatedPoints);
+  }, [draggingPointId, points, onPointsChange, getSVGCoordinates, xToTime, yToValue]);
   
   const handleMouseUp = useCallback(() => {
-    if (draggingPointId || isDraggingBaseline) {
+    if (draggingPointId) {
       onDragEnd();
     }
     setDraggingPointId(null);
-    setIsDraggingBaseline(false);
-  }, [draggingPointId, isDraggingBaseline, onDragEnd]);
+  }, [draggingPointId, onDragEnd]);
 
   useEffect(() => {
-    if (draggingPointId || isDraggingBaseline) {
+    if (draggingPointId) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp, { once: true });
     }
@@ -79,21 +70,25 @@ export default function AutomationCurve({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [draggingPointId, isDraggingBaseline, handleMouseMove, handleMouseUp]);
+  }, [draggingPointId, handleMouseMove, handleMouseUp]);
 
 
   if (!visible || duration === 0) return null;
 
   const getPathData = () => {
     if (points.length === 0) {
+      // If no points, draw a line at the master volume level
       return `M 0 ${valueToY(baselineValue)} L 100 ${valueToY(baselineValue)}`;
     }
     
     const sortedPoints = [...points].sort((a, b) => a.time - b.time);
     const firstPoint = sortedPoints[0];
     
+    // Start line from the beginning of the track at the first point's value
     const pathParts = [`M 0 ${valueToY(firstPoint.value)} L ${timeToX(firstPoint.time)} ${valueToY(firstPoint.value)}`];
+    // Connect all the points
     pathParts.push(...sortedPoints.map(p => `L ${timeToX(p.time)} ${valueToY(p.value)}`));
+    // End line at the end of the track with the last point's value
     const lastPoint = sortedPoints[sortedPoints.length - 1];
     pathParts.push(`L 100 ${valueToY(lastPoint.value)}`);
 
@@ -110,8 +105,10 @@ export default function AutomationCurve({
     
     let value;
     if (points.length === 0) {
+        // First point takes the value of the master volume line
         value = baselineValue;
     } else {
+        // Interpolate value from existing line
         const sortedPoints = [...points].sort((a, b) => a.time - b.time);
         let p1 = sortedPoints[0];
         if (time < p1.time) {
@@ -138,11 +135,12 @@ export default function AutomationCurve({
         id: `point_${Date.now()}`,
         time,
         value,
+        name: `${points.length + 1}`
     };
     
     const newPoints = [...points, newPoint];
     onPointsChange(newPoints);
-    onDragEnd();
+    onDragEnd(); // Save immediately after adding
   };
   
   const handlePointMouseDown = (e: React.MouseEvent, pointId: string) => {
@@ -150,47 +148,36 @@ export default function AutomationCurve({
     setDraggingPointId(pointId);
     onDragStart();
   };
-
-  const handleBaselineMouseDown = (e: React.MouseEvent) => {
-    if (points.length > 0) return; // Only allow baseline drag when no points exist
-    e.stopPropagation();
-    setIsDraggingBaseline(true);
-    onDragStart();
-  };
   
   return (
     <div
       data-automation-element
       className="absolute inset-0 w-full h-full"
-      onClick={points.length > 0 ? handleAddPoint : undefined}
+      onClick={handleAddPoint}
     >
       <svg
         ref={svgRef}
         width="100%"
         height="100%"
-        viewBox="0 0 100 192"
+        viewBox={`0 0 100 ${maxHeight}`}
         preserveAspectRatio="none"
         className="overflow-visible"
       >
-        {/* Invisible wider path for easier interaction with baseline */}
-        {points.length === 0 && (
-           <path
-              d={getPathData()}
-              stroke="transparent"
-              strokeWidth="10"
-              fill="none"
-              className="cursor-ns-resize"
-              onMouseDown={handleBaselineMouseDown}
-           />
-        )}
+        {/* Invisible wider path for easier clicking */}
+         <path
+            d={getPathData()}
+            stroke="transparent"
+            strokeWidth="10"
+            fill="none"
+            className="cursor-pointer"
+         />
         <path
           d={getPathData()}
           stroke={color}
           strokeWidth="2"
           fill="none"
           vectorEffect="non-scaling-stroke"
-          className={points.length > 0 ? "pointer-events-none" : "cursor-ns-resize pointer-events-auto"}
-          onMouseDown={points.length === 0 ? handleBaselineMouseDown : undefined}
+          className="pointer-events-none"
         />
         {points.map(point => (
           <circle
@@ -210,5 +197,3 @@ export default function AutomationCurve({
     </div>
   );
 }
-
-    

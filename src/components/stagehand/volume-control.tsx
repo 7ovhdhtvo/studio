@@ -94,6 +94,7 @@ export default function VolumeControl({
   onUpdatePoint,
   onDeletePoint,
 }: VolumeControlProps) {
+  const isAutomationActive = showAutomation && automationPoints.length > 0;
 
   if (!isOpen) {
     return (
@@ -128,11 +129,11 @@ export default function VolumeControl({
                         max={100}
                         step={1}
                         onValueChange={(value) => onVolumeChange(value[0])}
-                        disabled={showAutomation}
+                        disabled={isAutomationActive}
                     />
                     <span className="text-sm font-mono w-12 text-center bg-secondary py-1 rounded-md">{Math.round(volume)}</span>
                   </div>
-                  {showAutomation && (
+                  {isAutomationActive && (
                     <p className="text-xs text-muted-foreground w-full -mt-1">Automation active</p>
                   )}
               </div>
@@ -156,7 +157,7 @@ export default function VolumeControl({
                {automationPoints.length > 0 ? (
                   automationPoints.sort((a,b) => a.time - b.time).map((point, index) => {
                     const pointNumber = index + 1;
-                    const displayName = point.name || `Point ${pointNumber}`;
+                    const displayName = point.name || `${pointNumber}`;
                     return (
                         <Popover key={point.id}>
                             <PopoverTrigger asChild>

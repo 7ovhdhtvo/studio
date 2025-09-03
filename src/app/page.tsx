@@ -77,16 +77,15 @@ export default function Home() {
   const getAutomationValue = useCallback((points: AutomationPoint[], time: number): number | null => {
     if (points.length === 0) return null;
     
-    if (points.length === 1) return points[0].value;
-
+    // Sort points by time to ensure correct interpolation
     const sortedPoints = [...points].sort((a, b) => a.time - b.time);
-    const firstPoint = sortedPoints[0];
-    const lastPoint = sortedPoints[sortedPoints.length - 1];
 
-    if (time <= firstPoint.time) return firstPoint.value;
-    if (time >= lastPoint.time) return lastPoint.value;
+    if (time <= sortedPoints[0].time) return sortedPoints[0].value;
+    if (time >= sortedPoints[sortedPoints.length - 1].time) return sortedPoints[sortedPoints.length - 1].value;
+    if (sortedPoints.length === 1) return sortedPoints[0].value;
 
-    let prevPoint = firstPoint;
+
+    let prevPoint = sortedPoints[0];
     for (let i = 1; i < sortedPoints.length; i++) {
         const nextPoint = sortedPoints[i];
         if (time >= prevPoint.time && time <= nextPoint.time) {
@@ -113,16 +112,16 @@ export default function Home() {
         const newProgress = (audio.currentTime / audio.duration) * 100;
         setProgress(newProgress);
 
-        if (showVolumeAutomation && !isDraggingAutomation) {
+        if (showVolumeAutomation && volumePoints.length > 0 && !isDraggingAutomation) {
             const automationVolume = getAutomationValue(volumePoints, audio.currentTime);
             if (automationVolume !== null) {
                 const newClampedVolume = Math.max(0, Math.min(100, automationVolume));
                 audio.volume = newClampedVolume / 100;
                 setVolume(Math.round(newClampedVolume));
-            } else {
-              // No automation points, use master volume
-              audio.volume = volume / 100;
             }
+        } else {
+            // No automation points, use master volume
+            audio.volume = volume / 100;
         }
         animationFrameRef.current = requestAnimationFrame(animate);
       }
@@ -190,10 +189,10 @@ export default function Home() {
   }, [isLooping]);
 
   useEffect(() => {
-    if (audioRef.current && !showVolumeAutomation) {
-      audioRef.current.volume = volume / 100;
+    if (audioRef.current && (!showVolumeAutomation || volumePoints.length === 0)) {
+        audioRef.current.volume = volume / 100;
     }
-  }, [volume, showVolumeAutomation]);
+  }, [volume, showVolumeAutomation, volumePoints]);
 
   const regenerateWaveform = useCallback(async (track: AudioFile, currentZoom: number) => {
     try {
@@ -263,10 +262,12 @@ export default function Home() {
     setActiveTrack(track);
     const trackVolumePoints = track.volumeAutomation || [];
     setVolumePoints(trackVolumePoints);
-    if (trackVolumePoints.length > 0) {
-      setVolume(trackVolumePoints[0].value);
-    } else {
+    if (trackVolumePoints.length === 0) {
       setVolume(75); // Default volume if no automation
+    } else {
+       // If points exist, find the value at time 0
+       const initialVolume = getAutomationValue(trackVolumePoints, 0);
+       setVolume(initialVolume ?? 75);
     }
 
     setWaveformData(null);
@@ -359,27 +360,20 @@ export default function Home() {
     }
   };
 
+  const handleAutomationDragStart = () => {
+    setIsDraggingAutomation(true);
+  }
+
   const handleAutomationDragEnd = () => {
     setIsDraggingAutomation(false);
     if (activeTrack) {
-        let pointsToSave = volumePoints;
-        // If there are no points, save the baseline volume as the first point.
-        if (pointsToSave.length === 0) {
-            pointsToSave = [{ id: 'baseline', time: 0, value: volume }];
-        }
-        updateTrackAutomation(activeTrack.id, pointsToSave);
+        updateTrackAutomation(activeTrack.id, volumePoints);
     }
   };
 
   const handleSetVolumePoints = (points: AutomationPoint[]) => {
     setVolumePoints(points);
-    if (activeTrack) {
-      updateTrackAutomation(activeTrack.id, points);
-    }
-  };
-  
-  const handleBaselineVolumeChange = (newVolume: number) => {
-    setVolume(newVolume);
+    // Defer saving until drag ends
   };
 
   const handleUpdateAutomationPoint = (id: string, newName: string, newTime: number) => {
@@ -521,9 +515,8 @@ export default function Home() {
                   masterVolume={volume}
                   automationPoints={volumePoints}
                   onAutomationPointsChange={handleSetVolumePoints}
-                  onAutomationDragStart={() => setIsDraggingAutomation(true)}
+                  onAutomationDragStart={handleAutomationDragStart}
                   onAutomationDragEnd={handleAutomationDragEnd}
-                  onBaselineVolumeChange={handleBaselineVolumeChange}
                 />
                 <PlaybackControls 
                   isPlaying={isPlaying} 
@@ -568,5 +561,3 @@ export default function Home() {
     </>
   );
 }
-
-    

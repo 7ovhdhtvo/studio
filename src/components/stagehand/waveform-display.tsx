@@ -28,7 +28,6 @@ type WaveformDisplayProps = {
   onAutomationPointsChange: (points: AutomationPoint[]) => void;
   onAutomationDragStart: () => void;
   onAutomationDragEnd: () => void;
-  onBaselineVolumeChange: (newVolume: number) => void;
 };
 
 const ChannelWaveform = ({ data, progress, isStereo }: { data: number[], progress: number, isStereo: boolean }) => {
@@ -71,7 +70,6 @@ export default function WaveformDisplay({
   onAutomationPointsChange,
   onAutomationDragStart,
   onAutomationDragEnd,
-  onBaselineVolumeChange,
 }: WaveformDisplayProps) {
   const waveformInteractionRef = useRef<HTMLDivElement>(null);
   const isMouseDownRef = useRef(false);
@@ -136,7 +134,7 @@ export default function WaveformDisplay({
        >
         <div 
           ref={waveformInteractionRef}
-          className="relative h-48 bg-card rounded-lg p-2 shadow-inner cursor-pointer"
+          className="relative h-48 bg-card rounded-lg p-2 shadow-inner"
           style={{ width: `${100 * zoom}%` }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
@@ -165,7 +163,6 @@ export default function WaveformDisplay({
               onDragStart={onAutomationDragStart}
               onDragEnd={onAutomationDragEnd}
               baselineValue={masterVolume}
-              onBaselineChange={onBaselineVolumeChange}
           />
           {/* Speed Automation Curve would go here */}
 
@@ -181,5 +178,3 @@ export default function WaveformDisplay({
     </div>
   );
 }
-
-    
