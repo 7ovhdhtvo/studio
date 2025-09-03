@@ -3,7 +3,7 @@
 
 import { cn } from '@/lib/utils';
 import { type WaveformData } from '@/lib/waveform';
-import { useRef, type MouseEvent, type RefObject, useState } from 'react';
+import { useRef, type MouseEvent, type RefObject } from 'react';
 import TimeRuler from './time-ruler';
 import type { AutomationPoint } from '@/lib/storage-manager';
 import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, Dot, Tooltip } from 'recharts';
@@ -233,20 +233,19 @@ export default function WaveformDisplay({
         return;
     }
     
-    if (!e || !e.activeCoordinate || e.activeLabel === undefined || e.chartY === undefined || !container) {
+    if (!e || !e.activeCoordinate || e.chartY === undefined || !container) {
         logger.log("handleChartClick: Aborted. Missing coordinate data in event.", {
             activeCoordinate: e?.activeCoordinate,
             activeLabel: e?.activeLabel,
             chartY: e?.chartY,
-            viewBox: e?.viewBox,
         });
         return;
     }
 
-    const { chartY, activeLabel } = e;
+    const { chartY, activeCoordinate } = e;
     const chartRect = container.getBoundingClientRect();
 
-    const clickTime = activeLabel;
+    const clickTime = (activeCoordinate.x / chartRect.width) * durationInSeconds;
     const yValue = Math.max(0, Math.min(100, (1 - (chartY / chartRect.height)) * 100));
     
     const newPoint: AutomationPoint = {
@@ -289,7 +288,7 @@ export default function WaveformDisplay({
             ref={waveformInteractionRef}
             className={cn(
               "w-full h-full",
-              showVolumeAutomation && "pointer-events-none"
+              showVolumeAutomation ? "pointer-events-none" : "pointer-events-auto"
             )}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
@@ -354,3 +353,4 @@ export default function WaveformDisplay({
 }
 
     
+
