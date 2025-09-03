@@ -106,8 +106,8 @@ export default function Home() {
         try {
           wakeLockRef.current = await navigator.wakeLock.request('screen');
           logger.log("Wake Lock acquired.");
-        } catch (err) {
-          logger.error("Failed to acquire wake lock", { err });
+        } catch (err: any) {
+          logger.error(`Failed to acquire wake lock: ${err.name}, ${err.message}`);
         }
       }
     };
@@ -118,8 +118,8 @@ export default function Home() {
           await wakeLockRef.current.release();
           wakeLockRef.current = null;
           logger.log("Wake Lock released.");
-        } catch (err) {
-          logger.error("Failed to release wake lock", { err });
+        } catch (err: any) {
+          logger.error(`Failed to release wake lock: ${err.name}, ${err.message}`);
         }
       }
     };
