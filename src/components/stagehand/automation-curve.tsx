@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import type { AutomationPoint } from '@/lib/storage-manager';
 
 type AutomationCurveProps = {
@@ -13,6 +13,7 @@ type AutomationCurveProps = {
   onPointsChange: (newPoints: AutomationPoint[]) => void;
   onDragStart: () => void;
   onDragEnd: () => void;
+  baselineValue: number;
 };
 
 export default function AutomationCurve({
@@ -24,44 +25,17 @@ export default function AutomationCurve({
   onPointsChange,
   onDragStart,
   onDragEnd,
+  baselineValue,
 }: AutomationCurveProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [draggingPointId, setDraggingPointId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const handleMouseUpGlobal = () => {
-      if (draggingPointId) {
-        setDraggingPointId(null);
-        onDragEnd();
-      }
-    };
-    const handleMouseMoveGlobal = (e: MouseEvent) => {
-      if (draggingPointId && svgRef.current) {
-        const { x, y } = getSVGCoordinates(e);
-        const newTime = Math.max(0, Math.min(duration, (x / 100) * duration));
-        const newValue = Math.max(0, Math.min(100, (maxHeight - y) / maxHeight * 100));
-        
-        const updatedPoints = points.map(p => 
-          p.id === draggingPointId ? { ...p, time: newTime, value: newValue } : p
-        );
-        onPointsChange(updatedPoints);
-      }
-    };
+  const valueToY = useCallback((value: number) => maxHeight - (value / 100) * maxHeight, [maxHeight]);
+  const timeToX = useCallback((time: number) => (time / duration) * 100, [duration]);
+  const yToValue = useCallback((y: number) => Math.max(0, Math.min(100, (maxHeight - y) / maxHeight * 100)), [maxHeight]);
+  const xToTime = useCallback((x: number) => Math.max(0, Math.min(duration, (x / 100) * duration)), [duration]);
 
-    window.addEventListener('mousemove', handleMouseMoveGlobal);
-    window.addEventListener('mouseup', handleMouseUpGlobal);
-    return () => {
-        window.removeEventListener('mousemove', handleMouseMoveGlobal);
-        window.removeEventListener('mouseup', handleMouseUpGlobal);
-    };
-  }, [draggingPointId, onDragEnd, points, onPointsChange, duration, maxHeight]);
-
-  if (!visible || duration === 0) return null;
-
-  const valueToY = (value: number) => maxHeight - (value / 100) * maxHeight;
-  const timeToX = (time: number) => (time / duration) * 100;
-
-  const getSVGCoordinates = (e: React.MouseEvent | MouseEvent) => {
+  const getSVGCoordinates = useCallback((e: React.MouseEvent | MouseEvent) => {
     if (!svgRef.current) return { x: 0, y: 0 };
     const svg = svgRef.current;
     const pt = svg.createSVGPoint();
@@ -69,13 +43,54 @@ export default function AutomationCurve({
     pt.y = e.clientY;
     const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
     return { x: svgP.x, y: svgP.y };
-  };
+  }, []);
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!draggingPointId || !svgRef.current) return;
+    
+    const { x, y } = getSVGCoordinates(e);
+    const newTime = xToTime(x);
+    const newValue = yToValue(y);
+    
+    const updatedPoints = points.map(p => 
+      p.id === draggingPointId ? { ...p, time: newTime, value: newValue } : p
+    );
+    onPointsChange(updatedPoints);
+  }, [draggingPointId, points, onPointsChange, getSVGCoordinates, xToTime, yToValue]);
+
+  const handleMouseUp = useCallback(() => {
+    if (draggingPointId) {
+      setDraggingPointId(null);
+      onDragEnd();
+    }
+  }, [draggingPointId, onDragEnd]);
+
+  useEffect(() => {
+    if (draggingPointId) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp, { once: true });
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [draggingPointId, handleMouseMove, handleMouseUp]);
+
+
+  if (!visible || duration === 0) return null;
+
   
   const getPathData = () => {
     if (points.length === 0) {
-        return `M 0 ${valueToY(75)} L 100 ${valueToY(75)}`;
+        return `M 0 ${valueToY(baselineValue)} L 100 ${valueToY(baselineValue)}`;
     }
+    
     const sortedPoints = [...points].sort((a, b) => a.time - b.time);
+    
+    if (sortedPoints.length === 0) {
+      return `M 0 ${valueToY(baselineValue)} L 100 ${valueToY(baselineValue)}`;
+    }
+
     const firstPoint = sortedPoints[0];
     const pathParts = [`M ${timeToX(firstPoint.time)} ${valueToY(firstPoint.value)}`];
     
@@ -99,14 +114,21 @@ export default function AutomationCurve({
     e.stopPropagation();
 
     const { x, y } = getSVGCoordinates(e);
-    const time = (x / 100) * duration;
-    const value = Math.max(0, Math.min(100, (maxHeight - y) / maxHeight * 100));
+    const time = xToTime(x);
+
+    let value: number;
+    if (points.length === 0) {
+        value = baselineValue;
+    } else {
+        value = yToValue(y);
+    }
 
     const newPoint: AutomationPoint = {
         id: `point_${Date.now()}`,
         time,
         value,
     };
+    
     const newPoints = [...points, newPoint];
     onPointsChange(newPoints);
     onDragEnd(); // Save after adding
