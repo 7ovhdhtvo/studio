@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useRef, useEffect, type MouseEvent } from 'react';
+import React, from 'react';
 import { type AutomationPoint } from '@/lib/storage-manager';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Trash2 } from 'lucide-react';
@@ -33,11 +33,11 @@ export default function AutomationCurve({
   maxHeight,
   baselineValue,
 }: AutomationCurveProps) {
-  const [draggingPointId, setDraggingPointId] = useState<string | null>(null);
-  const [contextMenu, setContextMenu] = useState<ContextMenuData | null>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
+  const [draggingPointId, setDraggingPointId] = React.useState<string | null>(null);
+  const [contextMenu, setContextMenu] = React.useState<ContextMenuData | null>(null);
+  const svgRef = React.useRef<SVGSVGElement>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const handleClickOutside = () => setContextMenu(null);
     window.addEventListener('click', handleClickOutside);
     return () => window.removeEventListener('click', handleClickOutside);
@@ -58,10 +58,11 @@ export default function AutomationCurve({
       pathData += ` L ${timeToX(p.time)} ${valueToY(p.value)}`;
     });
   } else {
+    // Draw a straight line based on the master volume
     pathData = `M 0 ${valueToY(baselineValue)} L 100 ${valueToY(baselineValue)}`;
   }
 
-  const getSVGCoordinates = (e: MouseEvent) => {
+  const getSVGCoordinates = (e: React.MouseEvent) => {
     if (!svgRef.current) return { x: 0, y: 0 };
     const svg = svgRef.current;
     const pt = svg.createSVGPoint();
@@ -75,7 +76,7 @@ export default function AutomationCurve({
     setDraggingPointId(pointId);
   };
 
-  const handleMouseMove = (e: MouseEvent) => {
+  const handleMouseMove = (e: React.MouseEvent) => {
     if (!draggingPointId || !svgRef.current) return;
     e.preventDefault();
     e.stopPropagation();
@@ -95,14 +96,15 @@ export default function AutomationCurve({
     setDraggingPointId(null);
   };
 
-  const handleAddPoint = (e: MouseEvent<SVGPathElement>) => {
+  const handleAddPoint = (e: React.MouseEvent<SVGPathElement>) => {
     if (e.target !== e.currentTarget) return; 
     
-    const { x, y } = getSVGCoordinates(e);
+    const { x } = getSVGCoordinates(e);
     const newTime = (x / 100) * duration;
-    let newValue = (maxHeight - y) / maxHeight * 100;
+    let newValue: number;
 
     if (points.length > 0) {
+        // Interpolate value based on existing points
         const sorted = [...points].sort((a,b) => a.time - b.time);
         let p1 = sorted[0];
         let p2 = sorted[sorted.length - 1];
@@ -111,17 +113,21 @@ export default function AutomationCurve({
         } else if (newTime > p2.time) {
             newValue = p2.value;
         } else {
+            let found = false;
             for(let i=0; i<sorted.length - 1; i++) {
                 if (newTime >= sorted[i].time && newTime <= sorted[i+1].time) {
                     p1 = sorted[i];
                     p2 = sorted[i+1];
                     const timeFraction = (newTime - p1.time) / (p2.time - p1.time);
                     newValue = p1.value + timeFraction * (p2.value - p1.value);
+                    found = true;
                     break;
                 }
             }
+            if (!found) newValue = baselineValue; // Fallback
         }
     } else {
+        // No points yet, use the baseline value
         newValue = baselineValue;
     }
 
@@ -139,7 +145,7 @@ export default function AutomationCurve({
       setContextMenu(null);
   }
 
-  const handleContextMenu = (e: MouseEvent, pointId: string) => {
+  const handleContextMenu = (e: React.MouseEvent, pointId: string) => {
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY, pointId });
   };
