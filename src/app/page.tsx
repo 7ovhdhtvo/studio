@@ -72,7 +72,7 @@ export default function Home() {
   const startProgressLoop = useCallback(() => {
     stopProgressLoop();
     const animate = () => {
-      if (audioRef.current && !isScrubbingRef.current) {
+      if (audioRef.current && !isScrubbingRef.current && !audioRef.current.paused) {
         const newProgress = (audioRef.current.currentTime / audioRef.current.duration) * 100;
         setProgress(newProgress);
         animationFrameRef.current = requestAnimationFrame(animate);
@@ -171,11 +171,15 @@ export default function Home() {
     if (!audio) return;
     
     if (isPlaying && audioSrc) {
-      logger.log('useEffect[isPlaying, audioSrc]: Attempting to play.');
-      audio.play().catch(e => logger.error("Playback failed on play/pause effect", e));
+      if (audio.paused) {
+        logger.log('useEffect[isPlaying, audioSrc]: Attempting to play.');
+        audio.play().catch(e => logger.error("Playback failed on play/pause effect", e));
+      }
     } else {
-      logger.log('useEffect[isPlaying, audioSrc]: Attempting to pause.');
-      audio.pause();
+      if (!audio.paused) {
+        logger.log('useEffect[isPlaying, audioSrc]: Attempting to pause.');
+        audio.pause();
+      }
     }
   }, [isPlaying, audioSrc]);
 
@@ -279,6 +283,7 @@ export default function Home() {
       audioRef.current.play().catch(e => logger.error("Loop playback failed", e));
     } else {
         setIsPlaying(false);
+        setProgress(0); // Also reset progress visually
     }
   };
 
@@ -384,5 +389,6 @@ export default function Home() {
       </main>
     </div>
   );
+}
 
-  
+    
