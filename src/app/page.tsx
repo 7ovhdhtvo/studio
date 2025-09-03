@@ -119,13 +119,16 @@ export default function Home() {
                 const newClampedVolume = Math.max(0, Math.min(100, automationVolume));
                 audio.volume = newClampedVolume / 100;
                 setVolume(Math.round(newClampedVolume));
+            } else {
+              // No automation points, use master volume
+              audio.volume = volume / 100;
             }
         }
         animationFrameRef.current = requestAnimationFrame(animate);
       }
     };
     animationFrameRef.current = requestAnimationFrame(animate);
-  }, [stopProgressLoop, showVolumeAutomation, volumePoints, getAutomationValue, isDraggingAutomation]);
+  }, [stopProgressLoop, showVolumeAutomation, volumePoints, getAutomationValue, isDraggingAutomation, volume]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -258,7 +261,14 @@ export default function Home() {
     
     setProgress(0);
     setActiveTrack(track);
-    setVolumePoints(track.volumeAutomation || []);
+    const trackVolumePoints = track.volumeAutomation || [];
+    setVolumePoints(trackVolumePoints);
+    if (trackVolumePoints.length > 0) {
+      setVolume(trackVolumePoints[0].value);
+    } else {
+      setVolume(75); // Default volume if no automation
+    }
+
     setWaveformData(null);
     setAudioSrc(null); // Clear previous source immediately
 
@@ -347,29 +357,29 @@ export default function Home() {
     if (isPlaying) {
       startProgressLoop();
     }
-    if (activeTrack) {
-        updateTrackAutomation(activeTrack.id, volumePoints);
-    }
   };
 
   const handleAutomationDragEnd = () => {
     setIsDraggingAutomation(false);
     if (activeTrack) {
-        updateTrackAutomation(activeTrack.id, volumePoints);
+        let pointsToSave = volumePoints;
+        // If there are no points, save the baseline volume as the first point.
+        if (pointsToSave.length === 0) {
+            pointsToSave = [{ id: 'baseline', time: 0, value: volume }];
+        }
+        updateTrackAutomation(activeTrack.id, pointsToSave);
     }
   };
 
   const handleSetVolumePoints = (points: AutomationPoint[]) => {
     setVolumePoints(points);
+    if (activeTrack) {
+      updateTrackAutomation(activeTrack.id, points);
+    }
   };
   
   const handleBaselineVolumeChange = (newVolume: number) => {
     setVolume(newVolume);
-    // If there are no points, create one to store the baseline
-    if (volumePoints.length <= 1) {
-      const newPoints = [{ id: 'baseline', time: 0, value: newVolume }];
-      setVolumePoints(newPoints);
-    }
   };
 
   const handleUpdateAutomationPoint = (id: string, newName: string, newTime: number) => {

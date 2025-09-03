@@ -130,7 +130,7 @@ export default function VolumeControl({
                         onValueChange={(value) => onVolumeChange(value[0])}
                         disabled={showAutomation}
                     />
-                    <span className="text-sm font-mono w-12 text-center bg-secondary py-1 rounded-md">{volume}</span>
+                    <span className="text-sm font-mono w-12 text-center bg-secondary py-1 rounded-md">{Math.round(volume)}</span>
                   </div>
                   {showAutomation && (
                     <p className="text-xs text-muted-foreground w-full -mt-1">Automation active</p>
