@@ -115,32 +115,32 @@ export default function WaveformDisplay({
   const isMouseDownRef = useRef(false);
   const draggingPointIdRef = useRef<string | null>(null);
 
-  const getChartData = (points: AutomationPoint[], baseline: number) => {
-    if (durationInSeconds === 0) return [];
+  const getChartData = (points: AutomationPoint[], baseline: number, duration: number) => {
+    if (duration === 0) return [];
     
     if (points.length === 0) {
         return [
             { time: 0, value: baseline, isAutomationPoint: false },
-            { time: durationInSeconds, value: baseline, isAutomationPoint: false }
+            { time: duration, value: baseline, isAutomationPoint: false }
         ];
     }
     
     const sortedPoints = [...points].sort((a, b) => a.time - b.time);
-    const data = sortedPoints.map(p => ({ ...p, isAutomationPoint: true }));
+    const data: any[] = sortedPoints.map(p => ({ ...p, isAutomationPoint: true }));
 
     if (sortedPoints[0].time > 0) {
         data.unshift({ time: 0, value: sortedPoints[0].value, isAutomationPoint: false });
     }
     
     const lastPoint = sortedPoints[sortedPoints.length - 1];
-    if (lastPoint.time < durationInSeconds) {
-        data.push({ time: durationInSeconds, value: lastPoint.value, isAutomationPoint: false });
+    if (lastPoint.time < duration) {
+        data.push({ time: duration, value: lastPoint.value, isAutomationPoint: false });
     }
     
     return data;
   };
   
-  const chartData = getChartData(automationPoints, masterVolume);
+  const chartData = getChartData(automationPoints, masterVolume, durationInSeconds);
 
   const handleInteraction = (e: MouseEvent<HTMLDivElement>) => {
     if (!waveformInteractionRef.current || draggingPointIdRef.current) return;
@@ -175,9 +175,7 @@ export default function WaveformDisplay({
   };
 
   const handlePointMouseDown = (payload: any) => {
-      if (!payload || !payload.id) {
-        return;
-      }
+      if (!payload || !payload.id) return;
       onAutomationDragStart();
       draggingPointIdRef.current = payload.id;
   };
@@ -186,6 +184,7 @@ export default function WaveformDisplay({
     if (payload && payload.id) {
         const newPoints = automationPoints.filter(p => p.id !== payload.id);
         onAutomationPointsChange(newPoints);
+        onAutomationDragEnd();
     }
   }
   
@@ -195,9 +194,8 @@ export default function WaveformDisplay({
       
       if (draggingPointIdRef.current) {
           const rect = container.getBoundingClientRect();
-          const { x, y } = e.activeCoordinate;
-          const newTime = Math.max(0, Math.min(durationInSeconds, (x / rect.width) * durationInSeconds));
-          const newValue = Math.max(0, Math.min(100, (1 - (y / rect.height)) * 100));
+          const newTime = Math.max(0, Math.min(durationInSeconds, (e.activeCoordinate.x / rect.width) * durationInSeconds));
+          const newValue = Math.max(0, Math.min(100, (1 - (e.activeCoordinate.y / rect.height)) * 100));
           
           const updatedPoints = automationPoints.map(p =>
             p.id === draggingPointIdRef.current ? { ...p, time: newTime, value: newValue } : p
@@ -209,7 +207,9 @@ export default function WaveformDisplay({
   const handleChartClick = (e: any) => {
     const container = waveformInteractionRef.current;
     
-    if (e && e.activePayload && e.activePayload.length > 0 && e.activeDot) {
+    if (draggingPointIdRef.current) return;
+
+    if (e && e.activeDot && e.activePayload && e.activePayload.length > 0) {
       return;
     }
 
@@ -219,12 +219,12 @@ export default function WaveformDisplay({
 
     const chartRect = container.getBoundingClientRect();
     const clickTime = (e.activeCoordinate.x / chartRect.width) * durationInSeconds;
-    const yValue = Math.max(0, Math.min(100, (1 - (e.chartY / chartRect.height)) * 100));
+    const clickValue = Math.max(0, Math.min(100, (1 - (e.activeCoordinate.y / chartRect.height)) * 100));
     
     const newPoint: AutomationPoint = {
         id: `point_${Date.now()}`,
         time: clickTime,
-        value: yValue,
+        value: clickValue,
         name: `${automationPoints.length + 1}`
     };
 
