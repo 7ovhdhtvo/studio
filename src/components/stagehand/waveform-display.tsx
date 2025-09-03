@@ -221,6 +221,7 @@ export default function WaveformDisplay({
 
   const handleChartClick = (e: any) => {
     logger.log("handleChartClick triggered. Event object:", e);
+    const container = waveformInteractionRef.current;
     if (draggingPointIdRef.current) {
         logger.log("handleChartClick: Aborted. A point is currently being dragged.");
         return;
@@ -232,7 +233,7 @@ export default function WaveformDisplay({
         return;
     }
     
-    if (!e || !e.activeCoordinate || e.activeLabel === undefined || e.chartY === undefined || !e.viewBox) {
+    if (!e || !e.activeCoordinate || e.activeLabel === undefined || e.chartY === undefined || !container) {
         logger.log("handleChartClick: Aborted. Missing coordinate data in event.", {
             activeCoordinate: e?.activeCoordinate,
             activeLabel: e?.activeLabel,
@@ -242,10 +243,11 @@ export default function WaveformDisplay({
         return;
     }
 
-    const { chartY, viewBox, activeLabel } = e;
+    const { chartY, activeLabel } = e;
+    const chartRect = container.getBoundingClientRect();
 
     const clickTime = activeLabel;
-    const yValue = Math.max(0, Math.min(100, (1 - ((chartY - viewBox.y) / viewBox.height)) * 100));
+    const yValue = Math.max(0, Math.min(100, (1 - (chartY / chartRect.height)) * 100));
     
     const newPoint: AutomationPoint = {
         id: `point_${Date.now()}`,
@@ -287,7 +289,7 @@ export default function WaveformDisplay({
             ref={waveformInteractionRef}
             className={cn(
               "w-full h-full",
-              showVolumeAutomation && "pointer-events-none" // Pass events through when editing
+              showVolumeAutomation && "pointer-events-none"
             )}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
@@ -305,44 +307,44 @@ export default function WaveformDisplay({
                   {durationInSeconds > 0 ? "Generating waveform..." : "No audio loaded"}
                </div>
             )}
+          </div>
             
-            <div className={cn(
-              "absolute inset-0",
-              showVolumeAutomation ? "pointer-events-auto" : "pointer-events-none"
-            )}>
-                {(showVolumeAutomation || showMockup) && durationInSeconds > 0 && (
-                     <ResponsiveContainer width="100%" height="100%">
-                        <LineChart
-                            data={chartData}
-                            margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
-                            onMouseMove={handleChartMouseMove}
-                            onClick={handleChartClick}
-                            onMouseUp={handleMouseUpAndLeave}
-                            onMouseLeave={handleMouseUpAndLeave}
-                        >
-                            <XAxis type="number" dataKey="time" domain={[0, durationInSeconds]} hide />
-                            <YAxis type="number" dataKey="value" domain={[0, 100]} hide />
-                            <Tooltip content={<CustomTooltip />} isAnimationActive={false} />
-                            <Line 
-                                type="linear" 
-                                dataKey="value" 
-                                stroke="hsl(var(--destructive))" 
-                                strokeWidth={2}
-                                dot={<CustomDot onMouseDown={handlePointMouseDown} onMouseUp={handleMouseUpAndLeave} onDoubleClick={handlePointDoubleClick} />}
-                                isAnimationActive={false}
-                                activeDot={{ r: 8 }}
-                            />
-                        </LineChart>
-                    </ResponsiveContainer>
-                )}
-            </div>
+          <div className={cn(
+            "absolute inset-0",
+            showVolumeAutomation ? "pointer-events-auto" : "pointer-events-none"
+          )}>
+              {(showVolumeAutomation || showMockup) && durationInSeconds > 0 && (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                          data={chartData}
+                          margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
+                          onMouseMove={handleChartMouseMove}
+                          onClick={handleChartClick}
+                          onMouseUp={handleMouseUpAndLeave}
+                          onMouseLeave={handleMouseUpAndLeave}
+                      >
+                          <XAxis type="number" dataKey="time" domain={[0, durationInSeconds]} hide />
+                          <YAxis type="number" dataKey="value" domain={[0, 100]} hide />
+                          <Tooltip content={<CustomTooltip />} isAnimationActive={false} />
+                          <Line 
+                              type="linear" 
+                              dataKey="value" 
+                              stroke="hsl(var(--destructive))" 
+                              strokeWidth={2}
+                              dot={<CustomDot onMouseDown={handlePointMouseDown} onMouseUp={handleMouseUpAndLeave} onDoubleClick={handlePointDoubleClick} />}
+                              isAnimationActive={false}
+                              activeDot={{ r: 8 }}
+                          />
+                      </LineChart>
+                  </ResponsiveContainer>
+              )}
+          </div>
 
-            <div 
-              className="absolute top-0 h-full w-0.5 bg-foreground/70 pointer-events-none"
-              style={{ left: `${progress}%` }}
-            >
-              <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 bg-foreground/70 rounded-full"></div>
-            </div>
+          <div 
+            className="absolute top-0 h-full w-0.5 bg-foreground/70 pointer-events-none"
+            style={{ left: `${progress}%` }}
+          >
+            <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 bg-foreground/70 rounded-full"></div>
           </div>
         </div>
         <TimeRuler duration={durationInSeconds} zoom={zoom} />
