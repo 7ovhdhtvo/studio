@@ -1,14 +1,72 @@
 
 "use client";
-
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
-import { Badge } from "@/components/ui/badge";
-import { LineChart, Volume2, VolumeX, Minus } from 'lucide-react';
 import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { LineChart, Volume2, VolumeX, Minus, Trash2 } from 'lucide-react';
 import type { AutomationPoint } from '@/lib/storage-manager';
+
+type PointEditorProps = {
+  point: AutomationPoint;
+  onUpdate: (id: string, newName: string, newTime: number) => void;
+  onDelete: (id: string) => void;
+};
+
+function PointEditor({ point, onUpdate, onDelete }: PointEditorProps) {
+  const [name, setName] = useState(point.name || '');
+  const [time, setTime] = useState(point.time.toFixed(2));
+
+  const handleSave = () => {
+    const timeValue = parseFloat(time);
+    if (!isNaN(timeValue)) {
+      onUpdate(point.id, name, timeValue);
+    }
+  };
+
+  return (
+    <PopoverContent className="w-56" align="end" side="top">
+      <div className="grid gap-4">
+        <div className="space-y-2">
+          <h4 className="font-medium leading-none">Edit Point</h4>
+          <p className="text-xs text-muted-foreground">
+            Update point details.
+          </p>
+        </div>
+        <div className="grid gap-2">
+          <div className="grid grid-cols-3 items-center gap-4">
+            <Label htmlFor="width">Name</Label>
+            <Input
+              id="width"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="col-span-2 h-8"
+            />
+          </div>
+          <div className="grid grid-cols-3 items-center gap-4">
+            <Label htmlFor="maxWidth">Time</Label>
+            <Input
+              id="maxWidth"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              className="col-span-2 h-8"
+            />
+          </div>
+        </div>
+        <div className="flex justify-between">
+            <Button size="sm" onClick={handleSave}>Save</Button>
+            <Button variant="destructive" size="icon" onClick={() => onDelete(point.id)}>
+                <Trash2 className="h-4 w-4" />
+            </Button>
+        </div>
+      </div>
+    </PopoverContent>
+  );
+}
 
 
 type VolumeControlProps = {
@@ -19,6 +77,8 @@ type VolumeControlProps = {
   showAutomation: boolean;
   onToggleAutomation: (value: boolean) => void;
   automationPoints: AutomationPoint[];
+  onUpdatePoint: (id: string, newName: string, newTime: number) => void;
+  onDeletePoint: (id: string) => void;
 };
 
 export default function VolumeControl({ 
@@ -28,7 +88,9 @@ export default function VolumeControl({
   onVolumeChange,
   showAutomation, 
   onToggleAutomation, 
-  automationPoints 
+  automationPoints,
+  onUpdatePoint,
+  onDeletePoint,
 }: VolumeControlProps) {
 
   if (!isOpen) {
@@ -90,13 +152,18 @@ export default function VolumeControl({
             <Label>Automation Points</Label>
             <div className="flex flex-wrap gap-2 p-2 bg-secondary rounded-md min-h-[40px]">
                {automationPoints.length > 0 ? (
-                  automationPoints.map(point => (
-                      <Badge key={point.id} variant="outline">
-                          {point.time.toFixed(1)}s: {Math.round(point.value)}%
-                      </Badge>
+                  automationPoints.sort((a,b) => a.time - b.time).map(point => (
+                    <Popover key={point.id}>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm" className="font-mono text-xs">
+                                {point.name || 'Unnamed'}: {point.time.toFixed(1)}s @ {Math.round(point.value)}%
+                            </Button>
+                        </PopoverTrigger>
+                        <PointEditor point={point} onUpdate={onUpdatePoint} onDelete={onDeletePoint} />
+                    </Popover>
                   ))
                ) : (
-                  <p className="text-xs text-muted-foreground">Click on the automation line to add points.</p>
+                  <p className="text-xs text-muted-foreground">Double-click on the automation line to add points.</p>
                )}
             </div>
           </div>

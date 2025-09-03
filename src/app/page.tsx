@@ -77,6 +77,7 @@ export default function Home() {
   const getAutomationValue = useCallback((points: AutomationPoint[], time: number): number | null => {
     if (points.length === 0) return null;
     
+    // If only one point exists, its value is constant across the timeline.
     if (points.length === 1) return points[0].value;
 
     const sortedPoints = [...points].sort((a, b) => a.time - b.time);
@@ -347,6 +348,9 @@ export default function Home() {
     if (isPlaying) {
       startProgressLoop();
     }
+    if (activeTrack) {
+        updateTrackAutomation(activeTrack.id, volumePoints);
+    }
   };
 
   const handleAutomationDragEnd = () => {
@@ -358,6 +362,22 @@ export default function Home() {
 
   const handleSetVolumePoints = (points: AutomationPoint[]) => {
     setVolumePoints(points);
+  };
+
+  const handleUpdateAutomationPoint = (id: string, newName: string, newTime: number) => {
+    if (!activeTrack) return;
+    const updatedPoints = volumePoints.map(p =>
+      p.id === id ? { ...p, name: newName, time: newTime } : p
+    );
+    setVolumePoints(updatedPoints);
+    updateTrackAutomation(activeTrack.id, updatedPoints);
+  };
+  
+  const handleDeleteAutomationPoint = (id: string) => {
+    if (!activeTrack) return;
+    const updatedPoints = volumePoints.filter(p => p.id !== id);
+    setVolumePoints(updatedPoints);
+    updateTrackAutomation(activeTrack.id, updatedPoints);
   };
 
   const getTracksInCurrentProject = () => {
@@ -503,6 +523,8 @@ export default function Home() {
                     showAutomation={showVolumeAutomation}
                     onToggleAutomation={setShowVolumeAutomation}
                     automationPoints={volumePoints}
+                    onUpdatePoint={handleUpdateAutomationPoint}
+                    onDeletePoint={handleDeleteAutomationPoint}
                   />
                   <SpeedControl 
                     isOpen={openControlPanel === 'speed'}
