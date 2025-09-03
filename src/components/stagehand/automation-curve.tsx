@@ -88,10 +88,6 @@ export default function AutomationCurve({
     
     const sortedPoints = [...points].sort((a, b) => a.time - b.time);
     
-    if (sortedPoints.length === 0) {
-      return `M 0 ${valueToY(baselineValue)} L 100 ${valueToY(baselineValue)}`;
-    }
-
     const firstPoint = sortedPoints[0];
     const pathParts = [`M ${timeToX(firstPoint.time)} ${valueToY(firstPoint.value)}`];
     
@@ -115,31 +111,9 @@ export default function AutomationCurve({
     e.stopPropagation();
 
     if (!svgRef.current) return;
-    const { x, y } = getSVGCoordinates(e);
+    const { x, y, svgWidth } = getSVGCoordinates(e);
     const time = xToTime(x, svgRef.current.viewBox.baseVal.width);
-
-    // Interpolate value based on existing points
-    const sortedPoints = [...points].sort((a, b) => a.time - b.time);
-    let value = baselineValue; // Default to baseline
-    if (sortedPoints.length > 0) {
-        let prevPoint = sortedPoints[0];
-        if (time <= prevPoint.time) {
-            value = prevPoint.value;
-        } else if (time >= sortedPoints[sortedPoints.length - 1].time) {
-            value = sortedPoints[sortedPoints.length - 1].value;
-        } else {
-            for (let i = 1; i < sortedPoints.length; i++) {
-                const nextPoint = sortedPoints[i];
-                if (time >= prevPoint.time && time <= nextPoint.time) {
-                    const timeFraction = (time - prevPoint.time) / (nextPoint.time - prevPoint.time);
-                    value = prevPoint.value + timeFraction * (nextPoint.value - prevPoint.value);
-                    break;
-                }
-                prevPoint = nextPoint;
-            }
-        }
-    }
-
+    const value = yToValue(y);
 
     const newPoint: AutomationPoint = {
         id: `point_${Date.now()}`,
