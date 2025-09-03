@@ -10,8 +10,6 @@ import type { AutomationPoint } from '@/lib/storage-manager';
 
 type WaveformDisplayProps = {
   waveformData: WaveformData | null;
-  volumePoints: AutomationPoint[];
-  onVolumePointsChange: (points: AutomationPoint[]) => void;
   speedPoints: AutomationPoint[];
   onSpeedPointsChange: (points: AutomationPoint[]) => void;
   showVolumeAutomation: boolean;
@@ -26,6 +24,7 @@ type WaveformDisplayProps = {
   showStereo: boolean;
   scrollContainerRef: RefObject<HTMLDivElement>;
   masterVolume: number;
+  onMasterVolumeChange: (newVolume: number) => void;
 };
 
 const ChannelWaveform = ({ data, progress, isStereo }: { data: number[], progress: number, isStereo: boolean }) => {
@@ -50,8 +49,6 @@ const ChannelWaveform = ({ data, progress, isStereo }: { data: number[], progres
 
 export default function WaveformDisplay({ 
   waveformData,
-  volumePoints,
-  onVolumePointsChange,
   speedPoints,
   onSpeedPointsChange,
   showVolumeAutomation, 
@@ -66,6 +63,7 @@ export default function WaveformDisplay({
   showStereo,
   scrollContainerRef,
   masterVolume,
+  onMasterVolumeChange,
 }: WaveformDisplayProps) {
   const waveformInteractionRef = useRef<HTMLDivElement>(null);
   const isMouseDownRef = useRef(false);
@@ -150,13 +148,12 @@ export default function WaveformDisplay({
           )}
           
           <AutomationCurve 
-              points={volumePoints}
-              onPointsChange={onVolumePointsChange}
               duration={durationInSeconds}
               color="hsl(var(--destructive))"
               visible={showVolumeAutomation}
               maxHeight={waveformHeight}
               baselineValue={masterVolume}
+              onBaselineChange={onMasterVolumeChange}
           />
           {/* Speed Automation Curve would go here */}
 

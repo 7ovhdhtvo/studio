@@ -212,17 +212,6 @@ export default function Home() {
       scrollContainer.scrollLeft = Math.max(0, newScrollLeft);
     }
   }, [zoom, progress]);
-  
-  const handleSetVolumePoints = (points: AutomationPoint[]) => {
-    setVolumePoints(points);
-  };
-  
-  const saveAutomation = () => {
-    if (activeTrack) {
-        updateTrackAutomation(activeTrack.id, volumePoints);
-    }
-  };
-
 
   const handleSetIsPlaying = (playing: boolean) => {
     if (!audioSrc && playing) {
@@ -351,7 +340,6 @@ export default function Home() {
   
   const handleScrubEnd = () => {
     isScrubbingRef.current = false;
-    saveAutomation();
     if (isPlaying) {
       startProgressLoop();
     }
@@ -464,8 +452,6 @@ export default function Home() {
 
                 <WaveformDisplay 
                   waveformData={waveformData}
-                  volumePoints={volumePoints}
-                  onVolumePointsChange={handleSetVolumePoints}
                   speedPoints={speedPoints}
                   onSpeedPointsChange={setSpeedPoints}
                   showVolumeAutomation={showVolumeAutomation}
@@ -480,6 +466,7 @@ export default function Home() {
                   showStereo={showStereo}
                   scrollContainerRef={waveformContainerRef}
                   masterVolume={volume}
+                  onMasterVolumeChange={setVolume}
                 />
                 <PlaybackControls 
                   isPlaying={isPlaying} 
