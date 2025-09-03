@@ -8,7 +8,7 @@ import WaveformDisplay from '@/components/stagehand/waveform-display';
 import SpeedControl from '@/components/stagehand/speed-control';
 import VolumeControl from '@/components/stagehand/volume-control';
 import { Button } from '@/components/ui/button';
-import { ZoomIn, ZoomOut } from 'lucide-react';
+import { ZoomIn, ZoomOut, Clapperboard } from 'lucide-react';
 import ImportDialog from '@/components/stagehand/import-dialog';
 import TrackList from '@/components/stagehand/track-list';
 import { useAudioStorage } from '@/hooks/useAudioStorage';
@@ -19,6 +19,7 @@ import { generateWaveformData, type WaveformData } from '@/lib/waveform';
 import { storageManager } from '@/lib/storage-manager';
 import { cn } from '@/lib/utils';
 import MetronomeControl from '@/components/stagehand/metronome-control';
+import PlaybackModeView from '@/components/stagehand/playback-mode-view';
 
 export type AutomationPoint = {
   time: number;
@@ -51,6 +52,7 @@ export default function Home() {
   const [waveformData, setWaveformData] = useState<WaveformData | null>(null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [showStereo, setShowStereo] = useState(false);
+  const [isPlaybackMode, setIsPlaybackMode] = useState(false);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLooping, setIsLooping] = useState(false);
@@ -314,6 +316,20 @@ export default function Home() {
     }
   };
 
+  if (isPlaybackMode) {
+    return (
+      <PlaybackModeView
+        isPlaying={isPlaying}
+        onTogglePlay={() => handleSetIsPlaying(!isPlaying)}
+        volume={volume}
+        onVolumeChange={setVolume}
+        onExit={() => setIsPlaybackMode(false)}
+        trackTitle={activeTrack?.title ?? "No Track Loaded"}
+        trackArtist={activeTrack?.originalName ?? ""}
+      />
+    );
+  }
+
   return (
     <div className="flex h-screen w-full flex-col bg-background text-foreground">
       <audio ref={audioRef} onEnded={handleAudioEnded} onPlay={() => startProgressLoop()} onPause={() => stopProgressLoop()} />
@@ -371,6 +387,9 @@ export default function Home() {
                 </Button>
                 <Button variant="outline" size="icon" onClick={handleZoomIn}>
                   <ZoomIn className="w-4 h-4" />
+                </Button>
+                <Button variant="outline" size="icon" onClick={() => setIsPlaybackMode(true)}>
+                  <Clapperboard className="w-4 h-4" />
                 </Button>
               </div>
             </div>
