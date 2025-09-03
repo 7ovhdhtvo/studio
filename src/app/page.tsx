@@ -314,6 +314,17 @@ export default function Home() {
     }
   };
 
+  const getTracksInCurrentProject = () => {
+    if (!activeProjectId) return [];
+    const project = folders.find(f => f.id === activeProjectId);
+    if (!project) return [];
+
+    const foldersInProject = folders.filter(f => f.parentId === activeProjectId);
+    const folderIdsInProject = [activeProjectId, ...foldersInProject.map(f => f.id)];
+
+    return tracks.filter(t => t.folderId && folderIdsInProject.includes(t.folderId));
+  }
+
   return (
     <>
       <audio 
@@ -339,6 +350,11 @@ export default function Home() {
           onBackToStart={handleBackToStart}
           currentTime={currentTime}
           duration={duration}
+          isLooping={isLooping}
+          onToggleLoop={toggleLoop}
+          projectTracks={getTracksInCurrentProject()}
+          onSelectTrack={handleSelectTrack}
+          activeTrackId={activeTrack?.id}
         />
       ) : (
         <div className="flex h-screen w-full flex-col bg-background text-foreground">
