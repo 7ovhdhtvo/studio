@@ -56,16 +56,21 @@ export default function VolumeControl({
                   <Label htmlFor="volume-slider">Master Volume</Label>
                    {volume === 0 ? <VolumeX className="w-5 h-5 text-muted-foreground" /> : <Volume2 className="w-5 h-5 text-muted-foreground" />}
               </div>
-              <div className="flex items-center gap-4">
-                  <Slider
-                      id="volume-slider"
-                      value={[volume]}
-                      max={100}
-                      step={1}
-                      onValueChange={(value) => onVolumeChange(value[0])}
-                      disabled={showAutomation}
-                  />
-                  <span className="text-sm font-mono w-12 text-center bg-secondary py-1 rounded-md">{volume}</span>
+              <div className="flex flex-col items-center gap-2">
+                  <div className="flex items-center gap-4 w-full">
+                    <Slider
+                        id="volume-slider"
+                        value={[volume]}
+                        max={100}
+                        step={1}
+                        onValueChange={(value) => onVolumeChange(value[0])}
+                        disabled={showAutomation}
+                    />
+                    <span className="text-sm font-mono w-12 text-center bg-secondary py-1 rounded-md">{volume}</span>
+                  </div>
+                  {showAutomation && (
+                    <p className="text-xs text-muted-foreground w-full -mt-1">Automation active</p>
+                  )}
               </div>
           </div>
            <div className="grid gap-2">
