@@ -66,6 +66,7 @@ export default function Home() {
     { id: '2', time: 6.8, value: 125 },
   ]);
   const [isDraggingAutomation, setIsDraggingAutomation] = useState(false);
+  const [debugState, setDebugState] = useState('Ready');
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const animationFrameRef = useRef<number>();
@@ -364,11 +365,14 @@ export default function Home() {
 
   const handleAutomationDragStart = () => {
     setIsDraggingAutomation(true);
+    setDebugState('Dragging point...');
   }
 
   const handleAutomationDragEnd = () => {
     setIsDraggingAutomation(false);
+    setDebugState('Ready');
     if (activeTrack) {
+        console.log("handleAutomationDragEnd: Persisting points", { points: volumePoints });
         updateTrackAutomation(activeTrack.id, volumePoints);
     }
   };
@@ -392,6 +396,12 @@ export default function Home() {
     const updatedPoints = volumePoints.filter(p => p.id !== id);
     setVolumePoints(updatedPoints);
     updateTrackAutomation(activeTrack.id, updatedPoints);
+  };
+
+  const handleDeleteAllAutomationPoints = () => {
+    if (!activeTrack) return;
+    setVolumePoints([]);
+    updateTrackAutomation(activeTrack.id, []);
   };
   
   const handleBaselineVolumeChange = (newVolume: number) => {
@@ -523,6 +533,8 @@ export default function Home() {
                   onAutomationPointsChange={handleSetVolumePoints}
                   onAutomationDragStart={handleAutomationDragStart}
                   onAutomationDragEnd={handleAutomationDragEnd}
+                  debugState={debugState}
+                  setDebugState={setDebugState}
                 />
                 <PlaybackControls 
                   isPlaying={isPlaying} 
@@ -545,6 +557,7 @@ export default function Home() {
                     automationPoints={volumePoints}
                     onUpdatePoint={handleUpdateAutomationPoint}
                     onDeletePoint={handleDeleteAutomationPoint}
+                    onDeleteAllPoints={handleDeleteAllAutomationPoints}
                   />
                   <SpeedControl 
                     isOpen={openControlPanel === 'speed'}

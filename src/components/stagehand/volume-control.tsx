@@ -83,6 +83,7 @@ type VolumeControlProps = {
   automationPoints: AutomationPoint[];
   onUpdatePoint: (id: string, newName: string, newTime: number) => void;
   onDeletePoint: (id: string) => void;
+  onDeleteAllPoints: () => void;
 };
 
 export default function VolumeControl({ 
@@ -97,6 +98,7 @@ export default function VolumeControl({
   automationPoints,
   onUpdatePoint,
   onDeletePoint,
+  onDeleteAllPoints,
 }: VolumeControlProps) {
 
   if (!isOpen) {
@@ -163,7 +165,18 @@ export default function VolumeControl({
             </div>
           </div>
           <div className="grid gap-2">
-            <Label>Automation Points</Label>
+            <div className="flex justify-between items-center">
+              <Label>Automation Points</Label>
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={onDeleteAllPoints}
+                disabled={automationPoints.length === 0}
+              >
+                  <Trash2 className="h-4 w-4 mr-2"/>
+                  Clear All
+              </Button>
+            </div>
             <div className="flex flex-wrap gap-2 p-2 bg-secondary rounded-md min-h-[40px]">
                {automationPoints.length > 0 ? (
                   automationPoints.sort((a,b) => a.time - b.time).map((point, index) => {
