@@ -354,9 +354,8 @@ export default function Home() {
               </div>
                <div className="flex items-center gap-2">
                 <Button 
-                  variant={showStereo ? 'secondary' : 'outline'} 
+                  variant={showStereo ? 'default' : 'outline'} 
                   onClick={() => setShowStereo(s => !s)}
-                  className={cn(showStereo && "bg-accent text-accent-foreground")}
                 >
                   Stereo
                 </Button>
