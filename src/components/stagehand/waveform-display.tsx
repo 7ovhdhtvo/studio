@@ -15,6 +15,7 @@ const CustomDot = (props: any) => {
         return null;
     }
     
+    // Increased hitbox size for easier interaction
     const hitboxSize = 24;
 
     return (
@@ -25,6 +26,7 @@ const CustomDot = (props: any) => {
             onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(payload); }}
             className="cursor-grab active:cursor-grabbing"
         >
+            {/* Invisible hitbox */}
             <rect 
                 x={-hitboxSize / 2} 
                 y={-hitboxSize / 2} 
@@ -32,6 +34,7 @@ const CustomDot = (props: any) => {
                 height={hitboxSize} 
                 fill="transparent"
             />
+            {/* Visible dot */}
             <circle r="6" fill={stroke} />
             <circle r="3" fill="hsl(var(--card))" />
         </g>
@@ -118,23 +121,24 @@ export default function WaveformDisplay({
   const getChartData = (points: AutomationPoint[], baseline: number, duration: number) => {
     if (duration === 0) return [];
     
-    if (points.length === 0) {
-        return [
-            { time: 0, value: baseline, isAutomationPoint: false },
-            { time: duration, value: baseline, isAutomationPoint: false }
-        ];
+    const sortedPoints = [...points].sort((a, b) => a.time - b.time);
+
+    if (sortedPoints.length === 0) {
+      return [
+        { time: 0, value: baseline, isAutomationPoint: false },
+        { time: duration, value: baseline, isAutomationPoint: false },
+      ];
     }
     
-    const sortedPoints = [...points].sort((a, b) => a.time - b.time);
     const data: any[] = sortedPoints.map(p => ({ ...p, isAutomationPoint: true }));
 
     if (sortedPoints[0].time > 0) {
-        data.unshift({ time: 0, value: sortedPoints[0].value, isAutomationPoint: false });
+      data.unshift({ time: 0, value: sortedPoints[0].value, isAutomationPoint: false });
     }
     
     const lastPoint = sortedPoints[sortedPoints.length - 1];
     if (lastPoint.time < duration) {
-        data.push({ time: duration, value: lastPoint.value, isAutomationPoint: false });
+      data.push({ time: duration, value: lastPoint.value, isAutomationPoint: false });
     }
     
     return data;
@@ -190,26 +194,27 @@ export default function WaveformDisplay({
   
   const handleChartMouseMove = (e: any) => {
       const container = waveformInteractionRef.current;
-      if (!container || !e?.activeCoordinate) return;
-      
-      if (draggingPointIdRef.current) {
-          const rect = container.getBoundingClientRect();
-          const newTime = Math.max(0, Math.min(durationInSeconds, (e.activeCoordinate.x / rect.width) * durationInSeconds));
-          const newValue = Math.max(0, Math.min(100, (1 - (e.activeCoordinate.y / rect.height)) * 100));
-          
-          const updatedPoints = automationPoints.map(p =>
-            p.id === draggingPointIdRef.current ? { ...p, time: newTime, value: newValue } : p
-          );
-          onAutomationPointsChange(updatedPoints);
+      if (!container || !draggingPointIdRef.current || !e?.activeCoordinate) {
+          return;
       }
+
+      const rect = container.getBoundingClientRect();
+      
+      // Correctly map mouse coordinates to data values
+      const newTime = Math.max(0, Math.min(durationInSeconds, (e.activeCoordinate.x / rect.width) * durationInSeconds));
+      const newValue = Math.max(0, Math.min(100, (1 - (e.activeCoordinate.y / rect.height)) * 100));
+      
+      const updatedPoints = automationPoints.map(p =>
+        p.id === draggingPointIdRef.current ? { ...p, time: newTime, value: newValue } : p
+      );
+      onAutomationPointsChange(updatedPoints);
   };
 
   const handleChartClick = (e: any) => {
     const container = waveformInteractionRef.current;
     
-    if (draggingPointIdRef.current) return;
-
-    if (e && e.activeDot && e.activePayload && e.activePayload.length > 0) {
+    // Do not create a new point if dragging or clicking an existing point's interactive area
+    if (draggingPointIdRef.current || (e && e.activeDot)) {
       return;
     }
 
@@ -217,9 +222,11 @@ export default function WaveformDisplay({
       return;
     }
 
-    const chartRect = container.getBoundingClientRect();
-    const clickTime = (e.activeCoordinate.x / chartRect.width) * durationInSeconds;
-    const clickValue = Math.max(0, Math.min(100, (1 - (e.activeCoordinate.y / chartRect.height)) * 100));
+    const rect = container.getBoundingClientRect();
+    
+    // Correctly calculate time and value based on the actual click coordinates
+    const clickTime = (e.activeCoordinate.x / rect.width) * durationInSeconds;
+    const clickValue = Math.max(0, Math.min(100, (1 - (e.activeCoordinate.y / rect.height)) * 100));
     
     const newPoint: AutomationPoint = {
         id: `point_${Date.now()}`,
@@ -259,7 +266,7 @@ export default function WaveformDisplay({
           <div 
             ref={waveformInteractionRef}
             className={cn(
-              "w-full h-full",
+              "absolute inset-0",
               showVolumeAutomation ? "pointer-events-none" : "pointer-events-auto"
             )}
             onMouseDown={handleMouseDown}
@@ -302,6 +309,7 @@ export default function WaveformDisplay({
                               dataKey="value" 
                               stroke="hsl(var(--destructive))" 
                               strokeWidth={2}
+                              activeDot={false}
                               dot={<CustomDot onMouseDown={handlePointMouseDown} onMouseUp={handleMouseUpAndLeave} onDoubleClick={handlePointDoubleClick} />}
                               isAnimationActive={false}
                           />
