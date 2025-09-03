@@ -11,10 +11,12 @@ import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, Dot, Tooltip } from
 const CustomDot = (props: any) => {
     const { cx, cy, stroke, payload, onMouseDown, onMouseUp } = props;
 
+    // We only want to render the interactive dots for actual automation points
     if (!payload.isAutomationPoint) {
         return null;
     }
     
+    // Hitbox makes it easier to click
     const hitboxSize = 24;
 
     return (
@@ -138,13 +140,13 @@ export default function WaveformDisplay({
     
     const data: any[] = sortedPoints.map(p => ({ ...p, isAutomationPoint: true }));
 
-    if (sortedPoints[0].time > 0.01) { // Add a small tolerance
+    if (sortedPoints[0].time > 0.01) {
         const firstPointValue = sortedPoints[0].value;
         data.unshift({ time: 0, value: firstPointValue, isAutomationPoint: false });
     }
     
     const lastPoint = sortedPoints[sortedPoints.length - 1];
-    if (lastPoint.time < duration - 0.01) { // Add a small tolerance
+    if (lastPoint.time < duration - 0.01) {
         const lastPointValue = lastPoint.value;
         data.push({ time: duration, value: lastPointValue, isAutomationPoint: false });
     }
@@ -180,6 +182,7 @@ export default function WaveformDisplay({
         onScrubEnd();
     }
     if (draggingPointIdRef.current) {
+        console.log('handleMouseUpAndLeave: Dragging ended for point:', draggingPointIdRef.current);
         setDebugState('Ready');
         onAutomationDragEnd();
         draggingPointIdRef.current = null;
@@ -187,7 +190,9 @@ export default function WaveformDisplay({
   };
 
   const handlePointMouseDown = (e: MouseEvent, payload: any) => {
+      console.log('handlePointMouseDown triggered. Payload:', payload);
       if (!payload || !payload.id) {
+        console.error('handlePointMouseDown: Aborted. No payload or ID.');
         return;
       }
       setDebugState(`Dragging point ${payload.id}`);
@@ -200,6 +205,7 @@ export default function WaveformDisplay({
       if (!draggingPointIdRef.current || !e?.activeCoordinate) {
           return;
       }
+      console.log('handleChartMouseMove: Dragging point', draggingPointIdRef.current);
       const container = waveformInteractionRef.current;
       if (!container) return;
 
@@ -215,15 +221,20 @@ export default function WaveformDisplay({
   };
 
   const handleChartClick = (e: any) => {
+    console.log('handleChartClick triggered. Event object:', e);
     if (draggingPointIdRef.current) {
+      console.log('handleChartClick: Aborted. A point is already being dragged.');
       return;
     }
+    // This check is crucial: if activeDot is present, it means we clicked an existing point's handle.
     if (e && e.activeDot) {
+      console.log('handleChartClick: Aborted. Click was on an existing point handle.');
       return;
     }
     
     const container = waveformInteractionRef.current;
     if (!e || !e.activeCoordinate || !container) {
+      console.error("handleChartClick: Aborted. Missing coordinate data in event.", { activeCoordinate: e?.activeCoordinate });
       return;
     }
 
@@ -238,10 +249,11 @@ export default function WaveformDisplay({
         name: `${automationPoints.length + 1}`
     };
 
-    setDebugState(`Creating new point at ${clickTime.toFixed(2)}s`);
+    console.log(`handleChartClick: Creating new point at ${clickTime.toFixed(2)}s, value ${clickValue.toFixed(2)}%`);
+    setDebugState(`Creating point at ${clickTime.toFixed(2)}s`);
     const newPoints = [...automationPoints, newPoint].sort((a,b) => a.time - b.time);
     onAutomationPointsChange(newPoints);
-    onAutomationDragEnd(); // Persist immediately
+    onAutomationDragEnd();
   };
 
   const currentTime = (progress / 100) * durationInSeconds;
@@ -269,10 +281,7 @@ export default function WaveformDisplay({
         >
           <div 
             ref={waveformInteractionRef}
-            className={cn(
-              "absolute inset-0 z-0",
-              showVolumeAutomation ? "pointer-events-none" : "pointer-events-auto"
-            )}
+            className="absolute inset-0 z-0"
             onMouseDown={handleScrubMouseDown}
             onMouseMove={handleScrubMouseMove}
             onMouseUp={handleMouseUpAndLeave}
@@ -330,6 +339,10 @@ export default function WaveformDisplay({
         </div>
         <TimeRuler duration={durationInSeconds} zoom={zoom} />
       </div>
+      <div className="w-full text-center text-xs font-mono text-yellow-500 bg-yellow-500/10 p-1 rounded-md">
+        Debug State: {debugState}
+      </div>
     </div>
   );
 }
+
