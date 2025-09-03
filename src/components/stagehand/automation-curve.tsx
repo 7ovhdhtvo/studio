@@ -13,7 +13,7 @@ type AutomationCurveProps = {
   onPointsChange: (newPoints: AutomationPoint[]) => void;
   onDragStart: () => void;
   onDragEnd: () => void;
-  baselineValue: number; // Master volume
+  baselineValue: number;
 };
 
 export default function AutomationCurve({
@@ -72,7 +72,6 @@ export default function AutomationCurve({
     };
   }, [draggingPointId, handleMouseMove, handleMouseUp]);
 
-
   if (!visible || duration === 0) return null;
 
   const getPathData = () => {
@@ -103,7 +102,28 @@ export default function AutomationCurve({
     const { x, y, svgWidth } = getSVGCoordinates(e);
     const time = xToTime(x, svgWidth);
     
-    let value = yToValue(y);
+    // Interpolate value on the line to place the new point accurately
+    const sortedPoints = [...points].sort((a, b) => a.time - b.time);
+    let value = yToValue(y); // Default to click position
+    if (sortedPoints.length > 0) {
+        let prevPoint = sortedPoints[0];
+        if (time <= prevPoint.time) {
+            value = prevPoint.value;
+        } else if (time >= sortedPoints[sortedPoints.length - 1].time) {
+            value = sortedPoints[sortedPoints.length - 1].value;
+        } else {
+            for (let i = 1; i < sortedPoints.length; i++) {
+                const nextPoint = sortedPoints[i];
+                if (time >= prevPoint.time && time <= nextPoint.time) {
+                    const timeFraction = (time - prevPoint.time) / (nextPoint.time - prevPoint.time);
+                    value = prevPoint.value + timeFraction * (nextPoint.value - prevPoint.value);
+                    break;
+                }
+                prevPoint = nextPoint;
+            }
+        }
+    }
+
 
     const newPoint: AutomationPoint = {
         id: `point_${Date.now()}`,
@@ -135,16 +155,26 @@ export default function AutomationCurve({
         viewBox={`0 0 100 ${maxHeight}`}
         preserveAspectRatio="none"
         className="overflow-visible"
-        onClick={handleAddPoint}
+        onClick={points.length > 0 ? handleAddPoint : undefined}
       >
-        {/* Invisible wider path for easier clicking */}
-         <path
+        {points.length === 0 ? (
+           <path
             d={getPathData()}
             stroke="transparent"
             strokeWidth="10"
             fill="none"
             className="cursor-pointer"
-         />
+            onClick={handleAddPoint}
+           />
+        ) : (
+           <path
+            d={getPathData()}
+            stroke="transparent"
+            strokeWidth="10"
+            fill="none"
+            className="cursor-pointer"
+           />
+        )}
         <path
           d={getPathData()}
           stroke={color}
@@ -154,18 +184,21 @@ export default function AutomationCurve({
           className="pointer-events-none"
         />
         {points.map(point => (
-          <circle
-            key={point.id}
-            cx={timeToX(point.time)}
-            cy={valueToY(point.value)}
-            r="5"
-            fill={color}
-            stroke={"hsl(var(--background))"}
-            strokeWidth="1"
-            className="cursor-grab"
-            onMouseDown={(e) => handlePointMouseDown(e, point.id)}
-            vectorEffect="non-scaling-stroke"
-          />
+            <g
+              key={point.id}
+              transform={`translate(${timeToX(point.time)}, ${valueToY(point.value)})`}
+              className="cursor-grab"
+              onMouseDown={(e) => handlePointMouseDown(e, point.id)}
+            >
+              <circle r="6" fill="transparent" />
+              <circle
+                r="4.5"
+                fill={color}
+                stroke={"hsl(var(--card))"}
+                strokeWidth="1.5"
+                vectorEffect="non-scaling-stroke"
+              />
+          </g>
         ))}
       </svg>
     </div>
