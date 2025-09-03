@@ -120,7 +120,6 @@ export default function WaveformDisplay({
   const waveformInteractionRef = useRef<HTMLDivElement>(null);
   const isMouseDownRef = useRef(false);
   const draggingPointIdRef = useRef<string | null>(null);
-  const isDraggingBaselineRef = useRef(false);
 
   const getChartData = (points: AutomationPoint[], baseline: number) => {
     if (durationInSeconds === 0) return [];
@@ -162,16 +161,11 @@ export default function WaveformDisplay({
   
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
     if (showVolumeAutomation) {
-      // Only allow dragging the baseline if NO points exist
-      if (automationPoints.length === 0) {
-        isDraggingBaselineRef.current = true;
-        onAutomationDragStart();
-      }
-    } else {
-      isMouseDownRef.current = true;
-      onScrubStart();
-      handleInteraction(e);
+      return; // Prevent playhead scrubbing when editing automation
     }
+    isMouseDownRef.current = true;
+    onScrubStart();
+    handleInteraction(e);
   };
   
   const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
@@ -185,9 +179,8 @@ export default function WaveformDisplay({
         isMouseDownRef.current = false;
         onScrubEnd();
     }
-    if (draggingPointIdRef.current || isDraggingBaselineRef.current) {
+    if (draggingPointIdRef.current) {
         draggingPointIdRef.current = null;
-        isDraggingBaselineRef.current = false;
         onAutomationDragEnd();
     }
   };
@@ -208,9 +201,9 @@ export default function WaveformDisplay({
   const handleChartMouseMove = (e: any) => {
       const container = waveformInteractionRef.current;
       if (!container || !e?.activeCoordinate) return;
-      const rect = container.getBoundingClientRect();
       
       if (draggingPointIdRef.current) {
+          const rect = container.getBoundingClientRect();
           const { x, y } = e.activeCoordinate;
           const newTime = Math.max(0, Math.min(durationInSeconds, (x / rect.width) * durationInSeconds));
           const newValue = Math.max(0, Math.min(100, (1 - (y / rect.height)) * 100));
@@ -219,16 +212,13 @@ export default function WaveformDisplay({
             p.id === draggingPointIdRef.current ? { ...p, time: newTime, value: newValue } : p
           );
           onAutomationPointsChange(updatedPoints);
-
-      } else if (isDraggingBaselineRef.current && automationPoints.length === 0) {
-          const { y } = e.activeCoordinate;
-          const newVolume = Math.max(0, Math.min(100, (1 - (y / rect.height)) * 100));
-          onMasterVolumeChange(newVolume);
       }
   };
 
   const handleChartClick = (e: any) => {
-    if (draggingPointIdRef.current || !showVolumeAutomation || !e?.activeCoordinate || !e?.activeLabel || !e.viewBox) return;
+    if (draggingPointIdRef.current || !showVolumeAutomation || !e?.activeCoordinate || !e?.activeLabel || !e.viewBox) {
+        return;
+    }
     
     // Prevent creating points if clicking on an existing one
     if (e.activePayload && e.activePayload.some((p: any) => p.payload.isAutomationPoint)) {
