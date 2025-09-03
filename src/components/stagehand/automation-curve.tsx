@@ -75,8 +75,9 @@ export default function AutomationCurve({
   if (!visible || duration === 0) return null;
 
   const getPathData = () => {
+    const baselineY = valueToY(baselineValue);
+
     if (points.length === 0) {
-      const baselineY = valueToY(baselineValue);
       return `M 0 ${baselineY} L 100 ${baselineY}`;
     }
 
@@ -127,7 +128,6 @@ export default function AutomationCurve({
         }
     }
 
-
     const newPoint: AutomationPoint = {
         id: `point_${Date.now()}`,
         time,
@@ -176,9 +176,9 @@ export default function AutomationCurve({
           className="pointer-events-none"
         />
         {points.map(point => {
-            const pointRadius = 4;
+            const outerRadius = 5;
+            const innerRadius = 3;
             const hitboxSize = 16;
-            // Use a group to handle mouse events and positioning
             return (
                 <g
                   key={point.id}
@@ -187,17 +187,23 @@ export default function AutomationCurve({
                   onMouseDown={(e) => handlePointMouseDown(e, point.id)}
                 >
                   <rect
-                    // Transparent larger rect for easier grabbing (the "hitbox")
+                    // The invisible, larger hitbox for easier interaction
                     x={-hitboxSize / 2}
                     y={-hitboxSize / 2}
                     width={hitboxSize}
                     height={hitboxSize}
                     fill="transparent"
                   />
-                  <circle
-                    // The small, visible point
-                    r={pointRadius}
+                   <circle
+                    // The outer ring color
+                    r={outerRadius}
                     fill={color}
+                    className="pointer-events-none"
+                  />
+                  <circle
+                    // The inner circle, creating the ring effect
+                    r={innerRadius}
+                    fill="hsl(var(--card))"
                     className="pointer-events-none"
                   />
               </g>
