@@ -64,6 +64,7 @@ export default function Home() {
     { id: '1', time: 3.2, value: 75 },
     { id: '2', time: 6.8, value: 125 },
   ]);
+  const [isDraggingAutomation, setIsDraggingAutomation] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const animationFrameRef = useRef<number>();
@@ -110,7 +111,7 @@ export default function Home() {
         const newProgress = (audio.currentTime / audio.duration) * 100;
         setProgress(newProgress);
 
-        if (showVolumeAutomation) {
+        if (showVolumeAutomation && !isDraggingAutomation) {
             const automationVolume = getAutomationValue(volumePoints, audio.currentTime);
             if (automationVolume !== null) {
                 audio.volume = automationVolume / 100;
@@ -121,7 +122,7 @@ export default function Home() {
       }
     };
     animationFrameRef.current = requestAnimationFrame(animate);
-  }, [stopProgressLoop, showVolumeAutomation, volumePoints, getAutomationValue]);
+  }, [stopProgressLoop, showVolumeAutomation, volumePoints, getAutomationValue, isDraggingAutomation]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -345,6 +346,15 @@ export default function Home() {
     }
   };
 
+  const handleAutomationDragEnd = () => {
+    setIsDraggingAutomation(false);
+    if (activeTrack) {
+        // Persist the change
+        const basePoint: AutomationPoint = { id: 'base', time: 0, value: volume };
+        updateTrackAutomation(activeTrack.id, [basePoint]);
+    }
+  };
+
   const getTracksInCurrentProject = () => {
     if (!activeProjectId) return [];
     const project = folders.find(f => f.id === activeProjectId);
@@ -467,6 +477,8 @@ export default function Home() {
                   scrollContainerRef={waveformContainerRef}
                   masterVolume={volume}
                   onMasterVolumeChange={setVolume}
+                  onAutomationDragStart={() => setIsDraggingAutomation(true)}
+                  onAutomationDragEnd={handleAutomationDragEnd}
                 />
                 <PlaybackControls 
                   isPlaying={isPlaying} 

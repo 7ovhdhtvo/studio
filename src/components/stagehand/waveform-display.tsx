@@ -25,6 +25,8 @@ type WaveformDisplayProps = {
   scrollContainerRef: RefObject<HTMLDivElement>;
   masterVolume: number;
   onMasterVolumeChange: (newVolume: number) => void;
+  onAutomationDragStart: () => void;
+  onAutomationDragEnd: () => void;
 };
 
 const ChannelWaveform = ({ data, progress, isStereo }: { data: number[], progress: number, isStereo: boolean }) => {
@@ -64,6 +66,8 @@ export default function WaveformDisplay({
   scrollContainerRef,
   masterVolume,
   onMasterVolumeChange,
+  onAutomationDragStart,
+  onAutomationDragEnd,
 }: WaveformDisplayProps) {
   const waveformInteractionRef = useRef<HTMLDivElement>(null);
   const isMouseDownRef = useRef(false);
@@ -154,6 +158,8 @@ export default function WaveformDisplay({
               maxHeight={waveformHeight}
               baselineValue={masterVolume}
               onBaselineChange={onMasterVolumeChange}
+              onDragStart={onAutomationDragStart}
+              onDragEnd={onAutomationDragEnd}
           />
           {/* Speed Automation Curve would go here */}
 

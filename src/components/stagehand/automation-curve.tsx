@@ -11,6 +11,8 @@ type AutomationCurveProps = {
   maxHeight: number;
   baselineValue: number; // The master volume level (0-100)
   onBaselineChange: (newValue: number) => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
 };
 
 export default function AutomationCurve({
@@ -20,6 +22,8 @@ export default function AutomationCurve({
   maxHeight,
   baselineValue,
   onBaselineChange,
+  onDragStart,
+  onDragEnd,
 }: AutomationCurveProps) {
   const [isDragging, setIsDragging] = React.useState(false);
   const svgRef = React.useRef<SVGSVGElement>(null);
@@ -28,11 +32,12 @@ export default function AutomationCurve({
     const handleMouseUpGlobal = () => {
       if (isDragging) {
         setIsDragging(false);
+        onDragEnd();
       }
     };
     window.addEventListener('mouseup', handleMouseUpGlobal);
     return () => window.removeEventListener('mouseup', handleMouseUpGlobal);
-  }, [isDragging]);
+  }, [isDragging, onDragEnd]);
 
   if (!visible || duration === 0) return null;
 
@@ -54,6 +59,7 @@ export default function AutomationCurve({
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(true);
+    onDragStart();
   };
   
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -67,7 +73,10 @@ export default function AutomationCurve({
   };
 
   const handleMouseUp = () => {
-    setIsDragging(false);
+    if (isDragging) {
+        setIsDragging(false);
+        onDragEnd();
+    }
   };
 
   return (
