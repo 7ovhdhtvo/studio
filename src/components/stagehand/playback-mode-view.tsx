@@ -85,21 +85,21 @@ export default function PlaybackModeView({
                 <Button
                     variant={isMuted ? "destructive" : "outline"}
                     size="icon"
-                    className="w-16 h-16 rounded-full"
+                    className="w-24 h-24 rounded-full"
                     onClick={toggleMute}
                     aria-label={isMuted ? "Unmute" : "Mute"}
                 >
-                    {isMuted ? <VolumeX className="w-8 h-8" /> : <Volume2 className="w-8 h-8" />}
+                    {isMuted ? <VolumeX className="w-12 h-12" /> : <Volume2 className="w-12 h-12" />}
                 </Button>
 
                 <Button
                     variant="outline"
                     size="icon"
-                    className="w-16 h-16 rounded-full"
+                    className="w-24 h-24 rounded-full"
                     onClick={onBackToStart}
                     aria-label="Back to Start"
                 >
-                    <SkipBack className="w-8 h-8" />
+                    <SkipBack className="w-12 h-12" />
                 </Button>
             </div>
         </div>
