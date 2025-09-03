@@ -17,7 +17,6 @@ import DebugConsole from '@/components/stagehand/debug-console';
 import { logger } from '@/lib/logger';
 import { generateWaveformData, type WaveformData } from '@/lib/waveform';
 import { storageManager } from '@/lib/storage-manager';
-import { cn } from '@/lib/utils';
 import MetronomeControl from '@/components/stagehand/metronome-control';
 import PlaybackModeView from '@/components/stagehand/playback-mode-view';
 
@@ -231,19 +230,25 @@ export default function Home() {
     setProgress(0);
     setActiveTrack(track);
     setWaveformData(null);
+    setAudioSrc(null); // Clear previous source immediately
 
     try {
       const url = await getAudioUrl(track.id);
-      logger.log('handleSelectTrack: Audio URL received.', { url });
-      setAudioSrc(url);
-      
-      await regenerateWaveform(track, zoom);
+      if (url) {
+        logger.log('handleSelectTrack: Audio URL received.', { url });
+        setAudioSrc(url);
+        
+        await regenerateWaveform(track, zoom);
 
-      if (wasPlaying) {
-        handleSetIsPlaying(true);
+        if (wasPlaying) {
+          // A short delay might be needed for the audio element to be ready
+          setTimeout(() => handleSetIsPlaying(true), 50);
+        }
+      } else {
+        logger.error('handleSelectTrack: Failed to get audio URL.', { trackId: track.id });
       }
     } catch (error) {
-       logger.error('handleSelectTrack: Failed to get audio URL or generate waveform.', { error });
+       logger.error('handleSelectTrack: Error during track selection process.', { error });
        setAudioSrc(null);
     }
   };
@@ -332,9 +337,9 @@ export default function Home() {
         onEnded={handleAudioEnded} 
         onPlay={() => startProgressLoop()} 
         onPause={() => stopProgressLoop()} 
-        onCanPlay={() => {
+        onLoadedData={() => {
           if (isPlaying) {
-            audioRef.current?.play().catch(e => logger.error("Playback failed in onCanPlay", e));
+            audioRef.current?.play().catch(e => logger.error("Playback failed in onLoadedData", e));
           }
         }}
       />

@@ -1,5 +1,6 @@
 
 import { logger } from './logger';
+import { localDB } from './local-db';
 
 const TRASH_FOLDER_ID = 'trash';
 
@@ -11,7 +12,7 @@ export interface AudioFile {
   size: number;
   createdAt: number;
   folderId: string | null;
-  blobUrl?: string; 
+  blobUrl?: string; // This will now be a temporary, in-memory URL
 }
 
 export interface Folder {
@@ -26,15 +27,16 @@ export interface Folder {
 class StorageManager {
   private metadata: Map<string, AudioFile> = new Map();
   private folders: Map<string, Folder> = new Map();
-  private audioBlobs: Map<string, Blob> = new Map();
   
   async initialize() {
     logger.log('StorageManager: Initializing...');
     try {
+      await localDB.openDB();
+
       const storedMeta = localStorage.getItem('audio_metadata');
       if (storedMeta) {
         this.metadata = new Map(JSON.parse(storedMeta));
-        logger.log(`StorageManager: Loaded ${this.metadata.size} tracks.`);
+        logger.log(`StorageManager: Loaded ${this.metadata.size} tracks metadata.`);
       }
 
       const storedFolders = localStorage.getItem('audio_folders');
@@ -56,18 +58,19 @@ class StorageManager {
 
       const projectsExist = Array.from(this.folders.values()).some(f => f.isProject);
       if (!projectsExist) {
-        await this.createProject("my first project");
+        await this.createProject("My First Project");
       }
       
+      // Revoke any old blob URLs from previous sessions
       this.metadata.forEach(file => {
         if (file.blobUrl && file.blobUrl.startsWith('blob:')) {
           URL.revokeObjectURL(file.blobUrl);
           file.blobUrl = undefined;
         }
       });
-      this.persistMetadata();
+      this.persistMetadata(); // Save the cleaned metadata
     } catch (e) {
-      logger.error('StorageManager: Failed to load data.', { error: e });
+      logger.error('StorageManager: Failed to initialize.', { error: e });
       this.metadata = new Map();
       this.folders = new Map();
     }
@@ -100,7 +103,7 @@ class StorageManager {
     const id = `audio_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     logger.log('StorageManager: Saving new audio file.', { name: file.name, folderId });
     
-    this.audioBlobs.set(id, file);
+    await localDB.setItem(id, file);
     const duration = await this.getAudioDuration(file);
     
     const audioFile: AudioFile = {
@@ -111,7 +114,7 @@ class StorageManager {
       size: file.size,
       createdAt: Date.now(),
       folderId: folderId,
-      blobUrl: URL.createObjectURL(file)
+      // blobUrl is NOT set here, it will be created on demand
     };
     
     this.metadata.set(id, audioFile);
@@ -148,11 +151,11 @@ class StorageManager {
     const allFilesToDelete = [...trashDescendants.files];
 
     for (const fileId of allFilesToDelete) {
+      await localDB.deleteItem(fileId);
       const file = this.metadata.get(fileId);
       if (file?.blobUrl) {
           URL.revokeObjectURL(file.blobUrl);
       }
-      this.audioBlobs.delete(fileId);
       this.metadata.delete(fileId);
     }
     
@@ -178,41 +181,29 @@ class StorageManager {
   }
   
   async getAudioUrl(id: string): Promise<string | null> {
-    const file = this.metadata.get(id);
-    if (!file) return null;
+    const fileMeta = this.metadata.get(id);
+    if (!fileMeta) return null;
     
-    if (file.blobUrl && file.blobUrl.startsWith('blob:')) return file.blobUrl;
+    // If we have a valid URL in memory, use it
+    if (fileMeta.blobUrl && fileMeta.blobUrl.startsWith('blob:')) {
+      return fileMeta.blobUrl;
+    }
     
-    const memoryBlob = this.audioBlobs.get(id);
-    if (memoryBlob) {
-      const url = URL.createObjectURL(memoryBlob);
-      file.blobUrl = url;
-      this.metadata.set(id, file);
+    // Otherwise, fetch from IndexedDB
+    const blob = await localDB.getItem(id);
+    if (blob) {
+      const url = URL.createObjectURL(blob);
+      fileMeta.blobUrl = url; // Cache the URL in memory for this session
+      this.metadata.set(id, fileMeta);
       return url;
     }
     
+    logger.error('StorageManager: Blob not found in IndexedDB for track.', { id });
     return null;
   }
 
   async getAudioBlob(id: string): Promise<Blob | null> {
-    const memoryBlob = this.audioBlobs.get(id);
-    if (memoryBlob) {
-      return memoryBlob;
-    }
-    // Fallback if blob is not in memory (e.g., after a refresh)
-    const fileMeta = this.metadata.get(id);
-    if (fileMeta?.blobUrl) {
-        try {
-            const response = await fetch(fileMeta.blobUrl);
-            const blob = await response.blob();
-            this.audioBlobs.set(id, blob); // Cache it back
-            return blob;
-        } catch (error) {
-            logger.error('Failed to fetch blob from blobUrl', { error });
-            return null;
-        }
-    }
-    return null;
+    return localDB.getItem(id);
   }
 
 
@@ -304,7 +295,7 @@ class StorageManager {
   private persistMetadata() {
     try {
       // Create a temporary object without blobUrl before serializing
-      const serializableMetadata = new Map<string, AudioFile>();
+      const serializableMetadata = new Map<string, Omit<AudioFile, 'blobUrl'>>();
       this.metadata.forEach((value, key) => {
           const { blobUrl, ...rest } = value;
           serializableMetadata.set(key, rest);
@@ -327,5 +318,3 @@ class StorageManager {
 }
 
 export const storageManager = new StorageManager();
-
-    
