@@ -58,7 +58,6 @@ export default function AutomationCurve({
       pathData += ` L ${timeToX(p.time)} ${valueToY(p.value)}`;
     });
   } else {
-    // Draw a neutral baseline if no points exist, based on master volume
     pathData = `M 0 ${valueToY(baselineValue)} L 100 ${valueToY(baselineValue)}`;
   }
 
@@ -97,14 +96,12 @@ export default function AutomationCurve({
   };
 
   const handleAddPoint = (e: MouseEvent<SVGPathElement>) => {
-    // Only trigger on the line itself, not on the point circles
     if (e.target !== e.currentTarget) return; 
     
     const { x, y } = getSVGCoordinates(e);
     const newTime = (x / 100) * duration;
     let newValue = (maxHeight - y) / maxHeight * 100;
 
-    // If adding the first point, find the interpolated value on the existing line
     if (points.length > 0) {
         const sorted = [...points].sort((a,b) => a.time - b.time);
         let p1 = sorted[0];
@@ -125,7 +122,6 @@ export default function AutomationCurve({
             }
         }
     } else {
-        // If it's the first point, its value is the baseline value
         newValue = baselineValue;
     }
 
@@ -154,7 +150,7 @@ export default function AutomationCurve({
         className="absolute inset-0 w-full h-full pointer-events-auto"
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp} // Stop dragging if mouse leaves container
+        onMouseLeave={handleMouseUp}
     >
       <svg
         ref={svgRef}
@@ -164,7 +160,6 @@ export default function AutomationCurve({
         preserveAspectRatio="none"
         className="overflow-visible"
       >
-        {/* Invisible thicker line to make clicking easier */}
         {pathData && (
              <path
                 d={pathData}

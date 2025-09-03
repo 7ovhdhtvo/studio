@@ -114,6 +114,7 @@ export default function Home() {
             const automationVolume = getAutomationValue(volumePoints, audio.currentTime);
             if (automationVolume !== null) {
                 audio.volume = automationVolume / 100;
+                setVolume(Math.round(automationVolume));
             }
         }
         animationFrameRef.current = requestAnimationFrame(animate);
@@ -214,10 +215,14 @@ export default function Home() {
   
   const handleSetVolumePoints = (points: AutomationPoint[]) => {
     setVolumePoints(points);
+  };
+  
+  const saveAutomation = () => {
     if (activeTrack) {
-        updateTrackAutomation(activeTrack.id, points);
+        updateTrackAutomation(activeTrack.id, volumePoints);
     }
   };
+
 
   const handleSetIsPlaying = (playing: boolean) => {
     if (!audioSrc && playing) {
@@ -346,6 +351,7 @@ export default function Home() {
   
   const handleScrubEnd = () => {
     isScrubbingRef.current = false;
+    saveAutomation();
     if (isPlaying) {
       startProgressLoop();
     }
