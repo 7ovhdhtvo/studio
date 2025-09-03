@@ -2,7 +2,7 @@
 import { logger } from './logger';
 
 const DB_NAME = 'StagehandDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Bump version to trigger onupgradeneeded
 const STORE_NAME = 'audioBlobs';
 
 export class LocalDB {
