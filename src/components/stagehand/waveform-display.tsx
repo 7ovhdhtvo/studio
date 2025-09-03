@@ -9,19 +9,20 @@ import type { AutomationPoint } from '@/lib/storage-manager';
 import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, Dot, Tooltip } from 'recharts';
 
 const CustomDot = (props: any) => {
-    const { cx, cy, stroke, payload, onMouseDown, onMouseUp } = props;
+    const { cx, cy, stroke, payload, onMouseDown, onMouseUp, onDoubleClick } = props;
 
     if (!payload.isAutomationPoint) {
         return null;
     }
     
-    const hitboxSize = 20;
+    const hitboxSize = 24;
 
     return (
         <g 
             transform={`translate(${cx}, ${cy})`}
-            onMouseDown={() => onMouseDown(payload)}
-            onMouseUp={onMouseUp}
+            onMouseDown={(e) => { e.stopPropagation(); onMouseDown(payload); }}
+            onMouseUp={(e) => { e.stopPropagation(); onMouseUp(); }}
+            onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(payload); }}
             className="cursor-grab active:cursor-grabbing"
         >
             <rect 
@@ -40,6 +41,7 @@ const CustomDot = (props: any) => {
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const point = payload[0].payload;
+    if (!point.isAutomationPoint) return null;
     return (
       <div className="bg-popover text-popover-foreground px-3 py-1.5 text-xs rounded-md border shadow-md">
         <p className="font-bold">{point.name || `Point`}</p>
@@ -114,6 +116,7 @@ export default function WaveformDisplay({
   const waveformInteractionRef = useRef<HTMLDivElement>(null);
   const isMouseDownRef = useRef(false);
   const draggingPointIdRef = useRef<string | null>(null);
+  const isDraggingBaselineRef = useRef(false);
 
   const getChartData = (points: AutomationPoint[], baseline: number) => {
     if (durationInSeconds === 0) return [];
@@ -129,7 +132,7 @@ export default function WaveformDisplay({
             data.push({ time: 0, value: sortedPoints[0].value, isAutomationPoint: false });
         }
         
-        sortedPoints.forEach(p => data.push({ ...p, time: p.time, value: p.value, isAutomationPoint: true }));
+        sortedPoints.forEach(p => data.push({ ...p, isAutomationPoint: true }));
         
         const lastPoint = sortedPoints[sortedPoints.length - 1];
         if (lastPoint.time < durationInSeconds) {
@@ -150,36 +153,32 @@ export default function WaveformDisplay({
   };
   
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
-    if (showVolumeAutomation) return;
-    isMouseDownRef.current = true;
-    onScrubStart();
-    handleInteraction(e);
-  };
-  
-  const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
-    if (isMouseDownRef.current && !draggingPointIdRef.current) {
+    if (showVolumeAutomation) {
+      if (automationPoints.length === 0) {
+        isDraggingBaselineRef.current = true;
+        onAutomationDragStart();
+      }
+    } else {
+      isMouseDownRef.current = true;
+      onScrubStart();
       handleInteraction(e);
     }
   };
   
-  const handleMouseUp = () => {
-    if (isMouseDownRef.current) {
-        isMouseDownRef.current = false;
-        onScrubEnd();
-    }
-    if (draggingPointIdRef.current) {
-        draggingPointIdRef.current = null;
-        onAutomationDragEnd();
+  const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
+    if (isMouseDownRef.current && !showVolumeAutomation) {
+      handleInteraction(e);
     }
   };
   
-  const handleMouseLeave = () => {
+  const handleMouseUpAndLeave = () => {
     if (isMouseDownRef.current) {
         isMouseDownRef.current = false;
         onScrubEnd();
     }
-    if (draggingPointIdRef.current) {
+    if (draggingPointIdRef.current || isDraggingBaselineRef.current) {
         draggingPointIdRef.current = null;
+        isDraggingBaselineRef.current = false;
         onAutomationDragEnd();
     }
   };
@@ -191,12 +190,12 @@ export default function WaveformDisplay({
   };
   
   const handleChartMouseMove = (e: any) => {
-      if (draggingPointIdRef.current && e?.activeCoordinate) {
+      const container = waveformInteractionRef.current;
+      if (!container || !e?.activeCoordinate) return;
+      const rect = container.getBoundingClientRect();
+      
+      if (draggingPointIdRef.current) {
           const { x, y } = e.activeCoordinate;
-          const container = waveformInteractionRef.current;
-          if (!container) return;
-          
-          const rect = container.getBoundingClientRect();
           const newTime = Math.max(0, Math.min(durationInSeconds, (x / rect.width) * durationInSeconds));
           const newValue = Math.max(0, Math.min(100, (1 - (y / rect.height)) * 100));
           
@@ -204,11 +203,9 @@ export default function WaveformDisplay({
             p.id === draggingPointIdRef.current ? { ...p, time: newTime, value: newValue } : p
           );
           onAutomationPointsChange(updatedPoints);
-      } else if (automationPoints.length === 0 && isMouseDownRef.current && e?.activeCoordinate) {
+
+      } else if (isDraggingBaselineRef.current && automationPoints.length === 0) {
           const { y } = e.activeCoordinate;
-          const container = waveformInteractionRef.current;
-          if (!container) return;
-          const rect = container.getBoundingClientRect();
           const newVolume = Math.max(0, Math.min(100, (1 - (y / rect.height)) * 100));
           onMasterVolumeChange(newVolume);
       }
@@ -221,7 +218,12 @@ export default function WaveformDisplay({
   }
 
   const handleChartClick = (e: any) => {
-    if (draggingPointIdRef.current || !e?.activeCoordinate || !e?.activeLabel || !e.viewBox || e.activePayload?.length > 0) return;
+    if (draggingPointIdRef.current || !showVolumeAutomation || !e?.activeCoordinate || !e?.activeLabel || !e.viewBox) return;
+    
+    // Prevent creating points if clicking on an existing one
+    if (e.activePayload && e.activePayload.some((p: any) => p.payload.isAutomationPoint)) {
+        return;
+    }
 
     const chartY = e.chartY;
     const clickTime = e.activeLabel;
@@ -267,8 +269,8 @@ export default function WaveformDisplay({
             className="w-full h-full"
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseLeave}
+            onMouseUp={handleMouseUpAndLeave}
+            onMouseLeave={handleMouseUpAndLeave}
           >
             {waveformData ? (
               <div className="w-full h-full flex flex-col justify-center items-center pointer-events-none">
@@ -287,11 +289,9 @@ export default function WaveformDisplay({
                      <ResponsiveContainer width="100%" height="100%">
                         <LineChart
                             data={chartData}
-                            margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
+                            margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
                             onMouseMove={handleChartMouseMove}
                             onClick={handleChartClick}
-                            onMouseDown={() => isMouseDownRef.current = true}
-                            onMouseUp={() => isMouseDownRef.current = false}
                         >
                             <XAxis type="number" dataKey="time" domain={[0, durationInSeconds]} hide />
                             <YAxis type="number" dataKey="value" domain={[0, 100]} hide />
@@ -301,8 +301,7 @@ export default function WaveformDisplay({
                                 dataKey="value" 
                                 stroke="hsl(var(--destructive))" 
                                 strokeWidth={2}
-                                dot={<CustomDot onMouseDown={handlePointMouseDown} onMouseUp={handleMouseUp} />}
-                                activeDot={{ onDoubleClick: handlePointDoubleClick }}
+                                dot={<CustomDot onMouseDown={handlePointMouseDown} onMouseUp={handleMouseUpAndLeave} onDoubleClick={handlePointDoubleClick} />}
                                 isAnimationActive={false}
                             />
                         </LineChart>
@@ -323,3 +322,4 @@ export default function WaveformDisplay({
     </div>
   );
 }
+
