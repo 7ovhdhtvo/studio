@@ -75,9 +75,8 @@ export default function AutomationCurve({
   if (!visible || duration === 0) return null;
 
   const getPathData = () => {
-    const baselineY = valueToY(baselineValue);
-
     if (points.length === 0) {
+      const baselineY = valueToY(baselineValue);
       return `M 0 ${baselineY} L 100 ${baselineY}`;
     }
 
@@ -103,31 +102,8 @@ export default function AutomationCurve({
     const { x, y, svgWidth } = getSVGCoordinates(e);
     const time = xToTime(x, svgWidth);
     
-    // Interpolate value on the line to place the new point accurately
-    const sortedPoints = [...points].sort((a, b) => a.time - b.time);
-    let value = yToValue(y); // Default to click position
+    let value = yToValue(y);
     
-    if (points.length === 0) {
-        value = baselineValue;
-    } else {
-        let prevPoint = sortedPoints[0];
-        if (time <= prevPoint.time) {
-            value = prevPoint.value;
-        } else if (time >= sortedPoints[sortedPoints.length - 1].time) {
-            value = sortedPoints[sortedPoints.length - 1].value;
-        } else {
-            for (let i = 1; i < sortedPoints.length; i++) {
-                const nextPoint = sortedPoints[i];
-                if (time >= prevPoint.time && time <= nextPoint.time) {
-                    const timeFraction = (time - prevPoint.time) / (nextPoint.time - prevPoint.time);
-                    value = prevPoint.value + timeFraction * (nextPoint.value - prevPoint.value);
-                    break;
-                }
-                prevPoint = nextPoint;
-            }
-        }
-    }
-
     const newPoint: AutomationPoint = {
         id: `point_${Date.now()}`,
         time,
@@ -135,9 +111,9 @@ export default function AutomationCurve({
         name: `${points.length + 1}`
     };
     
-    const newPoints = [...points, newPoint];
+    const newPoints = [...points, newPoint].sort((a,b) => a.time - b.time);
     onPointsChange(newPoints);
-    onDragEnd(); // Save immediately after adding
+    onDragEnd();
   };
   
   const handlePointMouseDown = (e: React.MouseEvent, pointId: string) => {
@@ -193,18 +169,21 @@ export default function AutomationCurve({
                     width={hitboxSize}
                     height={hitboxSize}
                     fill="transparent"
+                    vectorEffect="non-scaling-stroke"
                   />
                    <circle
                     // The outer ring color
                     r={outerRadius}
                     fill={color}
                     className="pointer-events-none"
+                    vectorEffect="non-scaling-stroke"
                   />
                   <circle
                     // The inner circle, creating the ring effect
                     r={innerRadius}
                     fill="hsl(var(--card))"
                     className="pointer-events-none"
+                    vectorEffect="non-scaling-stroke"
                   />
               </g>
             )
