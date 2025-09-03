@@ -4,11 +4,16 @@
 import { cn } from '@/lib/utils';
 import { type WaveformData } from '@/lib/waveform';
 import { useRef, type MouseEvent, type RefObject } from 'react';
-import { Line, LineChart as RechartsLineChart, ResponsiveContainer } from 'recharts';
 import TimeRuler from './time-ruler';
+import AutomationCurve from './automation-curve';
+import type { AutomationPoint } from '@/lib/storage-manager';
 
 type WaveformDisplayProps = {
   waveformData: WaveformData | null;
+  volumePoints: AutomationPoint[];
+  onVolumePointsChange: (points: AutomationPoint[]) => void;
+  speedPoints: AutomationPoint[];
+  onSpeedPointsChange: (points: AutomationPoint[]) => void;
   showVolumeAutomation: boolean;
   showSpeedAutomation: boolean;
   durationInSeconds: number;
@@ -20,46 +25,6 @@ type WaveformDisplayProps = {
   onScrubEnd: () => void;
   showStereo: boolean;
   scrollContainerRef: RefObject<HTMLDivElement>;
-};
-
-const volumeData = [
-  { time: 0, value: 30 },
-  { time: 1, value: 30 },
-  { time: 2, value: 80 },
-  { time: 3, value: 80 },
-  { time: 4, value: 50 },
-  { time: 5, value: 50 },
-  { time: 6, value: 100 },
-  { time: 7, value: 100 },
-  { time: 8, value: 0 },
-  { time: 9, value: 0 },
-];
-
-const speedData = [
-  { time: 0, value: 100 },
-  { time: 1, value: 100 },
-  { time: 2, value: 100 },
-  { time: 3, value: 75 },
-  { time: 4, value: 75 },
-  { time: 5, value: 125 },
-  { time: 6, value: 125 },
-  { time: 7, value: 100 },
-  { time: 8, value: 100 },
-  { time: 9, value: 100 },
-];
-
-const AutomationCurve = ({ data, color, visible }: { data: any[], color: string, visible: boolean }) => {
-  if (!visible) return null;
-
-  return (
-    <div className="absolute inset-0 w-full h-full opacity-70 pointer-events-none">
-      <ResponsiveContainer width="100%" height="100%">
-        <RechartsLineChart data={data}>
-          <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={true} />
-        </RechartsLineChart>
-      </ResponsiveContainer>
-    </div>
-  );
 };
 
 const ChannelWaveform = ({ data, progress, isStereo }: { data: number[], progress: number, isStereo: boolean }) => {
@@ -84,6 +49,10 @@ const ChannelWaveform = ({ data, progress, isStereo }: { data: number[], progres
 
 export default function WaveformDisplay({ 
   waveformData,
+  volumePoints,
+  onVolumePointsChange,
+  speedPoints,
+  onSpeedPointsChange,
   showVolumeAutomation, 
   showSpeedAutomation,
   durationInSeconds,
@@ -108,6 +77,10 @@ export default function WaveformDisplay({
   };
   
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
+    // Prevent scrub when interacting with automation curve
+    if ((e.target as HTMLElement).closest('[data-automation-element]')) {
+        return;
+    }
     isMouseDownRef.current = true;
     onScrubStart();
     handleInteraction(e);
@@ -134,6 +107,7 @@ export default function WaveformDisplay({
   };
 
   const currentTime = (progress / 100) * durationInSeconds;
+  const waveformHeight = 192; // Corresponds to h-48 in tailwind
 
   const formatTime = (seconds: number) => {
     if (isNaN(seconds) || seconds < 0) seconds = 0;
@@ -173,8 +147,17 @@ export default function WaveformDisplay({
              </div>
           )}
           
-          <AutomationCurve data={volumeData} color="hsl(var(--destructive))" visible={showVolumeAutomation && !showStereo} />
-          <AutomationCurve data={speedData} color="#F5B041" visible={showSpeedAutomation && !showStereo} />
+          <div data-automation-element>
+            <AutomationCurve 
+                points={volumePoints}
+                onPointsChange={onVolumePointsChange}
+                duration={durationInSeconds}
+                color="hsl(var(--destructive))"
+                visible={showVolumeAutomation}
+                maxHeight={waveformHeight}
+            />
+          </div>
+          {/* Speed Automation Curve would go here */}
 
           <div 
             className="absolute top-0 h-full w-0.5 bg-foreground/70 pointer-events-none"

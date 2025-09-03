@@ -8,11 +8,8 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from "@/components/ui/badge";
 import { LineChart, Volume2, VolumeX, Minus } from 'lucide-react';
 import { Button } from '../ui/button';
+import type { AutomationPoint } from '@/lib/storage-manager';
 
-type AutomationPoint = {
-  time: number;
-  value: number;
-};
 
 type VolumeControlProps = {
   isOpen: boolean;
@@ -66,6 +63,7 @@ export default function VolumeControl({
                       max={100}
                       step={1}
                       onValueChange={(value) => onVolumeChange(value[0])}
+                      disabled={showAutomation}
                   />
                   <span className="text-sm font-mono w-12 text-center bg-secondary py-1 rounded-md">{volume}</span>
               </div>
@@ -88,8 +86,8 @@ export default function VolumeControl({
             <div className="flex flex-wrap gap-2 p-2 bg-secondary rounded-md min-h-[40px]">
                {automationPoints.length > 0 ? (
                   automationPoints.map(point => (
-                      <Badge key={`${point.time}-${point.value}`} variant="outline">
-                          {point.time.toFixed(1)}s: {point.value}%
+                      <Badge key={point.id} variant="outline">
+                          {point.time.toFixed(1)}s: {Math.round(point.value)}%
                       </Badge>
                   ))
                ) : (

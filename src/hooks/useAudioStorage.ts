@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { storageManager, type AudioFile, type Folder } from '@/lib/storage-manager';
+import { storageManager, type AudioFile, type Folder, type AutomationPoint } from '@/lib/storage-manager';
 import { logger } from '@/lib/logger';
 
 export function useAudioStorage() {
@@ -134,6 +134,13 @@ export function useAudioStorage() {
     return await storageManager.getAudioUrl(id);
   }, []);
   
+  const updateTrackAutomation = useCallback(async (trackId: string, points: AutomationPoint[]) => {
+    const success = await storageManager.updateTrackAutomation(trackId, points);
+    if (success) {
+      refreshData();
+    }
+  }, [refreshData]);
+
   return {
     tracks,
     folders,
@@ -150,5 +157,6 @@ export function useAudioStorage() {
     recoverTrack,
     recoverFolder,
     getAudioUrl,
+    updateTrackAutomation,
   };
 }

@@ -12,18 +12,13 @@ import { ZoomIn, ZoomOut, Clapperboard } from 'lucide-react';
 import ImportDialog from '@/components/stagehand/import-dialog';
 import TrackList from '@/components/stagehand/track-list';
 import { useAudioStorage } from '@/hooks/useAudioStorage';
-import type { AudioFile, Folder } from '@/lib/storage-manager';
+import type { AudioFile, Folder, AutomationPoint } from '@/lib/storage-manager';
 import DebugConsole from '@/components/stagehand/debug-console';
 import { logger } from '@/lib/logger';
 import { generateWaveformData, type WaveformData } from '@/lib/waveform';
 import { storageManager } from '@/lib/storage-manager';
 import MetronomeControl from '@/components/stagehand/metronome-control';
 import PlaybackModeView from '@/components/stagehand/playback-mode-view';
-
-export type AutomationPoint = {
-  time: number;
-  value: number;
-};
 
 export type OpenControlPanel = 'volume' | 'speed' | 'metronome' | null;
 
@@ -44,6 +39,7 @@ export default function Home() {
     emptyTrash,
     recoverTrack,
     recoverFolder,
+    updateTrackAutomation,
   } = useAudioStorage();
 
   const [activeTrack, setActiveTrack] = useState<AudioFile | null>(null);
@@ -55,7 +51,7 @@ export default function Home() {
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLooping, setIsLooping] = useState(false);
-  const [showVolumeAutomation, setShowVolumeAutomation] = useState(true);
+  const [showVolumeAutomation, setShowVolumeAutomation] = useState(false);
   const [showSpeedAutomation, setShowSpeedAutomation] = useState(false);
   const [zoom, setZoom] = useState(1); // 1 = 100%
   const [speed, setSpeed] = useState(100); // Global speed in %
@@ -63,6 +59,12 @@ export default function Home() {
   const [openControlPanel, setOpenControlPanel] = useState<OpenControlPanel>(null);
   const [progress, setProgress] = useState(0); // Progress in percentage
   
+  const [volumePoints, setVolumePoints] = useState<AutomationPoint[]>([]);
+  const [speedPoints, setSpeedPoints] = useState<AutomationPoint[]>([
+    { id: '1', time: 3.2, value: 75 },
+    { id: '2', time: 6.8, value: 125 },
+  ]);
+
   const audioRef = useRef<HTMLAudioElement>(null);
   const animationFrameRef = useRef<number>();
   const isScrubbingRef = useRef(false);
@@ -70,6 +72,29 @@ export default function Home() {
 
   const duration = audioRef.current?.duration ?? activeTrack?.duration ?? 0;
   const currentTime = audioRef.current?.currentTime ?? 0;
+
+  const getAutomationValue = useCallback((points: AutomationPoint[], time: number): number | null => {
+    if (points.length === 0) return null;
+
+    const sortedPoints = [...points].sort((a, b) => a.time - b.time);
+    const firstPoint = sortedPoints[0];
+    const lastPoint = sortedPoints[sortedPoints.length - 1];
+
+    if (time <= firstPoint.time) return firstPoint.value;
+    if (time >= lastPoint.time) return lastPoint.value;
+
+    let prevPoint = firstPoint;
+    for (let i = 1; i < sortedPoints.length; i++) {
+        const nextPoint = sortedPoints[i];
+        if (time >= prevPoint.time && time <= nextPoint.time) {
+            const timeFraction = (time - prevPoint.time) / (nextPoint.time - prevPoint.time);
+            return prevPoint.value + timeFraction * (nextPoint.value - prevPoint.value);
+        }
+        prevPoint = nextPoint;
+    }
+
+    return null; // Should not be reached
+  }, []);
 
   const stopProgressLoop = useCallback(() => {
     if (animationFrameRef.current) {
@@ -81,13 +106,21 @@ export default function Home() {
     stopProgressLoop();
     const animate = () => {
       if (audioRef.current && !isScrubbingRef.current && !audioRef.current.paused) {
-        const newProgress = (audioRef.current.currentTime / audioRef.current.duration) * 100;
+        const audio = audioRef.current;
+        const newProgress = (audio.currentTime / audio.duration) * 100;
         setProgress(newProgress);
+
+        if (showVolumeAutomation) {
+            const automationVolume = getAutomationValue(volumePoints, audio.currentTime);
+            if (automationVolume !== null) {
+                audio.volume = automationVolume / 100;
+            }
+        }
         animationFrameRef.current = requestAnimationFrame(animate);
       }
     };
     animationFrameRef.current = requestAnimationFrame(animate);
-  }, [stopProgressLoop]);
+  }, [stopProgressLoop, showVolumeAutomation, volumePoints, getAutomationValue]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -149,10 +182,10 @@ export default function Home() {
   }, [isLooping]);
 
   useEffect(() => {
-    if (audioRef.current) {
+    if (audioRef.current && !showVolumeAutomation) {
       audioRef.current.volume = volume / 100;
     }
-  }, [volume]);
+  }, [volume, showVolumeAutomation]);
 
   const regenerateWaveform = useCallback(async (track: AudioFile, currentZoom: number) => {
     try {
@@ -178,16 +211,14 @@ export default function Home() {
       scrollContainer.scrollLeft = Math.max(0, newScrollLeft);
     }
   }, [zoom, progress]);
-
-  const [volumePoints, setVolumePoints] = useState<AutomationPoint[]>([
-    { time: 2.5, value: 80 },
-    { time: 5.0, value: 50 },
-  ]);
-  const [speedPoints, setSpeedPoints] = useState<AutomationPoint[]>([
-    { time: 3.2, value: 75 },
-    { time: 6.8, value: 125 },
-  ]);
   
+  const handleSetVolumePoints = (points: AutomationPoint[]) => {
+    setVolumePoints(points);
+    if (activeTrack) {
+        updateTrackAutomation(activeTrack.id, points);
+    }
+  };
+
   const handleSetIsPlaying = (playing: boolean) => {
     if (!audioSrc && playing) {
       logger.log('handleSetIsPlaying: Cannot play, no audio source.');
@@ -229,6 +260,7 @@ export default function Home() {
     
     setProgress(0);
     setActiveTrack(track);
+    setVolumePoints(track.volumeAutomation || []);
     setWaveformData(null);
     setAudioSrc(null); // Clear previous source immediately
 
@@ -418,7 +450,7 @@ export default function Home() {
                     <Button variant="outline" size="icon" onClick={handleZoomIn}>
                       <ZoomIn className="w-4 h-4" />
                     </Button>
-                    <Button variant="outline" size="icon" onClick={() => setIsPlaybackMode(true)}>
+                    <Button variant="outline" size="icon" onClick={() => setIsPlaybackMode(true)} disabled={!activeTrack}>
                       <Clapperboard className="w-4 h-4" />
                     </Button>
                   </div>
@@ -426,6 +458,10 @@ export default function Home() {
 
                 <WaveformDisplay 
                   waveformData={waveformData}
+                  volumePoints={volumePoints}
+                  onVolumePointsChange={handleSetVolumePoints}
+                  speedPoints={speedPoints}
+                  onSpeedPointsChange={setSpeedPoints}
                   showVolumeAutomation={showVolumeAutomation}
                   showSpeedAutomation={showSpeedAutomation}
                   durationInSeconds={duration}

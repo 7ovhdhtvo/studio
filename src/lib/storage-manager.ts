@@ -4,6 +4,13 @@ import { localDB } from './local-db';
 
 const TRASH_FOLDER_ID = 'trash';
 
+export interface AutomationPoint {
+  id: string;
+  time: number;
+  value: number;
+  name?: string;
+}
+
 export interface AudioFile {
   id: string;
   title: string;
@@ -12,6 +19,7 @@ export interface AudioFile {
   size: number;
   createdAt: number;
   folderId: string | null;
+  volumeAutomation?: AutomationPoint[];
   blobUrl?: string; // This will now be a temporary, in-memory URL
 }
 
@@ -121,6 +129,7 @@ class StorageManager {
       size: file.size,
       createdAt: Date.now(),
       folderId: folderId,
+      volumeAutomation: [],
       // blobUrl is NOT set here, it will be created on demand
     };
     
@@ -291,6 +300,15 @@ class StorageManager {
     return true;
   }
   
+  async updateTrackAutomation(trackId: string, points: AutomationPoint[]): Promise<boolean> {
+    const track = this.metadata.get(trackId);
+    if (!track) return false;
+    track.volumeAutomation = points;
+    this.metadata.set(trackId, track);
+    this.persistMetadata();
+    return true;
+  }
+
   getAllTracks(): AudioFile[] {
     return Array.from(this.metadata.values()).sort((a, b) => a.title.localeCompare(b.title));
   }
