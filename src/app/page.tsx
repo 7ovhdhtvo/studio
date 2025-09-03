@@ -77,7 +77,6 @@ export default function Home() {
   const getAutomationValue = useCallback((points: AutomationPoint[], time: number): number | null => {
     if (points.length === 0) return null;
     
-    // If only one point exists, its value is constant across the timeline.
     if (points.length === 1) return points[0].value;
 
     const sortedPoints = [...points].sort((a, b) => a.time - b.time);
@@ -97,7 +96,7 @@ export default function Home() {
         prevPoint = nextPoint;
     }
 
-    return null; // Should not be reached
+    return null;
   }, []);
 
   const stopProgressLoop = useCallback(() => {
@@ -363,6 +362,15 @@ export default function Home() {
   const handleSetVolumePoints = (points: AutomationPoint[]) => {
     setVolumePoints(points);
   };
+  
+  const handleBaselineVolumeChange = (newVolume: number) => {
+    setVolume(newVolume);
+    // If there are no points, create one to store the baseline
+    if (volumePoints.length <= 1) {
+      const newPoints = [{ id: 'baseline', time: 0, value: newVolume }];
+      setVolumePoints(newPoints);
+    }
+  };
 
   const handleUpdateAutomationPoint = (id: string, newName: string, newTime: number) => {
     if (!activeTrack) return;
@@ -505,6 +513,7 @@ export default function Home() {
                   onAutomationPointsChange={handleSetVolumePoints}
                   onAutomationDragStart={() => setIsDraggingAutomation(true)}
                   onAutomationDragEnd={handleAutomationDragEnd}
+                  onBaselineVolumeChange={handleBaselineVolumeChange}
                 />
                 <PlaybackControls 
                   isPlaying={isPlaying} 
@@ -549,3 +558,5 @@ export default function Home() {
     </>
   );
 }
+
+    
