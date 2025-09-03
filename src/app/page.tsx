@@ -141,30 +141,21 @@ export default function Home() {
   }, [isPlaying]);
   
   useEffect(() => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.play().catch(e => console.error("Playback failed", e));
-      } else {
-        audioRef.current.pause();
-      }
-    }
-  }, [isPlaying]);
-
-  useEffect(() => {
-    if (audioRef.current && audioSrc) {
-      audioRef.current.src = audioSrc;
-      audioRef.current.load();
-      audioRef.current.addEventListener('loadedmetadata', () => {
-        if (isPlaying) {
-          audioRef.current?.play().catch(e => console.error("Playback failed", e));
-        }
-      });
-    } else if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = "";
-    }
-  }, [audioSrc, isPlaying]);
+    const audio = audioRef.current;
+    if (!audio) return;
   
+    if (audioSrc && audio.src !== audioSrc) {
+      audio.src = audioSrc;
+      audio.load();
+    }
+  
+    if (isPlaying && audioSrc) {
+      audio.play().catch(e => console.error("Playback failed", e));
+    } else {
+      audio.pause();
+    }
+  }, [isPlaying, audioSrc]);
+
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.loop = isLooping;
