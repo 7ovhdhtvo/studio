@@ -1,16 +1,19 @@
+
 "use client";
 
 import { cn } from '@/lib/utils';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { Line, LineChart as RechartsLineChart, ResponsiveContainer } from 'recharts';
 import TimeRuler from './time-ruler';
 
 type WaveformDisplayProps = {
-  isPlaying: boolean;
   showVolumeAutomation: boolean;
   showSpeedAutomation: boolean;
   durationInSeconds: number;
   zoom: number;
+  progress: number;
+  onProgressChange: (newProgress: number) => void;
+  isPlaying: boolean;
 };
 
 const volumeData = [
@@ -43,7 +46,7 @@ const AutomationCurve = ({ data, color, visible }: { data: any[], color: string,
   if (!visible) return null;
 
   return (
-    <div className="absolute inset-0 w-full h-full opacity-70">
+    <div className="absolute inset-0 w-full h-full opacity-70 pointer-events-none">
       <ResponsiveContainer width="100%" height="100%">
         <RechartsLineChart data={data}>
           <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={true} />
@@ -54,43 +57,51 @@ const AutomationCurve = ({ data, color, visible }: { data: any[], color: string,
 };
 
 export default function WaveformDisplay({ 
-  isPlaying, 
   showVolumeAutomation, 
   showSpeedAutomation,
   durationInSeconds,
-  zoom
+  zoom,
+  progress,
+  onProgressChange,
+  isPlaying,
 }: WaveformDisplayProps) {
   const [bars, setBars] = useState<number[]>([]);
-  const [progress, setProgress] = useState(0); // Progress in percentage
   const containerRef = useRef<HTMLDivElement>(null);
+  const waveformContainerRef = useRef<HTMLDivElement>(null);
+  const isScrubbingRef = useRef(false);
 
   useEffect(() => {
     const newBars = Array.from({ length: 150 }, () => Math.random() * 0.8 + 0.2);
     setBars(newBars);
   }, []);
 
-  useEffect(() => {
-    let animationFrameId: number;
-    if (isPlaying) {
-      const startTime = Date.now() - (progress / 100) * durationInSeconds * 1000;
-      const animate = () => {
-        const elapsedTime = Date.now() - startTime;
-        const newProgress = (elapsedTime / (durationInSeconds * 1000)) * 100;
-        
-        if (newProgress >= 100) {
-          setProgress(100);
-        } else {
-          setProgress(newProgress);
-          animationFrameId = requestAnimationFrame(animate);
-        }
-      };
-      animationFrameId = requestAnimationFrame(animate);
-    }
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-    };
-  }, [isPlaying, durationInSeconds]);
+  const handleInteraction = (e: MouseEvent<HTMLDivElement>) => {
+    if (!waveformContainerRef.current) return;
+    const rect = waveformContainerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const newProgress = Math.max(0, Math.min(100, (x / rect.width) * 100));
+    onProgressChange(newProgress);
+  };
   
+  const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
+    isScrubbingRef.current = true;
+    handleInteraction(e);
+  };
+  
+  const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
+    if (isScrubbingRef.current) {
+      handleInteraction(e);
+    }
+  };
+  
+  const handleMouseUp = () => {
+    isScrubbingRef.current = false;
+  };
+  
+  const handleMouseLeave = () => {
+    isScrubbingRef.current = false;
+  };
+
   const currentTime = (progress / 100) * durationInSeconds;
 
   const formatTime = (seconds: number) => {
@@ -110,14 +121,19 @@ export default function WaveformDisplay({
          className="w-full overflow-x-auto"
        >
         <div 
-          className="relative h-48 bg-card rounded-lg p-2 flex items-center gap-0.5 shadow-inner"
+          ref={waveformContainerRef}
+          className="relative h-48 bg-card rounded-lg p-2 flex items-center gap-0.5 shadow-inner cursor-pointer"
           style={{ width: `${100 * zoom}%` }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
         >
           {bars.map((height, index) => (
             <div
               key={index}
               className={cn(
-                "w-full rounded-sm transition-colors duration-200",
+                "w-full rounded-sm transition-colors duration-200 pointer-events-none",
                 (index / bars.length * 100) < progress ? "bg-primary" : "bg-primary/20"
               )}
               style={{ height: `${height * 100}%` }}
@@ -128,7 +144,7 @@ export default function WaveformDisplay({
           <AutomationCurve data={speedData} color="#F5B041" visible={showSpeedAutomation} />
 
           <div 
-            className="absolute top-0 h-full w-0.5 bg-foreground/70"
+            className="absolute top-0 h-full w-0.5 bg-foreground/70 pointer-events-none"
             style={{ left: `${progress}%` }}
           >
             <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 bg-foreground/70 rounded-full"></div>

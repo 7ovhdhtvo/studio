@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Header from '@/components/stagehand/header';
 import PlaybackControls from '@/components/stagehand/playback-controls';
 import WaveformDisplay from '@/components/stagehand/waveform-display';
@@ -53,9 +53,41 @@ export default function Home() {
   const [zoom, setZoom] = useState(1); // 1 = 100%
   const [speed, setSpeed] = useState(100); // Global speed in %
   const [openControlPanel, setOpenControlPanel] = useState<OpenControlPanel>(null);
+  const [progress, setProgress] = useState(0); // Progress in percentage
   
   const audioRef = useRef<HTMLAudioElement>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  const animationFrameRef = useRef<number>();
+
+  const duration = activeTrack?.duration ?? 180;
+
+  const stopProgressLoop = useCallback(() => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+  }, []);
+
+  const startProgressLoop = useCallback(() => {
+    stopProgressLoop();
+    const animate = () => {
+      if (audioRef.current) {
+        const newProgress = (audioRef.current.currentTime / duration) * 100;
+        setProgress(newProgress);
+        animationFrameRef.current = requestAnimationFrame(animate);
+      }
+    };
+    animationFrameRef.current = requestAnimationFrame(animate);
+  }, [duration, stopProgressLoop]);
+
+  useEffect(() => {
+    if (isPlaying) {
+      startProgressLoop();
+    } else {
+      stopProgressLoop();
+    }
+    return stopProgressLoop;
+  }, [isPlaying, startProgressLoop, stopProgressLoop]);
+
 
   useEffect(() => {
     if (!isLoading && folders.length > 0) {
@@ -121,15 +153,17 @@ export default function Home() {
   useEffect(() => {
     if (audioRef.current && audioSrc) {
       audioRef.current.src = audioSrc;
-      audioRef.current.load(); // Ensure the new source is loaded
-      if (isPlaying) {
-        audioRef.current.play().catch(e => console.error("Playback failed", e));
-      }
+      audioRef.current.load();
+      audioRef.current.addEventListener('loadedmetadata', () => {
+        if (isPlaying) {
+          audioRef.current?.play().catch(e => console.error("Playback failed", e));
+        }
+      });
     } else if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.src = "";
     }
-  }, [audioSrc]);
+  }, [audioSrc, isPlaying]);
   
   useEffect(() => {
     if (audioRef.current) {
@@ -158,6 +192,7 @@ export default function Home() {
 
   const handleSelectTrack = async (track: AudioFile) => {
     setIsPlaying(false);
+    setProgress(0);
     setActiveTrack(track);
     const url = await getAudioUrl(track.id);
     setAudioSrc(url);
@@ -168,6 +203,7 @@ export default function Home() {
     if (activeTrack?.id === id) {
       setActiveTrack(null);
       setAudioSrc(null);
+      setProgress(0);
     }
   }
 
@@ -197,12 +233,36 @@ export default function Home() {
   const handleBackToStart = () => {
     if (audioRef.current) {
       audioRef.current.currentTime = 0;
+      setProgress(0);
     }
   }
 
+  const handleProgressChange = (newProgress: number) => {
+    setProgress(newProgress);
+    if (audioRef.current) {
+      const newTime = (newProgress / 100) * duration;
+      if (Math.abs(audioRef.current.currentTime - newTime) > 0.1) {
+        audioRef.current.currentTime = newTime;
+      }
+    }
+  };
+
+  const handleAudioEnded = () => {
+    if (!isLooping) {
+        setIsPlaying(false);
+        setProgress(100);
+        stopProgressLoop();
+    } else {
+        if (audioRef.current) {
+            audioRef.current.currentTime = 0;
+            audioRef.current.play();
+        }
+    }
+  };
+
   return (
     <div className="flex h-screen w-full flex-col bg-background text-foreground">
-      <audio ref={audioRef} onEnded={() => {if (!isLooping) setIsPlaying(false)}} />
+      <audio ref={audioRef} onEnded={handleAudioEnded} />
       <Header />
       <main className="grid flex-1 grid-cols-1 md:grid-cols-[300px_1fr] lg:grid-cols-[350px_1fr]">
         <div className="flex flex-col border-r bg-card">
@@ -256,11 +316,13 @@ export default function Home() {
             </div>
 
             <WaveformDisplay 
-              isPlaying={isPlaying} 
               showVolumeAutomation={showVolumeAutomation}
               showSpeedAutomation={showSpeedAutomation}
-              durationInSeconds={activeTrack?.duration ?? 180}
+              durationInSeconds={duration}
               zoom={zoom}
+              progress={progress}
+              onProgressChange={handleProgressChange}
+              isPlaying={isPlaying}
             />
             <PlaybackControls 
               isPlaying={isPlaying} 
