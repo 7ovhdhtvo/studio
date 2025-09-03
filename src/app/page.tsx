@@ -100,48 +100,20 @@ export default function Home() {
   }, [isLoading, folders, activeProjectId]);
 
   
-  // Effect for loading new audio source
   useEffect(() => {
-    logger.log('useEffect[audioSrc]: Triggered.', { audioSrc });
     const audio = audioRef.current;
     if (audio && audioSrc) {
-      if (audio.src !== audioSrc) {
-        logger.log('useEffect[audioSrc]: Setting new audio source.', { newSrc: audioSrc });
-        audio.src = audioSrc;
-        audio.load();
-        if (isPlaying) {
-          logger.log('useEffect[audioSrc]: New src was set while isPlaying is true, attempting to play.');
-          audio.play().catch(e => logger.error("Playback failed on new src", e));
+        if (audio.src !== audioSrc) {
+            audio.src = audioSrc;
+            audio.load();
         }
-      }
     } else if (audio && !audioSrc) {
-      logger.log('useEffect[audioSrc]: Clearing audio source.');
-      audio.src = "";
+        audio.src = "";
     }
-  }, [audioSrc, isPlaying]);
-
-  // Effect for handling play/pause
-  useEffect(() => {
-    logger.log('useEffect[isPlaying, audioSrc]: Triggered.', { isPlaying, hasAudioSrc: !!audioSrc });
-    const audio = audioRef.current;
-    if (!audio) return;
-    
-    if (isPlaying && audioSrc) {
-      if (audio.paused) {
-        logger.log('useEffect[isPlaying, audioSrc]: Attempting to play.');
-        audio.play().catch(e => logger.error("Playback failed on play/pause effect", e));
-      }
-    } else {
-      if (!audio.paused) {
-        logger.log('useEffect[isPlaying, audioSrc]: Attempting to pause.');
-        audio.pause();
-      }
-    }
-  }, [isPlaying, audioSrc]);
+  }, [audioSrc]);
 
   useEffect(() => {
     if (audioRef.current) {
-      logger.log('useEffect[isLooping]: Setting loop property.', { isLooping });
       audioRef.current.loop = isLooping;
     }
   }, [isLooping]);
@@ -155,6 +127,24 @@ export default function Home() {
     { time: 3.2, value: 75 },
     { time: 6.8, value: 125 },
   ]);
+  
+  const handleSetIsPlaying = (playing: boolean) => {
+    const audio = audioRef.current;
+    if (!audio || !audioSrc) {
+        setIsPlaying(false);
+        return;
+    }
+
+    if (playing) {
+        audio.play().catch(e => {
+            logger.error("Playback failed in handleSetIsPlaying", e);
+            setIsPlaying(false);
+        });
+    } else {
+        audio.pause();
+    }
+    setIsPlaying(playing);
+  };
 
   const toggleLoop = () => {
     logger.log('toggleLoop: Toggling loop state.');
@@ -170,13 +160,25 @@ export default function Home() {
 
   const handleSelectTrack = async (track: AudioFile) => {
     logger.log('handleSelectTrack: Track selected.', { trackId: track.id, title: track.title });
-    setIsPlaying(false);
+    const wasPlaying = isPlaying;
+    handleSetIsPlaying(false);
     setProgress(0);
     setActiveTrack(track);
     try {
       const url = await getAudioUrl(track.id);
       logger.log('handleSelectTrack: Audio URL received.', { url });
       setAudioSrc(url);
+       if (wasPlaying) {
+        const audio = audioRef.current;
+        if (audio) {
+            // We need to wait for the audio to be ready to play
+            const playPromise = () => {
+                 handleSetIsPlaying(true);
+                 audio.removeEventListener('canplay', playPromise);
+            }
+            audio.addEventListener('canplay', playPromise);
+        }
+       }
     } catch (error) {
        logger.error('handleSelectTrack: Failed to get audio URL.', { error });
     }
@@ -234,18 +236,15 @@ export default function Home() {
 
   const handleAudioEnded = () => {
     logger.log('handleAudioEnded: Audio track ended.', { isLooping });
-    if (isLooping && audioRef.current) {
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(e => logger.error("Loop playback failed", e));
-    } else {
-        setIsPlaying(false);
-        setProgress(0); // Also reset progress visually
+    if (!isLooping) {
+        handleSetIsPlaying(false);
+        setProgress(0);
     }
   };
 
   return (
     <div className="flex h-screen w-full flex-col bg-background text-foreground">
-      <audio ref={audioRef} onEnded={handleAudioEnded} />
+      <audio ref={audioRef} onEnded={handleAudioEnded} onPlay={() => startProgressLoop()} onPause={() => stopProgressLoop()} />
       <Header />
       <main className="grid flex-1 grid-cols-1 md:grid-cols-[300px_1fr] lg:grid-cols-[350px_1fr]">
         <div className="flex flex-col border-r bg-card">
@@ -311,7 +310,7 @@ export default function Home() {
             />
             <PlaybackControls 
               isPlaying={isPlaying} 
-              setIsPlaying={setIsPlaying}
+              setIsPlaying={handleSetIsPlaying}
               isLooping={isLooping}
               onToggleLoop={toggleLoop}
               onBackToStart={handleBackToStart}
@@ -346,5 +345,3 @@ export default function Home() {
     </div>
   );
 }
-
-    
