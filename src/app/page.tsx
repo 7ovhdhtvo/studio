@@ -18,6 +18,7 @@ import DebugConsole from '@/components/stagehand/debug-console';
 import { logger } from '@/lib/logger';
 import { generateWaveformData, type WaveformData } from '@/lib/waveform';
 import { storageManager } from '@/lib/storage-manager';
+import { cn } from '@/lib/utils';
 
 export type AutomationPoint = {
   time: number;
@@ -352,7 +353,13 @@ export default function Home() {
                 </p>
               </div>
                <div className="flex items-center gap-2">
-                <Button variant={showStereo ? 'secondary' : 'outline'} onClick={() => setShowStereo(s => !s)}>Stereo</Button>
+                <Button 
+                  variant={showStereo ? 'secondary' : 'outline'} 
+                  onClick={() => setShowStereo(s => !s)}
+                  className={cn(showStereo && "bg-accent text-accent-foreground")}
+                >
+                  Stereo
+                </Button>
                 <Button variant="outline" size="icon" onClick={handleZoomOut}>
                   <ZoomOut className="w-4 h-4" />
                 </Button>
