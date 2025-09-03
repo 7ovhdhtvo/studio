@@ -105,7 +105,8 @@ export default function AutomationCurve({
     // Interpolate value on the line to place the new point accurately
     const sortedPoints = [...points].sort((a, b) => a.time - b.time);
     let value = yToValue(y); // Default to click position
-    if (sortedPoints.length === 0) {
+    
+    if (points.length === 0) {
         value = baselineValue;
     } else {
         let prevPoint = sortedPoints[0];
@@ -174,21 +175,35 @@ export default function AutomationCurve({
           vectorEffect="non-scaling-stroke"
           className="pointer-events-none"
         />
-        {points.map(point => (
-            <g
-              key={point.id}
-              transform={`translate(${timeToX(point.time)}, ${valueToY(point.value)})`}
-              className="cursor-grab"
-              onMouseDown={(e) => handlePointMouseDown(e, point.id)}
-            >
-              <circle r="6" fill="transparent" />
-              <circle
-                r="4"
-                fill={color}
-                vectorEffect="non-scaling-stroke"
-              />
-          </g>
-        ))}
+        {points.map(point => {
+            const pointSize = 8;
+            // Use a group to handle mouse events and positioning
+            return (
+                <g
+                  key={point.id}
+                  transform={`translate(${timeToX(point.time)}, ${valueToY(point.value)})`}
+                  className="cursor-grab"
+                  onMouseDown={(e) => handlePointMouseDown(e, point.id)}
+                >
+                  <rect
+                    // Transparent larger rect for easier grabbing
+                    x={-pointSize}
+                    y={-pointSize}
+                    width={pointSize * 2}
+                    height={pointSize * 2}
+                    fill="transparent"
+                  />
+                  <rect
+                    x={-pointSize / 2}
+                    y={-pointSize / 2}
+                    width={pointSize}
+                    height={pointSize}
+                    fill={color}
+                    vectorEffect="non-scaling-stroke"
+                  />
+              </g>
+            )
+        })}
       </svg>
     </div>
   );
