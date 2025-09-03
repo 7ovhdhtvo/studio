@@ -267,7 +267,7 @@ export default function Home() {
               setIsPlaying={setIsPlaying}
               isLooping={isLooping}
               onToggleLoop={toggleLoop}
-              onBackToStart={handleBackToStart} 
+              onBackToStart={handleBackToStart}
             />
 
             <div className="flex justify-center items-start gap-4 pt-4 flex-wrap">
