@@ -228,23 +228,21 @@ export default function WaveformDisplay({
   }
 
   const handleChartClick = (e: any) => {
-    if (draggingPointIdRef.current || !e?.activeCoordinate) return;
+    if (draggingPointIdRef.current || !e?.activeCoordinate || !e?.activeLabel || !e.chartY || !e.viewBox) return;
 
-    if (e.activePayload && e.activePayload.length > 0 && e.viewBox) {
-        const chartY = e.chartY;
-        const clickTime = e.activeLabel;
-        const yValue = Math.max(0, Math.min(100, (1 - ((chartY - e.viewBox.y) / e.viewBox.height)) * 100));
-        
-        const newPoint: AutomationPoint = {
-            id: `point_${Date.now()}`,
-            time: clickTime,
-            value: yValue,
-            name: `${automationPoints.length + 1}`
-        };
-        const newPoints = [...automationPoints, newPoint].sort((a,b) => a.time - b.time);
-        onAutomationPointsChange(newPoints);
-        onAutomationDragEnd();
-    }
+    const chartY = e.chartY;
+    const clickTime = e.activeLabel;
+    const yValue = Math.max(0, Math.min(100, (1 - ((chartY - e.viewBox.y) / e.viewBox.height)) * 100));
+    
+    const newPoint: AutomationPoint = {
+        id: `point_${Date.now()}`,
+        time: clickTime,
+        value: yValue,
+        name: `${automationPoints.length + 1}`
+    };
+    const newPoints = [...automationPoints, newPoint].sort((a,b) => a.time - b.time);
+    onAutomationPointsChange(newPoints);
+    onAutomationDragEnd();
   };
 
 
@@ -330,4 +328,3 @@ export default function WaveformDisplay({
     </div>
   );
 }
-
