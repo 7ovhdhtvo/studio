@@ -21,9 +21,9 @@ const CustomDot = (props: any) => {
     return (
         <g 
             transform={`translate(${cx}, ${cy})`}
-            onMouseDown={onMouseDown}
+            onMouseDown={() => onMouseDown(payload)}
             onMouseUp={onMouseUp}
-            onDoubleClick={onDoubleClick}
+            onDoubleClick={() => onDoubleClick(payload)}
             className="cursor-grab active:cursor-grabbing"
         >
             {/* Transparent hitbox for easier grabbing */}
@@ -155,6 +155,7 @@ export default function WaveformDisplay({
   };
   
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
+    if (showVolumeAutomation) return; // Don't scrub when editing automation
     isMouseDownRef.current = true;
     onScrubStart();
     handleInteraction(e);
@@ -189,9 +190,9 @@ export default function WaveformDisplay({
     }
   };
 
-  const handlePointMouseDown = (point: any) => {
+  const handlePointMouseDown = (payload: any) => {
       onAutomationDragStart();
-      draggingPointIdRef.current = point.payload.id;
+      draggingPointIdRef.current = payload.id;
   };
   
   const handleChartMouseMove = (e: any) => {
@@ -219,8 +220,8 @@ export default function WaveformDisplay({
       }
   };
   
-  const handlePointDoubleClick = (point: any) => {
-    const pointId = point.payload.id;
+  const handlePointDoubleClick = (payload: any) => {
+    const pointId = payload.id;
     const updatedPoints = automationPoints.filter(p => p.id !== pointId);
     onAutomationPointsChange(updatedPoints);
     onAutomationDragEnd(); // Persist the deletion
