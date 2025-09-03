@@ -7,6 +7,7 @@ import { Line, LineChart as RechartsLineChart, ResponsiveContainer } from 'recha
 import TimeRuler from './time-ruler';
 
 type WaveformDisplayProps = {
+  waveformData: number[];
   showVolumeAutomation: boolean;
   showSpeedAutomation: boolean;
   durationInSeconds: number;
@@ -59,6 +60,7 @@ const AutomationCurve = ({ data, color, visible }: { data: any[], color: string,
 };
 
 export default function WaveformDisplay({ 
+  waveformData,
   showVolumeAutomation, 
   showSpeedAutomation,
   durationInSeconds,
@@ -69,14 +71,8 @@ export default function WaveformDisplay({
   onScrubStart,
   onScrubEnd,
 }: WaveformDisplayProps) {
-  const [bars, setBars] = useState<number[]>([]);
   const waveformContainerRef = useRef<HTMLDivElement>(null);
   const isMouseDownRef = useRef(false);
-
-  useEffect(() => {
-    const newBars = Array.from({ length: 150 }, () => Math.random() * 0.8 + 0.2);
-    setBars(newBars);
-  }, []);
 
   const handleInteraction = (e: MouseEvent<HTMLDivElement>) => {
     if (!waveformContainerRef.current) return;
@@ -113,6 +109,7 @@ export default function WaveformDisplay({
   const currentTime = (progress / 100) * durationInSeconds;
 
   const formatTime = (seconds: number) => {
+    if (isNaN(seconds) || seconds < 0) seconds = 0;
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     const ms = Math.floor((seconds - Math.floor(seconds)) * 100);
@@ -129,23 +126,29 @@ export default function WaveformDisplay({
        >
         <div 
           ref={waveformContainerRef}
-          className="relative h-48 bg-card rounded-lg p-2 flex items-center gap-0.5 shadow-inner cursor-pointer"
+          className="relative h-48 bg-card rounded-lg p-2 flex items-center gap-[1px] shadow-inner cursor-pointer"
           style={{ width: `${100 * zoom}%` }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
         >
-          {bars.map((height, index) => (
-            <div
-              key={index}
-              className={cn(
-                "w-full rounded-sm transition-colors duration-200 pointer-events-none",
-                (index / bars.length * 100) < progress ? "bg-primary" : "bg-primary/20"
-              )}
-              style={{ height: `${height * 100}%` }}
-            />
-          ))}
+          {waveformData.length > 0 ? (
+            waveformData.map((height, index) => (
+              <div
+                key={index}
+                className={cn(
+                  "w-full rounded-sm transition-colors duration-200 pointer-events-none",
+                  (index / waveformData.length * 100) < progress ? "bg-primary" : "bg-primary/20"
+                )}
+                style={{ height: `${height * 100}%` }}
+              />
+            ))
+          ) : (
+             <div className="w-full text-center text-muted-foreground">
+                {durationInSeconds > 0 ? "Generating waveform..." : "No audio loaded"}
+             </div>
+          )}
           
           <AutomationCurve data={volumeData} color="hsl(var(--destructive))" visible={showVolumeAutomation} />
           <AutomationCurve data={speedData} color="#F5B041" visible={showSpeedAutomation} />
@@ -162,3 +165,5 @@ export default function WaveformDisplay({
     </div>
   );
 }
+
+    

@@ -16,6 +16,8 @@ import { useAudioStorage } from '@/hooks/useAudioStorage';
 import type { AudioFile, Folder } from '@/lib/storage-manager';
 import DebugConsole from '@/components/stagehand/debug-console';
 import { logger } from '@/lib/logger';
+import { generateWaveformData } from '@/lib/waveform';
+import { storageManager } from '@/lib/storage-manager';
 
 export type AutomationPoint = {
   time: number;
@@ -45,6 +47,7 @@ export default function Home() {
 
   const [activeTrack, setActiveTrack] = useState<AudioFile | null>(null);
   const [audioSrc, setAudioSrc] = useState<string | null>(null);
+  const [waveformData, setWaveformData] = useState<number[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -60,7 +63,7 @@ export default function Home() {
   const animationFrameRef = useRef<number>();
   const isScrubbingRef = useRef(false);
 
-  const duration = activeTrack?.duration ?? 180;
+  const duration = audioRef.current?.duration ?? activeTrack?.duration ?? 0;
 
   const stopProgressLoop = useCallback(() => {
     if (animationFrameRef.current) {
@@ -103,14 +106,24 @@ export default function Home() {
   useEffect(() => {
     const audio = audioRef.current;
     if (audio && audioSrc) {
-        if (audio.src !== audioSrc) {
-            audio.src = audioSrc;
-            audio.load();
-        }
+      if (audio.src !== audioSrc) {
+        logger.log("useEffect[audioSrc]: New audio source detected. Loading.", { audioSrc });
+        audio.src = audioSrc;
+        audio.load();
+        const handleCanPlay = () => {
+           logger.log("useEffect[audioSrc]: Audio can play.", { isPlaying });
+           if (isPlaying) {
+             audio.play().catch(e => logger.error("Playback failed in src effect", e));
+           }
+           audio.removeEventListener('canplay', handleCanPlay);
+        };
+        audio.addEventListener('canplay', handleCanPlay);
+      }
     } else if (audio && !audioSrc) {
-        audio.src = "";
+       logger.log("useEffect[audioSrc]: Clearing audio source.");
+       audio.src = "";
     }
-  }, [audioSrc]);
+  }, [audioSrc, isPlaying]);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -131,20 +144,21 @@ export default function Home() {
   const handleSetIsPlaying = (playing: boolean) => {
     const audio = audioRef.current;
     if (!audio || !audioSrc) {
-        setIsPlaying(false);
-        return;
+      setIsPlaying(false);
+      return;
     }
 
     if (playing) {
-        audio.play().catch(e => {
-            logger.error("Playback failed in handleSetIsPlaying", e);
-            setIsPlaying(false);
-        });
+      audio.play().catch(e => {
+        logger.error("Playback failed in handleSetIsPlaying", e);
+        setIsPlaying(false);
+      });
     } else {
-        audio.pause();
+      audio.pause();
     }
     setIsPlaying(playing);
   };
+
 
   const toggleLoop = () => {
     logger.log('toggleLoop: Toggling loop state.');
@@ -161,28 +175,37 @@ export default function Home() {
   const handleSelectTrack = async (track: AudioFile) => {
     logger.log('handleSelectTrack: Track selected.', { trackId: track.id, title: track.title });
     const wasPlaying = isPlaying;
-    handleSetIsPlaying(false);
+    
+    // Stop current playback before switching
+    if (isPlaying) {
+      handleSetIsPlaying(false);
+    }
+
     setProgress(0);
     setActiveTrack(track);
+    setWaveformData([]); // Clear old waveform data
+
     try {
       const url = await getAudioUrl(track.id);
       logger.log('handleSelectTrack: Audio URL received.', { url });
       setAudioSrc(url);
-       if (wasPlaying) {
-        const audio = audioRef.current;
-        if (audio) {
-            // We need to wait for the audio to be ready to play
-            const playPromise = () => {
-                 handleSetIsPlaying(true);
-                 audio.removeEventListener('canplay', playPromise);
-            }
-            audio.addEventListener('canplay', playPromise);
-        }
-       }
+
+      // Generate waveform
+      const audioBlob = await storageManager.getAudioBlob(track.id);
+      if (audioBlob) {
+        const data = await generateWaveformData(await audioBlob.arrayBuffer());
+        setWaveformData(data);
+      }
+      
+      if (wasPlaying) {
+        // This will be handled by the useEffect for audioSrc
+        handleSetIsPlaying(true);
+      }
     } catch (error) {
-       logger.error('handleSelectTrack: Failed to get audio URL.', { error });
+       logger.error('handleSelectTrack: Failed to get audio URL or generate waveform.', { error });
     }
   };
+
 
   const handleDeleteTrack = async (id: string) => {
     await deleteTrack(id);
@@ -305,6 +328,7 @@ export default function Home() {
             </div>
 
             <WaveformDisplay 
+              waveformData={waveformData}
               showVolumeAutomation={showVolumeAutomation}
               showSpeedAutomation={showSpeedAutomation}
               durationInSeconds={duration}

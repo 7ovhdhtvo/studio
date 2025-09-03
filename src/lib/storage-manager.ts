@@ -194,6 +194,28 @@ class StorageManager {
     return null;
   }
 
+  async getAudioBlob(id: string): Promise<Blob | null> {
+    const memoryBlob = this.audioBlobs.get(id);
+    if (memoryBlob) {
+      return memoryBlob;
+    }
+    // Fallback if blob is not in memory (e.g., after a refresh)
+    const fileMeta = this.metadata.get(id);
+    if (fileMeta?.blobUrl) {
+        try {
+            const response = await fetch(fileMeta.blobUrl);
+            const blob = await response.blob();
+            this.audioBlobs.set(id, blob); // Cache it back
+            return blob;
+        } catch (error) {
+            logger.error('Failed to fetch blob from blobUrl', { error });
+            return null;
+        }
+    }
+    return null;
+  }
+
+
   // FOLDER MANAGEMENT
   async createFolder(name: string, parentId: string): Promise<Folder> {
     const id = `folder_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -305,3 +327,5 @@ class StorageManager {
 }
 
 export const storageManager = new StorageManager();
+
+    
