@@ -13,11 +13,12 @@ import type { AutomationPoint } from '@/lib/storage-manager';
 
 type PointEditorProps = {
   point: AutomationPoint;
+  pointNumber: number;
   onUpdate: (id: string, newName: string, newTime: number) => void;
   onDelete: (id: string) => void;
 };
 
-function PointEditor({ point, onUpdate, onDelete }: PointEditorProps) {
+function PointEditor({ point, pointNumber, onUpdate, onDelete }: PointEditorProps) {
   const [name, setName] = useState(point.name || '');
   const [time, setTime] = useState(point.time.toFixed(2));
 
@@ -32,7 +33,7 @@ function PointEditor({ point, onUpdate, onDelete }: PointEditorProps) {
     <PopoverContent className="w-56" align="end" side="top">
       <div className="grid gap-4">
         <div className="space-y-2">
-          <h4 className="font-medium leading-none">Edit Point</h4>
+          <h4 className="font-medium leading-none">Edit Point {pointNumber}</h4>
           <p className="text-xs text-muted-foreground">
             Update point details.
           </p>
@@ -45,6 +46,7 @@ function PointEditor({ point, onUpdate, onDelete }: PointEditorProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="col-span-2 h-8"
+              placeholder='Optional'
             />
           </div>
           <div className="grid grid-cols-3 items-center gap-4">
@@ -152,18 +154,22 @@ export default function VolumeControl({
             <Label>Automation Points</Label>
             <div className="flex flex-wrap gap-2 p-2 bg-secondary rounded-md min-h-[40px]">
                {automationPoints.length > 0 ? (
-                  automationPoints.sort((a,b) => a.time - b.time).map(point => (
-                    <Popover key={point.id}>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm" className="font-mono text-xs">
-                                {point.name || 'Unnamed'}: {point.time.toFixed(1)}s @ {Math.round(point.value)}%
-                            </Button>
-                        </PopoverTrigger>
-                        <PointEditor point={point} onUpdate={onUpdatePoint} onDelete={onDeletePoint} />
-                    </Popover>
-                  ))
+                  automationPoints.sort((a,b) => a.time - b.time).map((point, index) => {
+                    const pointNumber = index + 1;
+                    const displayName = point.name || `Point ${pointNumber}`;
+                    return (
+                        <Popover key={point.id}>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="font-mono text-xs">
+                                    {displayName}: {point.time.toFixed(1)}s @ {Math.round(point.value)}%
+                                </Button>
+                            </PopoverTrigger>
+                            <PointEditor point={point} pointNumber={pointNumber} onUpdate={onUpdatePoint} onDelete={onDeletePoint} />
+                        </Popover>
+                    )
+                  })
                ) : (
-                  <p className="text-xs text-muted-foreground">Double-click on the automation line to add points.</p>
+                  <p className="text-xs text-muted-foreground">Click on the automation line to add points.</p>
                )}
             </div>
           </div>

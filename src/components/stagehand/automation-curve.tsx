@@ -49,7 +49,7 @@ export default function AutomationCurve({
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!draggingPointId || !svgRef.current) return;
     
-    const { x, y, svgWidth } = getSVGCoordinates(e);
+    const { x, y } = getSVGCoordinates(e);
     const newTime = xToTime(x, svgRef.current.viewBox.baseVal.width);
     const newValue = yToValue(y);
     
@@ -79,47 +79,71 @@ export default function AutomationCurve({
 
 
   if (!visible || duration === 0) return null;
-
   
   const getPathData = () => {
     if (points.length === 0) {
-        return `M 0 ${valueToY(baselineValue)} L 100 ${valueToY(baselineValue)}`;
+      return `M 0 ${valueToY(baselineValue)} L 100 ${valueToY(baselineValue)}`;
     }
     
     const sortedPoints = [...points].sort((a, b) => a.time - b.time);
-    
     const firstPoint = sortedPoints[0];
-    const pathParts = [`M ${timeToX(firstPoint.time)} ${valueToY(firstPoint.value)}`];
     
     // Line from start to first point
-    pathParts.unshift(`M 0 ${valueToY(firstPoint.value)} L ${timeToX(firstPoint.time)} ${valueToY(firstPoint.value)}`);
-
-    for (let i = 1; i < sortedPoints.length; i++) {
-        const p = sortedPoints[i];
-        pathParts.push(`L ${timeToX(p.time)} ${valueToY(p.value)}`);
-    }
+    const pathParts = [`M 0 ${valueToY(firstPoint.value)} L ${timeToX(firstPoint.time)} ${valueToY(firstPoint.value)}`];
     
+    // Line connecting all points
+    pathParts.push(...sortedPoints.map(p => `L ${timeToX(p.time)} ${valueToY(p.value)}`));
+
     // Line from last point to end
-    const lastPoint = sortedPoints[sortedPoints.length-1];
+    const lastPoint = sortedPoints[sortedPoints.length - 1];
     pathParts.push(`L 100 ${valueToY(lastPoint.value)}`);
 
     return pathParts.join(' ');
   };
   
   const handleAddPoint = (e: React.MouseEvent) => {
+    // Prevent adding a point when dragging an existing one starts
+    if ((e.target as SVGElement).tagName === 'circle') return;
+    
     e.preventDefault();
     e.stopPropagation();
 
     if (!svgRef.current) return;
-    const { x, y, svgWidth } = getSVGCoordinates(e);
+    const { x, y } = getSVGCoordinates(e);
     const time = xToTime(x, svgRef.current.viewBox.baseVal.width);
-    const value = yToValue(y);
+    
+    let value;
+    if (points.length === 0) {
+        value = baselineValue;
+    } else {
+        const sortedPoints = [...points].sort((a, b) => a.time - b.time);
+        let p1 = sortedPoints[0];
+        if (time < p1.time) {
+            value = p1.value;
+        } else {
+            let found = false;
+            for (let i = 0; i < sortedPoints.length - 1; i++) {
+                p1 = sortedPoints[i];
+                const p2 = sortedPoints[i+1];
+                if (time >= p1.time && time <= p2.time) {
+                    const timeFraction = (time - p1.time) / (p2.time - p1.time);
+                    value = p1.value + timeFraction * (p2.value - p1.value);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                value = sortedPoints[sortedPoints.length-1].value;
+            }
+        }
+    }
+
 
     const newPoint: AutomationPoint = {
         id: `point_${Date.now()}`,
         time,
         value,
-        name: `${points.length + 1}`
+        name: ``, // Name is determined by display order
     };
     
     const newPoints = [...points, newPoint];
@@ -137,7 +161,7 @@ export default function AutomationCurve({
     <div 
         data-automation-element
         className="absolute inset-0 w-full h-full pointer-events-auto"
-        onDoubleClick={handleAddPoint}
+        onClick={handleAddPoint}
     >
       <svg
         ref={svgRef}
