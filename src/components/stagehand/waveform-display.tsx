@@ -14,6 +14,8 @@ type WaveformDisplayProps = {
   progress: number;
   onProgressChange: (newProgress: number) => void;
   isPlaying: boolean;
+  onScrubStart: () => void;
+  onScrubEnd: () => void;
 };
 
 const volumeData = [
@@ -64,11 +66,12 @@ export default function WaveformDisplay({
   progress,
   onProgressChange,
   isPlaying,
+  onScrubStart,
+  onScrubEnd,
 }: WaveformDisplayProps) {
   const [bars, setBars] = useState<number[]>([]);
-  const containerRef = useRef<HTMLDivElement>(null);
   const waveformContainerRef = useRef<HTMLDivElement>(null);
-  const isScrubbingRef = useRef(false);
+  const isMouseDownRef = useRef(false);
 
   useEffect(() => {
     const newBars = Array.from({ length: 150 }, () => Math.random() * 0.8 + 0.2);
@@ -84,22 +87,27 @@ export default function WaveformDisplay({
   };
   
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
-    isScrubbingRef.current = true;
+    isMouseDownRef.current = true;
+    onScrubStart();
     handleInteraction(e);
   };
   
   const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
-    if (isScrubbingRef.current) {
+    if (isMouseDownRef.current) {
       handleInteraction(e);
     }
   };
   
   const handleMouseUp = () => {
-    isScrubbingRef.current = false;
+    isMouseDownRef.current = false;
+    onScrubEnd();
   };
   
   const handleMouseLeave = () => {
-    isScrubbingRef.current = false;
+    if (isMouseDownRef.current) {
+        isMouseDownRef.current = false;
+        onScrubEnd();
+    }
   };
 
   const currentTime = (progress / 100) * durationInSeconds;
@@ -117,7 +125,6 @@ export default function WaveformDisplay({
           {formatTime(currentTime)}
        </div>
        <div 
-         ref={containerRef}
          className="w-full overflow-x-auto"
        >
         <div 

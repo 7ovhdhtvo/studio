@@ -15,6 +15,7 @@ import TrackList from '@/components/stagehand/track-list';
 import { useAudioStorage } from '@/hooks/useAudioStorage';
 import type { AudioFile, Folder } from '@/lib/storage-manager';
 import DebugConsole from '@/components/stagehand/debug-console';
+import { logger } from '@/lib/logger';
 
 export type AutomationPoint = {
   time: number;
@@ -58,6 +59,7 @@ export default function Home() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const animationFrameRef = useRef<number>();
+  const isScrubbingRef = useRef(false);
 
   const duration = activeTrack?.duration ?? 180;
 
@@ -70,14 +72,14 @@ export default function Home() {
   const startProgressLoop = useCallback(() => {
     stopProgressLoop();
     const animate = () => {
-      if (audioRef.current) {
-        const newProgress = (audioRef.current.currentTime / duration) * 100;
+      if (audioRef.current && !isScrubbingRef.current) {
+        const newProgress = (audioRef.current.currentTime / audioRef.current.duration) * 100;
         setProgress(newProgress);
         animationFrameRef.current = requestAnimationFrame(animate);
       }
     };
     animationFrameRef.current = requestAnimationFrame(animate);
-  }, [duration, stopProgressLoop]);
+  }, [stopProgressLoop]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -103,8 +105,9 @@ export default function Home() {
       if ('wakeLock' in navigator) {
         try {
           wakeLockRef.current = await navigator.wakeLock.request('screen');
+          logger.log("Wake Lock acquired.");
         } catch (err) {
-          console.warn(`Failed to acquire wake lock: ${err}`);
+          logger.error("Failed to acquire wake lock", { err });
         }
       }
     };
@@ -114,8 +117,9 @@ export default function Home() {
         try {
           await wakeLockRef.current.release();
           wakeLockRef.current = null;
+          logger.log("Wake Lock released.");
         } catch (err) {
-          console.warn(`Failed to release wake lock: ${err}`);
+          logger.error("Failed to release wake lock", { err });
         }
       }
     };
@@ -142,34 +146,42 @@ export default function Home() {
   
   // Effect for loading new audio source
   useEffect(() => {
+    logger.log('useEffect[audioSrc]: Triggered.', { audioSrc });
     const audio = audioRef.current;
     if (audio && audioSrc) {
       if (audio.src !== audioSrc) {
+        logger.log('useEffect[audioSrc]: Setting new audio source.', { newSrc: audioSrc });
         audio.src = audioSrc;
         audio.load();
         if (isPlaying) {
-          audio.play().catch(e => console.error("Playback failed on new src", e));
+          logger.log('useEffect[audioSrc]: New src was set while isPlaying is true, attempting to play.');
+          audio.play().catch(e => logger.error("Playback failed on new src", e));
         }
       }
     } else if (audio && !audioSrc) {
+      logger.log('useEffect[audioSrc]: Clearing audio source.');
       audio.src = "";
     }
   }, [audioSrc, isPlaying]);
 
   // Effect for handling play/pause
   useEffect(() => {
+    logger.log('useEffect[isPlaying, audioSrc]: Triggered.', { isPlaying, hasAudioSrc: !!audioSrc });
     const audio = audioRef.current;
     if (!audio) return;
     
     if (isPlaying && audioSrc) {
-      audio.play().catch(e => console.error("Playback failed", e));
+      logger.log('useEffect[isPlaying, audioSrc]: Attempting to play.');
+      audio.play().catch(e => logger.error("Playback failed on play/pause effect", e));
     } else {
+      logger.log('useEffect[isPlaying, audioSrc]: Attempting to pause.');
       audio.pause();
     }
   }, [isPlaying, audioSrc]);
 
   useEffect(() => {
     if (audioRef.current) {
+      logger.log('useEffect[isLooping]: Setting loop property.', { isLooping });
       audioRef.current.loop = isLooping;
     }
   }, [isLooping]);
@@ -184,7 +196,10 @@ export default function Home() {
     { time: 6.8, value: 125 },
   ]);
 
-  const toggleLoop = () => setIsLooping(prev => !prev);
+  const toggleLoop = () => {
+    logger.log('toggleLoop: Toggling loop state.');
+    setIsLooping(prev => !prev);
+  }
 
   const handleToggleControlPanel = (panel: OpenControlPanel) => {
     setOpenControlPanel(prev => (prev === panel ? null : panel));
@@ -194,11 +209,17 @@ export default function Home() {
   const handleZoomOut = () => setZoom(prev => Math.max(prev / 1.5, 1));
 
   const handleSelectTrack = async (track: AudioFile) => {
+    logger.log('handleSelectTrack: Track selected.', { trackId: track.id, title: track.title });
     setIsPlaying(false);
     setProgress(0);
     setActiveTrack(track);
-    const url = await getAudioUrl(track.id);
-    setAudioSrc(url);
+    try {
+      const url = await getAudioUrl(track.id);
+      logger.log('handleSelectTrack: Audio URL received.', { url });
+      setAudioSrc(url);
+    } catch (error) {
+       logger.error('handleSelectTrack: Failed to get audio URL.', { error });
+    }
   };
 
   const handleDeleteTrack = async (id: string) => {
@@ -222,7 +243,7 @@ export default function Home() {
     if (activeProjectId) {
       await createFolder(activeProjectId);
     } else {
-      console.warn("No active project selected to create a folder in.");
+      logger.error("No active project selected to create a folder in.");
     }
   };
   
@@ -234,6 +255,7 @@ export default function Home() {
   }
   
   const handleBackToStart = () => {
+    logger.log('handleBackToStart: Triggered.');
     if (audioRef.current) {
       audioRef.current.currentTime = 0;
       setProgress(0);
@@ -242,8 +264,8 @@ export default function Home() {
 
   const handleProgressChange = (newProgress: number) => {
     setProgress(newProgress);
-    if (audioRef.current) {
-      const newTime = (newProgress / 100) * duration;
+    if (audioRef.current && audioRef.current.duration) {
+      const newTime = (newProgress / 100) * audioRef.current.duration;
       if (Math.abs(audioRef.current.currentTime - newTime) > 0.1) {
         audioRef.current.currentTime = newTime;
       }
@@ -251,16 +273,13 @@ export default function Home() {
   };
 
   const handleAudioEnded = () => {
+    logger.log('handleAudioEnded: Audio track ended.', { isLooping });
     if (!isLooping) {
         setIsPlaying(false);
-        setProgress(100);
-        stopProgressLoop();
-    } else {
-        if (audioRef.current) {
-            audioRef.current.currentTime = 0;
-            audioRef.current.play();
-        }
+        // Don't set progress to 100, let the animation frame handle it
     }
+    // The native loop attribute handles looping, so no extra logic needed here
+    // unless we want custom loop points in the future.
   };
 
   return (
@@ -326,6 +345,8 @@ export default function Home() {
               progress={progress}
               onProgressChange={handleProgressChange}
               isPlaying={isPlaying}
+              onScrubStart={() => isScrubbingRef.current = true}
+              onScrubEnd={() => isScrubbingRef.current = false}
             />
             <PlaybackControls 
               isPlaying={isPlaying} 
