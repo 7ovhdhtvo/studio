@@ -15,6 +15,7 @@ type AutomationCurveProps = {
   color: string;
   visible: boolean;
   maxHeight: number; // The height of the container in pixels
+  baselineValue: number; // The master volume level (0-100)
 };
 
 type ContextMenuData = {
@@ -23,8 +24,6 @@ type ContextMenuData = {
   pointId: string;
 };
 
-const NEUTRAL_VALUE = 75; // Default volume level
-
 export default function AutomationCurve({
   points,
   onPointsChange,
@@ -32,6 +31,7 @@ export default function AutomationCurve({
   color,
   visible,
   maxHeight,
+  baselineValue,
 }: AutomationCurveProps) {
   const [draggingPointId, setDraggingPointId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuData | null>(null);
@@ -58,8 +58,8 @@ export default function AutomationCurve({
       pathData += ` L ${timeToX(p.time)} ${valueToY(p.value)}`;
     });
   } else {
-    // Draw a neutral baseline if no points exist
-    pathData = `M 0 ${valueToY(NEUTRAL_VALUE)} L 100 ${valueToY(NEUTRAL_VALUE)}`;
+    // Draw a neutral baseline if no points exist, based on master volume
+    pathData = `M 0 ${valueToY(baselineValue)} L 100 ${valueToY(baselineValue)}`;
   }
 
   const getSVGCoordinates = (e: MouseEvent) => {
@@ -124,6 +124,9 @@ export default function AutomationCurve({
                 }
             }
         }
+    } else {
+        // If it's the first point, its value is the baseline value
+        newValue = baselineValue;
     }
 
 

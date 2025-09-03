@@ -25,6 +25,7 @@ type WaveformDisplayProps = {
   onScrubEnd: () => void;
   showStereo: boolean;
   scrollContainerRef: RefObject<HTMLDivElement>;
+  masterVolume: number;
 };
 
 const ChannelWaveform = ({ data, progress, isStereo }: { data: number[], progress: number, isStereo: boolean }) => {
@@ -64,6 +65,7 @@ export default function WaveformDisplay({
   onScrubEnd,
   showStereo,
   scrollContainerRef,
+  masterVolume,
 }: WaveformDisplayProps) {
   const waveformInteractionRef = useRef<HTMLDivElement>(null);
   const isMouseDownRef = useRef(false);
@@ -154,6 +156,7 @@ export default function WaveformDisplay({
               color="hsl(var(--destructive))"
               visible={showVolumeAutomation}
               maxHeight={waveformHeight}
+              baselineValue={masterVolume}
           />
           {/* Speed Automation Curve would go here */}
 

@@ -473,6 +473,7 @@ export default function Home() {
                   onScrubEnd={handleScrubEnd}
                   showStereo={showStereo}
                   scrollContainerRef={waveformContainerRef}
+                  masterVolume={volume}
                 />
                 <PlaybackControls 
                   isPlaying={isPlaying} 
