@@ -9,9 +9,8 @@ import type { AutomationPoint } from '@/lib/storage-manager';
 import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, Dot, Tooltip } from 'recharts';
 
 const CustomDot = (props: any) => {
-    const { cx, cy, stroke, payload, onMouseDown, onMouseUp, onDoubleClick } = props;
+    const { cx, cy, stroke, payload, onMouseDown, onMouseUp } = props;
 
-    // We only render our custom dot for actual automation points
     if (!payload.isAutomationPoint) {
         return null;
     }
@@ -23,10 +22,8 @@ const CustomDot = (props: any) => {
             transform={`translate(${cx}, ${cy})`}
             onMouseDown={() => onMouseDown(payload)}
             onMouseUp={onMouseUp}
-            onDoubleClick={() => onDoubleClick(payload)}
             className="cursor-grab active:cursor-grabbing"
         >
-            {/* Transparent hitbox for easier grabbing */}
             <rect 
                 x={-hitboxSize / 2} 
                 y={-hitboxSize / 2} 
@@ -34,15 +31,13 @@ const CustomDot = (props: any) => {
                 height={hitboxSize} 
                 fill="transparent"
             />
-            {/* Outer ring */}
             <circle r="6" fill={stroke} />
-            {/* Inner circle to create the ring effect */}
             <circle r="3" fill="hsl(var(--card))" />
         </g>
     );
 };
 
-const CustomTooltip = ({ active, payload, label, duration }: any) => {
+const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const point = payload[0].payload;
     return (
@@ -74,6 +69,7 @@ type WaveformDisplayProps = {
   onAutomationPointsChange: (points: AutomationPoint[]) => void;
   onAutomationDragStart: () => void;
   onAutomationDragEnd: () => void;
+  onDeletePoint: (id: string) => void;
 };
 
 const ChannelWaveform = ({ data, progress, isStereo }: { data: number[], progress: number, isStereo: boolean }) => {
@@ -113,6 +109,7 @@ export default function WaveformDisplay({
   onAutomationPointsChange,
   onAutomationDragStart,
   onAutomationDragEnd,
+  onDeletePoint,
 }: WaveformDisplayProps) {
   const waveformInteractionRef = useRef<HTMLDivElement>(null);
   const isMouseDownRef = useRef(false);
@@ -128,14 +125,12 @@ export default function WaveformDisplay({
     } else {
         const sortedPoints = [...points].sort((a, b) => a.time - b.time);
         
-        // Start from beginning of track
         if (sortedPoints[0].time > 0) {
             data.push({ time: 0, value: sortedPoints[0].value, isAutomationPoint: false });
         }
         
         sortedPoints.forEach(p => data.push({ ...p, time: p.time, value: p.value, isAutomationPoint: true }));
         
-        // End at end of track
         const lastPoint = sortedPoints[sortedPoints.length - 1];
         if (lastPoint.time < durationInSeconds) {
             data.push({ time: durationInSeconds, value: lastPoint.value, isAutomationPoint: false });
@@ -155,7 +150,7 @@ export default function WaveformDisplay({
   };
   
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
-    if (showVolumeAutomation) return; // Don't scrub when editing automation
+    if (showVolumeAutomation) return;
     isMouseDownRef.current = true;
     onScrubStart();
     handleInteraction(e);
@@ -172,7 +167,6 @@ export default function WaveformDisplay({
         isMouseDownRef.current = false;
         onScrubEnd();
     }
-    // This also handles ending an automation drag
     if (draggingPointIdRef.current) {
         draggingPointIdRef.current = null;
         onAutomationDragEnd();
@@ -191,6 +185,7 @@ export default function WaveformDisplay({
   };
 
   const handlePointMouseDown = (payload: any) => {
+      if (!payload || !payload.id) return;
       onAutomationDragStart();
       draggingPointIdRef.current = payload.id;
   };
@@ -210,7 +205,6 @@ export default function WaveformDisplay({
           );
           onAutomationPointsChange(updatedPoints);
       } else if (automationPoints.length === 0 && isMouseDownRef.current && e?.activeCoordinate) {
-          // Baseline drag
           const { y } = e.activeCoordinate;
           const container = waveformInteractionRef.current;
           if (!container) return;
@@ -221,14 +215,13 @@ export default function WaveformDisplay({
   };
   
   const handlePointDoubleClick = (payload: any) => {
-    const pointId = payload.id;
-    const updatedPoints = automationPoints.filter(p => p.id !== pointId);
-    onAutomationPointsChange(updatedPoints);
-    onAutomationDragEnd(); // Persist the deletion
+    if (payload && payload.id) {
+        onDeletePoint(payload.id);
+    }
   }
 
   const handleChartClick = (e: any) => {
-    if (draggingPointIdRef.current || !e?.activeCoordinate || !e?.activeLabel || !e.chartY || !e.viewBox) return;
+    if (draggingPointIdRef.current || !e?.activeCoordinate || !e?.activeLabel || !e.viewBox || e.activePayload?.length > 0) return;
 
     const chartY = e.chartY;
     const clickTime = e.activeLabel;
@@ -297,6 +290,8 @@ export default function WaveformDisplay({
                             margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
                             onMouseMove={handleChartMouseMove}
                             onClick={handleChartClick}
+                            onMouseDown={() => isMouseDownRef.current = true}
+                            onMouseUp={() => isMouseDownRef.current = false}
                         >
                             <XAxis type="number" dataKey="time" domain={[0, durationInSeconds]} hide />
                             <YAxis type="number" dataKey="value" domain={[0, 100]} hide />
@@ -306,8 +301,8 @@ export default function WaveformDisplay({
                                 dataKey="value" 
                                 stroke="hsl(var(--destructive))" 
                                 strokeWidth={2}
-                                dot={<CustomDot onMouseDown={handlePointMouseDown} onDoubleClick={handlePointDoubleClick} />}
-                                activeDot={false}
+                                dot={<CustomDot onMouseDown={handlePointMouseDown} onMouseUp={handleMouseUp} />}
+                                activeDot={{ onDoubleClick: handlePointDoubleClick }}
                                 isAnimationActive={false}
                             />
                         </LineChart>
