@@ -52,13 +52,13 @@ export default function Home() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLooping, setIsLooping] = useState(false);
   const [showVolumeAutomation, setShowVolumeAutomation] = useState(false);
+  const [isAutomationActive, setIsAutomationActive] = useState(false);
   const [showSpeedAutomation, setShowSpeedAutomation] = useState(false);
   const [zoom, setZoom] = useState(1); // 1 = 100%
   const [speed, setSpeed] = useState(100); // Global speed in %
   const [volume, setVolume] = useState(75); // Global volume in % (0-100)
   const [openControlPanel, setOpenControlPanel] = useState<OpenControlPanel>(null);
   const [progress, setProgress] = useState(0); // Progress in percentage
-  const [showMockupCurve, setShowMockupCurve] = useState(false);
   
   const [volumePoints, setVolumePoints] = useState<AutomationPoint[]>([]);
   const [speedPoints, setSpeedPoints] = useState<AutomationPoint[]>([
@@ -113,7 +113,7 @@ export default function Home() {
         const newProgress = (audio.currentTime / audio.duration) * 100;
         setProgress(newProgress);
 
-        if (showVolumeAutomation && volumePoints.length > 0 && !isDraggingAutomation) {
+        if (isAutomationActive && volumePoints.length > 0 && !isDraggingAutomation) {
             const automationVolume = getAutomationValue(volumePoints, audio.currentTime);
             if (automationVolume !== null) {
                 const newClampedVolume = Math.max(0, Math.min(100, automationVolume));
@@ -121,14 +121,15 @@ export default function Home() {
                 setVolume(Math.round(newClampedVolume));
             }
         } else {
-            // No automation points, use master volume
+            // No automation active, use master volume
             audio.volume = volume / 100;
         }
         animationFrameRef.current = requestAnimationFrame(animate);
       }
     };
     animationFrameRef.current = requestAnimationFrame(animate);
-  }, [stopProgressLoop, showVolumeAutomation, volumePoints, getAutomationValue, isDraggingAutomation, volume]);
+  }, [stopProgressLoop, isAutomationActive, volumePoints, getAutomationValue, isDraggingAutomation, volume]);
+
 
   useEffect(() => {
     if (isPlaying) {
@@ -190,10 +191,10 @@ export default function Home() {
   }, [isLooping]);
 
   useEffect(() => {
-    if (audioRef.current && (!showVolumeAutomation || volumePoints.length === 0)) {
+    if (audioRef.current && !isAutomationActive) {
         audioRef.current.volume = volume / 100;
     }
-  }, [volume, showVolumeAutomation, volumePoints]);
+  }, [volume, isAutomationActive]);
 
   const regenerateWaveform = useCallback(async (track: AudioFile, currentZoom: number) => {
     try {
@@ -392,6 +393,13 @@ export default function Home() {
     setVolumePoints(updatedPoints);
     updateTrackAutomation(activeTrack.id, updatedPoints);
   };
+  
+  const handleBaselineVolumeChange = (newVolume: number) => {
+    setVolume(newVolume);
+    if (activeTrack && volumePoints.length === 0) {
+      // Potentially save this as a "base volume" for the track if needed
+    }
+  };
 
   const getTracksInCurrentProject = () => {
     if (!activeProjectId) return [];
@@ -500,25 +508,21 @@ export default function Home() {
 
                 <WaveformDisplay 
                   waveformData={waveformData}
-                  speedPoints={speedPoints}
-                  onSpeedPointsChange={setSpeedPoints}
-                  showVolumeAutomation={showVolumeAutomation}
-                  showSpeedAutomation={showSpeedAutomation}
                   durationInSeconds={duration}
                   zoom={zoom}
                   progress={progress}
                   onProgressChange={handleProgressChange}
-                  isPlaying={isPlaying}
                   onScrubStart={() => isScrubbingRef.current = true}
                   onScrubEnd={handleScrubEnd}
                   showStereo={showStereo}
                   scrollContainerRef={waveformContainerRef}
                   masterVolume={volume}
+                  onMasterVolumeChange={handleBaselineVolumeChange}
+                  showVolumeAutomation={showVolumeAutomation}
                   automationPoints={volumePoints}
                   onAutomationPointsChange={handleSetVolumePoints}
                   onAutomationDragStart={handleAutomationDragStart}
                   onAutomationDragEnd={handleAutomationDragEnd}
-                  showMockupCurve={showMockupCurve}
                 />
                 <PlaybackControls 
                   isPlaying={isPlaying} 
@@ -536,11 +540,11 @@ export default function Home() {
                     onVolumeChange={setVolume}
                     showAutomation={showVolumeAutomation}
                     onToggleAutomation={setShowVolumeAutomation}
+                    isAutomationActive={isAutomationActive}
+                    onToggleIsAutomationActive={setIsAutomationActive}
                     automationPoints={volumePoints}
                     onUpdatePoint={handleUpdateAutomationPoint}
                     onDeletePoint={handleDeleteAutomationPoint}
-                    showMockupCurve={showMockupCurve}
-                    onToggleMockupCurve={setShowMockupCurve}
                   />
                   <SpeedControl 
                     isOpen={openControlPanel === 'speed'}

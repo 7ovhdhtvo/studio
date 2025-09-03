@@ -3,27 +3,30 @@
 
 import { cn } from '@/lib/utils';
 import { type WaveformData } from '@/lib/waveform';
-import { useRef, type MouseEvent, type RefObject, useCallback, useState, useEffect } from 'react';
+import { useRef, type MouseEvent, type RefObject } from 'react';
 import TimeRuler from './time-ruler';
 import type { AutomationPoint } from '@/lib/storage-manager';
 import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, Dot, Tooltip } from 'recharts';
 
 const CustomDot = (props: any) => {
-    const { cx, cy, stroke, payload, onMouseDown, onMouseUp } = props;
+    const { cx, cy, stroke, payload, onMouseDown, onMouseUp, onDoubleClick } = props;
 
+    // We only render our custom dot for actual automation points
     if (!payload.isAutomationPoint) {
         return null;
     }
-
-    const hitboxSize = 16;
+    
+    const hitboxSize = 20;
 
     return (
         <g 
             transform={`translate(${cx}, ${cy})`}
             onMouseDown={onMouseDown}
             onMouseUp={onMouseUp}
+            onDoubleClick={onDoubleClick}
             className="cursor-grab active:cursor-grabbing"
         >
+            {/* Transparent hitbox for easier grabbing */}
             <rect 
                 x={-hitboxSize / 2} 
                 y={-hitboxSize / 2} 
@@ -31,33 +34,46 @@ const CustomDot = (props: any) => {
                 height={hitboxSize} 
                 fill="transparent"
             />
-            <circle r="5" fill={stroke} stroke="hsl(var(--card))" strokeWidth={2} />
+            {/* Outer ring */}
+            <circle r="6" fill={stroke} />
+            {/* Inner circle to create the ring effect */}
+            <circle r="3" fill="hsl(var(--card))" />
         </g>
     );
+};
+
+const CustomTooltip = ({ active, payload, label, duration }: any) => {
+  if (active && payload && payload.length) {
+    const point = payload[0].payload;
+    return (
+      <div className="bg-popover text-popover-foreground px-3 py-1.5 text-xs rounded-md border shadow-md">
+        <p className="font-bold">{point.name || `Point`}</p>
+        <p>Time: {point.time.toFixed(2)}s</p>
+        <p>Volume: {Math.round(point.value)}%</p>
+      </div>
+    );
+  }
+  return null;
 };
 
 
 type WaveformDisplayProps = {
   waveformData: WaveformData | null;
-  speedPoints: AutomationPoint[];
-  onSpeedPointsChange: (points: AutomationPoint[]) => void;
-  showVolumeAutomation: boolean;
-  showSpeedAutomation: boolean;
   durationInSeconds: number;
   zoom: number;
   progress: number;
   onProgressChange: (newProgress: number) => void;
-  isPlaying: boolean;
   onScrubStart: () => void;
   onScrubEnd: () => void;
   showStereo: boolean;
   scrollContainerRef: RefObject<HTMLDivElement>;
   masterVolume: number;
+  onMasterVolumeChange: (newVolume: number) => void;
+  showVolumeAutomation: boolean;
   automationPoints: AutomationPoint[];
   onAutomationPointsChange: (points: AutomationPoint[]) => void;
   onAutomationDragStart: () => void;
   onAutomationDragEnd: () => void;
-  showMockupCurve: boolean;
 };
 
 const ChannelWaveform = ({ data, progress, isStereo }: { data: number[], progress: number, isStereo: boolean }) => {
@@ -82,29 +98,25 @@ const ChannelWaveform = ({ data, progress, isStereo }: { data: number[], progres
 
 export default function WaveformDisplay({ 
   waveformData,
-  speedPoints,
-  onSpeedPointsChange,
-  showVolumeAutomation, 
-  showSpeedAutomation,
   durationInSeconds,
   zoom,
   progress,
   onProgressChange,
-  isPlaying,
   onScrubStart,
   onScrubEnd,
   showStereo,
   scrollContainerRef,
   masterVolume,
+  onMasterVolumeChange,
+  showVolumeAutomation, 
   automationPoints,
   onAutomationPointsChange,
   onAutomationDragStart,
   onAutomationDragEnd,
-  showMockupCurve,
 }: WaveformDisplayProps) {
   const waveformInteractionRef = useRef<HTMLDivElement>(null);
   const isMouseDownRef = useRef(false);
-  const [draggingPointId, setDraggingPointId] = useState<string | null>(null);
+  const draggingPointIdRef = useRef<string | null>(null);
 
   const getChartData = (points: AutomationPoint[], baseline: number) => {
     if (durationInSeconds === 0) return [];
@@ -121,7 +133,7 @@ export default function WaveformDisplay({
             data.push({ time: 0, value: sortedPoints[0].value, isAutomationPoint: false });
         }
         
-        sortedPoints.forEach(p => data.push({ ...p, isAutomationPoint: true }));
+        sortedPoints.forEach(p => data.push({ ...p, time: p.time, value: p.value, isAutomationPoint: true }));
         
         // End at end of track
         const lastPoint = sortedPoints[sortedPoints.length - 1];
@@ -135,7 +147,7 @@ export default function WaveformDisplay({
   const chartData = getChartData(automationPoints, masterVolume);
 
   const handleInteraction = (e: MouseEvent<HTMLDivElement>) => {
-    if (!waveformInteractionRef.current || draggingPointId) return;
+    if (!waveformInteractionRef.current || draggingPointIdRef.current) return;
     const rect = waveformInteractionRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const newProgress = Math.max(0, Math.min(100, (x / rect.width) * 100));
@@ -149,7 +161,7 @@ export default function WaveformDisplay({
   };
   
   const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
-    if (isMouseDownRef.current && !draggingPointId) {
+    if (isMouseDownRef.current && !draggingPointIdRef.current) {
       handleInteraction(e);
     }
   };
@@ -159,6 +171,11 @@ export default function WaveformDisplay({
         isMouseDownRef.current = false;
         onScrubEnd();
     }
+    // This also handles ending an automation drag
+    if (draggingPointIdRef.current) {
+        draggingPointIdRef.current = null;
+        onAutomationDragEnd();
+    }
   };
   
   const handleMouseLeave = () => {
@@ -166,20 +183,19 @@ export default function WaveformDisplay({
         isMouseDownRef.current = false;
         onScrubEnd();
     }
+    if (draggingPointIdRef.current) {
+        draggingPointIdRef.current = null;
+        onAutomationDragEnd();
+    }
   };
 
   const handlePointMouseDown = (point: any) => {
       onAutomationDragStart();
-      setDraggingPointId(point.id);
-  };
-
-  const handlePointMouseUp = () => {
-      onAutomationDragEnd();
-      setDraggingPointId(null);
+      draggingPointIdRef.current = point.payload.id;
   };
   
   const handleChartMouseMove = (e: any) => {
-      if (draggingPointId && e?.activeCoordinate) {
+      if (draggingPointIdRef.current && e?.activeCoordinate) {
           const { x, y } = e.activeCoordinate;
           const container = waveformInteractionRef.current;
           if (!container) return;
@@ -189,27 +205,35 @@ export default function WaveformDisplay({
           const newValue = Math.max(0, Math.min(100, (1 - (y / rect.height)) * 100));
           
           const updatedPoints = automationPoints.map(p =>
-            p.id === draggingPointId ? { ...p, time: newTime, value: newValue } : p
+            p.id === draggingPointIdRef.current ? { ...p, time: newTime, value: newValue } : p
           );
           onAutomationPointsChange(updatedPoints);
+      } else if (automationPoints.length === 0 && isMouseDownRef.current && e?.activeCoordinate) {
+          // Baseline drag
+          const { y } = e.activeCoordinate;
+          const container = waveformInteractionRef.current;
+          if (!container) return;
+          const rect = container.getBoundingClientRect();
+          const newVolume = Math.max(0, Math.min(100, (1 - (y / rect.height)) * 100));
+          onMasterVolumeChange(newVolume);
       }
   };
+  
+  const handlePointDoubleClick = (point: any) => {
+    const pointId = point.payload.id;
+    const updatedPoints = automationPoints.filter(p => p.id !== pointId);
+    onAutomationPointsChange(updatedPoints);
+    onAutomationDragEnd(); // Persist the deletion
+  }
 
   const handleChartClick = (e: any) => {
-    if (draggingPointId || !e?.activeCoordinate) return;
+    if (draggingPointIdRef.current || !e?.activeCoordinate) return;
 
-    // Prevent adding point if clicking near an existing dot
     if (e.activePayload && e.activePayload.length > 0) {
-        const clickTime = e.activeLabel;
-        const clickValue = e.activePayload[0].value;
         const chartY = e.chartY;
+        const clickTime = e.activeLabel;
+        const yValue = Math.max(0, Math.min(100, (1 - ((chartY - e.viewBox.y) / e.viewBox.height)) * 100));
         
-        const yValue = Math.max(0, Math.min(100, (1 - ((chartY - e.chartY_offset) / e.height)) * 100));
-
-        const proximityThreshold = durationInSeconds * 0.01;
-        const isNearExisting = automationPoints.some(p => Math.abs(p.time - clickTime) < proximityThreshold);
-        if (isNearExisting) return;
-
         const newPoint: AutomationPoint = {
             id: `point_${Date.now()}`,
             time: clickTime,
@@ -266,24 +290,24 @@ export default function WaveformDisplay({
                </div>
             )}
             
-            <div className="absolute inset-0">
+            <div className={cn("absolute inset-0", !showVolumeAutomation && "pointer-events-none")}>
                 {showVolumeAutomation && durationInSeconds > 0 && (
                      <ResponsiveContainer width="100%" height="100%">
                         <LineChart
                             data={chartData}
                             margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
                             onMouseMove={handleChartMouseMove}
-                            onMouseUp={handlePointMouseUp}
                             onClick={handleChartClick}
                         >
                             <XAxis type="number" dataKey="time" domain={[0, durationInSeconds]} hide />
                             <YAxis type="number" dataKey="value" domain={[0, 100]} hide />
+                            <Tooltip content={<CustomTooltip />} />
                             <Line 
                                 type="linear" 
                                 dataKey="value" 
                                 stroke="hsl(var(--destructive))" 
                                 strokeWidth={2}
-                                dot={<CustomDot onMouseDown={handlePointMouseDown} onMouseUp={handlePointMouseUp} />}
+                                dot={<CustomDot onMouseDown={handlePointMouseDown} onDoubleClick={handlePointDoubleClick} />}
                                 activeDot={false}
                                 isAnimationActive={false}
                             />
