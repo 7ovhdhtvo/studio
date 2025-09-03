@@ -21,8 +21,8 @@ const CustomDot = (props: any) => {
     return (
         <g 
             transform={`translate(${cx}, ${cy})`}
-            onMouseDown={(e) => { e.stopPropagation(); onMouseDown(payload); }}
-            onMouseUp={(e) => { e.stopPropagation(); onMouseUp(); }}
+            onMouseDown={(e) => { e.stopPropagation(); onMouseDown(e, payload); }}
+            onMouseUp={(e) => { e.stopPropagation(); onMouseUp(e); }}
             onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(payload); }}
             className="cursor-grab active:cursor-grabbing"
         >
@@ -173,12 +173,12 @@ export default function WaveformDisplay({
         onScrubEnd();
     }
     if (draggingPointIdRef.current) {
-        draggingPointIdRef.current = null;
         onAutomationDragEnd();
+        draggingPointIdRef.current = null;
     }
   };
 
-  const handlePointMouseDown = (payload: any) => {
+  const handlePointMouseDown = (e: MouseEvent, payload: any) => {
       if (!payload || !payload.id) return;
       onAutomationDragStart();
       draggingPointIdRef.current = payload.id;
@@ -200,7 +200,6 @@ export default function WaveformDisplay({
 
       const rect = container.getBoundingClientRect();
       
-      // Correctly map mouse coordinates to data values
       const newTime = Math.max(0, Math.min(durationInSeconds, (e.activeCoordinate.x / rect.width) * durationInSeconds));
       const newValue = Math.max(0, Math.min(100, (1 - (e.activeCoordinate.y / rect.height)) * 100));
       
@@ -211,20 +210,18 @@ export default function WaveformDisplay({
   };
 
   const handleChartClick = (e: any) => {
-    const container = waveformInteractionRef.current;
-    
-    // Do not create a new point if dragging or clicking an existing point's interactive area
-    if (draggingPointIdRef.current || (e && e.activeDot)) {
+    // This check prevents creating a new point when clicking on an existing one's dot.
+    if (!e || e.activeDot) {
       return;
     }
-
-    if (!e || !e.activeCoordinate || !container) {
+    
+    const container = waveformInteractionRef.current;
+    if (!e.activeCoordinate || !container) {
       return;
     }
 
     const rect = container.getBoundingClientRect();
     
-    // Correctly calculate time and value based on the actual click coordinates
     const clickTime = (e.activeCoordinate.x / rect.width) * durationInSeconds;
     const clickValue = Math.max(0, Math.min(100, (1 - (e.activeCoordinate.y / rect.height)) * 100));
     
@@ -309,7 +306,6 @@ export default function WaveformDisplay({
                               dataKey="value" 
                               stroke="hsl(var(--destructive))" 
                               strokeWidth={2}
-                              activeDot={false}
                               dot={<CustomDot onMouseDown={handlePointMouseDown} onMouseUp={handleMouseUpAndLeave} onDoubleClick={handlePointDoubleClick} />}
                               isAnimationActive={false}
                           />
@@ -330,3 +326,4 @@ export default function WaveformDisplay({
     </div>
   );
 }
+
