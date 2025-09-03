@@ -76,6 +76,9 @@ export default function Home() {
 
   const getAutomationValue = useCallback((points: AutomationPoint[], time: number): number | null => {
     if (points.length === 0) return null;
+    
+    // If only one point exists (baseline), return its value regardless of time.
+    if (points.length === 1) return points[0].value;
 
     const sortedPoints = [...points].sort((a, b) => a.time - b.time);
     const firstPoint = sortedPoints[0];
@@ -349,9 +352,7 @@ export default function Home() {
   const handleAutomationDragEnd = () => {
     setIsDraggingAutomation(false);
     if (activeTrack) {
-        // Persist the change
-        const basePoint: AutomationPoint = { id: 'base', time: 0, value: volume };
-        updateTrackAutomation(activeTrack.id, [basePoint]);
+        updateTrackAutomation(activeTrack.id, volumePoints);
     }
   };
 
@@ -476,7 +477,13 @@ export default function Home() {
                   showStereo={showStereo}
                   scrollContainerRef={waveformContainerRef}
                   masterVolume={volume}
-                  onMasterVolumeChange={setVolume}
+                  onMasterVolumeChange={(newVolume) => {
+                      if (activeTrack) {
+                          const basePoint: AutomationPoint = { id: 'base', time: 0, value: newVolume };
+                          setVolumePoints([basePoint]);
+                      }
+                      setVolume(newVolume);
+                  }}
                   onAutomationDragStart={() => setIsDraggingAutomation(true)}
                   onAutomationDragEnd={handleAutomationDragEnd}
                 />
