@@ -176,7 +176,8 @@ export default function AutomationCurve({
           className="pointer-events-none"
         />
         {points.map(point => {
-            const pointSize = 8;
+            const pointRadius = 4;
+            const hitboxSize = 16;
             // Use a group to handle mouse events and positioning
             return (
                 <g
@@ -186,20 +187,18 @@ export default function AutomationCurve({
                   onMouseDown={(e) => handlePointMouseDown(e, point.id)}
                 >
                   <rect
-                    // Transparent larger rect for easier grabbing
-                    x={-pointSize}
-                    y={-pointSize}
-                    width={pointSize * 2}
-                    height={pointSize * 2}
+                    // Transparent larger rect for easier grabbing (the "hitbox")
+                    x={-hitboxSize / 2}
+                    y={-hitboxSize / 2}
+                    width={hitboxSize}
+                    height={hitboxSize}
                     fill="transparent"
                   />
-                  <rect
-                    x={-pointSize / 2}
-                    y={-pointSize / 2}
-                    width={pointSize}
-                    height={pointSize}
+                  <circle
+                    // The small, visible point
+                    r={pointRadius}
                     fill={color}
-                    vectorEffect="non-scaling-stroke"
+                    className="pointer-events-none"
                   />
               </g>
             )
