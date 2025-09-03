@@ -3,30 +3,35 @@
 
 import { cn } from '@/lib/utils';
 import { type WaveformData } from '@/lib/waveform';
-import { useRef, type MouseEvent, type RefObject } from 'react';
+import { useRef, type MouseEvent, type RefObject, useState } from 'react';
 import TimeRuler from './time-ruler';
 import type { AutomationPoint } from '@/lib/storage-manager';
 import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, Dot, Tooltip } from 'recharts';
 
 const CustomDot = (props: any) => {
-    const { cx, cy, stroke, payload, onMouseDown, onMouseUp, onDoubleClick } = props;
+    const { cx, cy, stroke, payload, onMouseDown, onMouseUp } = props;
 
     if (!payload.isAutomationPoint) {
         return null;
     }
     
-    // Increased hitbox size for easier interaction
     const hitboxSize = 24;
 
     return (
         <g 
             transform={`translate(${cx}, ${cy})`}
-            onMouseDown={(e) => { e.stopPropagation(); onMouseDown(e, payload); }}
-            onMouseUp={(e) => { e.stopPropagation(); onMouseUp(e); }}
-            onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(payload); }}
+            onMouseDown={(e) => { 
+                console.log("CustomDot: onMouseDown triggered", { e, payload });
+                e.stopPropagation(); 
+                onMouseDown(e, payload); 
+            }}
+            onMouseUp={(e) => { 
+                console.log("CustomDot: onMouseUp triggered", { e, payload });
+                e.stopPropagation(); 
+                onMouseUp(e); 
+            }}
             className="cursor-grab active:cursor-grabbing"
         >
-            {/* Invisible hitbox */}
             <rect 
                 x={-hitboxSize / 2} 
                 y={-hitboxSize / 2} 
@@ -34,7 +39,6 @@ const CustomDot = (props: any) => {
                 height={hitboxSize} 
                 fill="transparent"
             />
-            {/* Visible dot */}
             <circle r="6" fill={stroke} />
             <circle r="3" fill="hsl(var(--card))" />
         </g>
@@ -118,6 +122,9 @@ export default function WaveformDisplay({
   const isMouseDownRef = useRef(false);
   const draggingPointIdRef = useRef<string | null>(null);
 
+  // --- DEBUG STATE ---
+  const [debugState, setDebugState] = useState('Ready');
+
   const getChartData = (points: AutomationPoint[], baseline: number, duration: number) => {
     if (duration === 0) return [];
     
@@ -133,12 +140,14 @@ export default function WaveformDisplay({
     const data: any[] = sortedPoints.map(p => ({ ...p, isAutomationPoint: true }));
 
     if (sortedPoints[0].time > 0) {
-      data.unshift({ time: 0, value: sortedPoints[0].value, isAutomationPoint: false });
+        const firstPointValue = sortedPoints[0].value;
+        data.unshift({ time: 0, value: firstPointValue, isAutomationPoint: false });
     }
     
     const lastPoint = sortedPoints[sortedPoints.length - 1];
     if (lastPoint.time < duration) {
-      data.push({ time: duration, value: lastPoint.value, isAutomationPoint: false });
+        const lastPointValue = lastPoint.value;
+        data.push({ time: duration, value: lastPointValue, isAutomationPoint: false });
     }
     
     return data;
@@ -154,49 +163,57 @@ export default function WaveformDisplay({
     onProgressChange(newProgress);
   };
   
-  const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
-    if (showVolumeAutomation) return;
+  const handleScrubMouseDown = (e: MouseEvent<HTMLDivElement>) => {
+    console.log("handleScrubMouseDown: Triggered");
+    if (showVolumeAutomation) {
+      console.log("handleScrubMouseDown: Aborted, automation is active.");
+      return;
+    }
     isMouseDownRef.current = true;
     onScrubStart();
     handleInteraction(e);
   };
   
-  const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
+  const handleScrubMouseMove = (e: MouseEvent<HTMLDivElement>) => {
     if (isMouseDownRef.current && !showVolumeAutomation) {
       handleInteraction(e);
     }
   };
   
   const handleMouseUpAndLeave = () => {
+    console.log("handleMouseUpAndLeave: Triggered");
     if (isMouseDownRef.current) {
         isMouseDownRef.current = false;
         onScrubEnd();
+        console.log("handleMouseUpAndLeave: Scrubbing ended.");
     }
     if (draggingPointIdRef.current) {
+        console.log(`handleMouseUpAndLeave: Dragging ended for point: ${draggingPointIdRef.current}`);
+        setDebugState('Ready');
         onAutomationDragEnd();
         draggingPointIdRef.current = null;
     }
   };
 
   const handlePointMouseDown = (e: MouseEvent, payload: any) => {
-      if (!payload || !payload.id) return;
+      console.log("handlePointMouseDown: Triggered", { payload });
+      if (!payload || !payload.id) {
+        console.error("handlePointMouseDown: Aborted. No payload or payload ID.");
+        return;
+      }
       onAutomationDragStart();
       draggingPointIdRef.current = payload.id;
+      setDebugState(`Dragging point ${payload.id}`);
   };
 
-  const handlePointDoubleClick = (payload: any) => {
-    if (payload && payload.id) {
-        const newPoints = automationPoints.filter(p => p.id !== payload.id);
-        onAutomationPointsChange(newPoints);
-        onAutomationDragEnd();
-    }
-  }
   
   const handleChartMouseMove = (e: any) => {
-      const container = waveformInteractionRef.current;
-      if (!container || !draggingPointIdRef.current || !e?.activeCoordinate) {
+      if (!draggingPointIdRef.current || !e?.activeCoordinate) {
           return;
       }
+      console.log(`handleChartMouseMove: Dragging point ${draggingPointIdRef.current}`);
+      const container = waveformInteractionRef.current;
+      if (!container) return;
 
       const rect = container.getBoundingClientRect();
       
@@ -210,13 +227,21 @@ export default function WaveformDisplay({
   };
 
   const handleChartClick = (e: any) => {
-    // This check prevents creating a new point when clicking on an existing one's dot.
-    if (!e || e.activeDot) {
+    console.log("handleChartClick: Triggered. Event object:", e);
+    
+    if (draggingPointIdRef.current) {
+      console.log("handleChartClick: Aborted. A point drag is already in progress.");
+      return;
+    }
+    
+    if (e && e.activeDot) {
+      console.log("handleChartClick: Aborted. Click was on an existing point handle.");
       return;
     }
     
     const container = waveformInteractionRef.current;
-    if (!e.activeCoordinate || !container) {
+    if (!e || !e.activeCoordinate || !container) {
+      console.error("handleChartClick: Aborted. Missing coordinate data in event.", { activeCoordinate: e?.activeCoordinate, container });
       return;
     }
 
@@ -232,9 +257,11 @@ export default function WaveformDisplay({
         name: `${automationPoints.length + 1}`
     };
 
+    console.log("handleChartClick: Creating new point.", newPoint);
+
     const newPoints = [...automationPoints, newPoint].sort((a,b) => a.time - b.time);
     onAutomationPointsChange(newPoints);
-    onAutomationDragEnd();
+    onAutomationDragEnd(); // To persist immediately
   };
 
   const currentTime = (progress / 100) * durationInSeconds;
@@ -252,6 +279,10 @@ export default function WaveformDisplay({
        <div className="font-mono text-4xl font-bold text-center w-full bg-secondary text-secondary-foreground py-2 rounded-lg">
           {formatTime(currentTime)}
        </div>
+        {/* --- DEBUG UI --- */}
+       <div className="w-full text-center bg-yellow-200 text-yellow-800 font-mono text-xs py-1">
+            Debug State: {debugState} | Dragging: {draggingPointIdRef.current || 'none'}
+       </div>
        <div 
          ref={scrollContainerRef}
          className="w-full overflow-x-auto"
@@ -263,11 +294,10 @@ export default function WaveformDisplay({
           <div 
             ref={waveformInteractionRef}
             className={cn(
-              "absolute inset-0",
-              showVolumeAutomation ? "pointer-events-none" : "pointer-events-auto"
+              "absolute inset-0 z-0", // Keep it behind the chart
             )}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
+            onMouseDown={handleScrubMouseDown}
+            onMouseMove={handleScrubMouseMove}
             onMouseUp={handleMouseUpAndLeave}
             onMouseLeave={handleMouseUpAndLeave}
           >
@@ -285,7 +315,7 @@ export default function WaveformDisplay({
           </div>
             
           <div className={cn(
-            "absolute inset-0",
+            "absolute inset-0 z-10", // Chart is on top
             showVolumeAutomation ? "pointer-events-auto" : "pointer-events-none"
           )}>
               {showVolumeAutomation && durationInSeconds > 0 && (
@@ -306,7 +336,7 @@ export default function WaveformDisplay({
                               dataKey="value" 
                               stroke="hsl(var(--destructive))" 
                               strokeWidth={2}
-                              dot={<CustomDot onMouseDown={handlePointMouseDown} onMouseUp={handleMouseUpAndLeave} onDoubleClick={handlePointDoubleClick} />}
+                              dot={<CustomDot onMouseDown={handlePointMouseDown} onMouseUp={handleMouseUpAndLeave} />}
                               isAnimationActive={false}
                           />
                       </LineChart>
@@ -315,7 +345,7 @@ export default function WaveformDisplay({
           </div>
 
           <div 
-            className="absolute top-0 h-full w-0.5 bg-foreground/70 pointer-events-none"
+            className="absolute top-0 h-full w-0.5 bg-foreground/70 pointer-events-none z-20"
             style={{ left: `${progress}%` }}
           >
             <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 bg-foreground/70 rounded-full"></div>
@@ -326,4 +356,3 @@ export default function WaveformDisplay({
     </div>
   );
 }
-
