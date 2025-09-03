@@ -47,6 +47,7 @@ export default function Home() {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isLooping, setIsLooping] = useState(false);
   const [showVolumeAutomation, setShowVolumeAutomation] = useState(true);
   const [showSpeedAutomation, setShowSpeedAutomation] = useState(false);
   const [zoom, setZoom] = useState(1); // 1 = 100%
@@ -129,6 +130,12 @@ export default function Home() {
       audioRef.current.src = "";
     }
   }, [audioSrc]);
+  
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.loop = isLooping;
+    }
+  }, [isLooping]);
 
 
   const [volumePoints, setVolumePoints] = useState<AutomationPoint[]>([
@@ -139,6 +146,8 @@ export default function Home() {
     { time: 3.2, value: 75 },
     { time: 6.8, value: 125 },
   ]);
+
+  const toggleLoop = () => setIsLooping(prev => !prev);
 
   const handleToggleControlPanel = (panel: OpenControlPanel) => {
     setOpenControlPanel(prev => (prev === panel ? null : panel));
@@ -193,7 +202,7 @@ export default function Home() {
 
   return (
     <div className="flex h-screen w-full flex-col bg-background text-foreground">
-      <audio ref={audioRef} onEnded={() => setIsPlaying(false)} />
+      <audio ref={audioRef} onEnded={() => {if (!isLooping) setIsPlaying(false)}} />
       <Header />
       <main className="grid flex-1 grid-cols-1 md:grid-cols-[300px_1fr] lg:grid-cols-[350px_1fr]">
         <div className="flex flex-col border-r bg-card">
@@ -256,6 +265,8 @@ export default function Home() {
             <PlaybackControls 
               isPlaying={isPlaying} 
               setIsPlaying={setIsPlaying}
+              isLooping={isLooping}
+              onToggleLoop={toggleLoop}
               onBackToStart={handleBackToStart} 
             />
 

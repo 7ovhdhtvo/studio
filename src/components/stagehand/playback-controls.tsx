@@ -9,10 +9,12 @@ import { cn } from '@/lib/utils';
 type PlaybackControlsProps = {
   isPlaying: boolean;
   setIsPlaying: Dispatch<SetStateAction<boolean>>;
+  isLooping: boolean;
+  onToggleLoop: () => void;
   onBackToStart: () => void;
 };
 
-export default function PlaybackControls({ isPlaying, setIsPlaying, onBackToStart }: PlaybackControlsProps) {
+export default function PlaybackControls({ isPlaying, setIsPlaying, isLooping, onToggleLoop, onBackToStart }: PlaybackControlsProps) {
   const togglePlay = () => setIsPlaying(!isPlaying);
 
   return (
@@ -20,10 +22,14 @@ export default function PlaybackControls({ isPlaying, setIsPlaying, onBackToStar
       <Button
         variant="outline"
         size="icon"
-        className="h-20 w-20 rounded-full bg-foreground/80 hover:bg-foreground shadow-lg transition-transform transform hover:scale-105"
+        className={cn(
+            "h-20 w-20 rounded-full shadow-lg transition-transform transform hover:scale-105",
+            isLooping ? "bg-primary text-primary-foreground" : "bg-foreground/80 hover:bg-foreground text-background"
+        )}
         aria-label="Loop"
+        onClick={onToggleLoop}
       >
-        <Repeat className="h-10 w-10 text-background" />
+        <Repeat className="h-10 w-10" />
       </Button>
 
       <Button
