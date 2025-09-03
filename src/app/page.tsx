@@ -115,7 +115,6 @@ export default function Home() {
     const audio = audioRef.current;
     if (!audio) return;
     
-    logger.log("useEffect[audioSrc]: Triggered.", { audioSrc });
     if (audioSrc) {
       if (audio.src !== audioSrc) {
         logger.log("useEffect[audioSrc]: New audio source detected. Loading.", { audioSrc });
@@ -133,18 +132,12 @@ export default function Home() {
     const audio = audioRef.current;
     if (!audio) return;
 
-    logger.log("useEffect[isPlaying, audioSrc]: Triggered.", { isPlaying, hasAudioSrc: !!audioSrc });
-
     if (isPlaying && audioSrc) {
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          logger.error("Playback failed", error);
-          setIsPlaying(false);
-        });
-      }
+      audio.play().catch(error => {
+        logger.error("Playback failed", error);
+        setIsPlaying(false);
+      });
     } else {
-      logger.log("useEffect[isPlaying, audioSrc]: Attempting to pause.");
       audio.pause();
     }
   }, [isPlaying, audioSrc]);
@@ -321,25 +314,8 @@ export default function Home() {
     }
   };
 
-  if (isPlaybackMode) {
-    return (
-      <PlaybackModeView
-        isPlaying={isPlaying}
-        onTogglePlay={() => handleSetIsPlaying(!isPlaying)}
-        volume={volume}
-        onVolumeChange={setVolume}
-        onExit={() => setIsPlaybackMode(false)}
-        trackTitle={activeTrack?.title ?? "No Track Loaded"}
-        trackArtist={activeTrack?.originalName ?? ""}
-        onBackToStart={handleBackToStart}
-        currentTime={currentTime}
-        duration={duration}
-      />
-    );
-  }
-
   return (
-    <div className="flex h-screen w-full flex-col bg-background text-foreground">
+    <>
       <audio 
         ref={audioRef} 
         onEnded={handleAudioEnded} 
@@ -351,117 +327,136 @@ export default function Home() {
           }
         }}
       />
-      <Header />
-      <main className="grid flex-1 grid-cols-1 md:grid-cols-[300px_1fr] lg:grid-cols-[350px_1fr]">
-        <div className="flex flex-col border-r bg-card">
-          <div className="p-4 flex justify-between items-center border-b">
-            <h2 className="text-lg font-semibold">Track Library</h2>
-            <ImportDialog onImportTrack={(file) => importAudio(file, null)} />
-          </div>
-          <TrackList 
-            tracks={tracks}
-            folders={folders}
-            activeTrackId={activeTrack?.id}
-            activeProjectId={activeProjectId}
-            onSelectTrack={handleSelectTrack}
-            onSelectProject={setActiveProjectId}
-            onDeleteTrack={handleDeleteTrack}
-            onDeleteFolder={deleteFolder}
-            onRenameTrack={handleRenameTrack}
-            onCreateFolder={handleCreateFolder}
-            onCreateProject={handleCreateProject}
-            onRenameFolder={renameFolder}
-            onMoveTrackToFolder={moveTrackToFolder}
-            onEmptyTrash={emptyTrash}
-            onRecoverTrack={handleRecoverTrack}
-            onRecoverFolder={recoverFolder}
-            onImportTrack={importAudio}
-          />
-        </div>
-
-        <div className="flex flex-col overflow-y-auto p-6 lg:p-8">
-          
-          <DebugConsole />
-
-          <div className="space-y-6">
-            <div className="flex justify-between items-start">
-              <div className="space-y-1">
-                <h2 className="text-2xl font-bold tracking-tight">
-                  {activeTrack?.title ?? "No Track Loaded"}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {activeTrack?.originalName ?? "Import or select a track to begin"}
-                </p>
+      {isPlaybackMode ? (
+        <PlaybackModeView
+          isPlaying={isPlaying}
+          onTogglePlay={() => handleSetIsPlaying(!isPlaying)}
+          volume={volume}
+          onVolumeChange={setVolume}
+          onExit={() => setIsPlaybackMode(false)}
+          trackTitle={activeTrack?.title ?? "No Track Loaded"}
+          trackArtist={activeTrack?.originalName ?? ""}
+          onBackToStart={handleBackToStart}
+          currentTime={currentTime}
+          duration={duration}
+        />
+      ) : (
+        <div className="flex h-screen w-full flex-col bg-background text-foreground">
+          <Header />
+          <main className="grid flex-1 grid-cols-1 md:grid-cols-[300px_1fr] lg:grid-cols-[350px_1fr]">
+            <div className="flex flex-col border-r bg-card">
+              <div className="p-4 flex justify-between items-center border-b">
+                <h2 className="text-lg font-semibold">Track Library</h2>
+                <ImportDialog onImportTrack={(file) => importAudio(file, null)} />
               </div>
-               <div className="flex items-center gap-2">
-                <Button 
-                  variant={showStereo ? 'default' : 'outline'} 
-                  onClick={() => setShowStereo(s => !s)}
-                >
-                  Stereo
-                </Button>
-                <Button variant="outline" size="icon" onClick={handleZoomOut}>
-                  <ZoomOut className="w-4 h-4" />
-                </Button>
-                <Button variant="outline" size="icon" onClick={handleZoomIn}>
-                  <ZoomIn className="w-4 h-4" />
-                </Button>
-                <Button variant="outline" size="icon" onClick={() => setIsPlaybackMode(true)}>
-                  <Clapperboard className="w-4 h-4" />
-                </Button>
-              </div>
+              <TrackList 
+                tracks={tracks}
+                folders={folders}
+                activeTrackId={activeTrack?.id}
+                activeProjectId={activeProjectId}
+                onSelectTrack={handleSelectTrack}
+                onSelectProject={setActiveProjectId}
+                onDeleteTrack={handleDeleteTrack}
+                onDeleteFolder={deleteFolder}
+                onRenameTrack={handleRenameTrack}
+                onCreateFolder={handleCreateFolder}
+                onCreateProject={handleCreateProject}
+                onRenameFolder={renameFolder}
+                onMoveTrackToFolder={moveTrackToFolder}
+                onEmptyTrash={emptyTrash}
+                onRecoverTrack={handleRecoverTrack}
+                onRecoverFolder={recoverFolder}
+                onImportTrack={importAudio}
+              />
             </div>
 
-            <WaveformDisplay 
-              waveformData={waveformData}
-              showVolumeAutomation={showVolumeAutomation}
-              showSpeedAutomation={showSpeedAutomation}
-              durationInSeconds={duration}
-              zoom={zoom}
-              progress={progress}
-              onProgressChange={handleProgressChange}
-              isPlaying={isPlaying}
-              onScrubStart={() => isScrubbingRef.current = true}
-              onScrubEnd={handleScrubEnd}
-              showStereo={showStereo}
-              scrollContainerRef={waveformContainerRef}
-            />
-            <PlaybackControls 
-              isPlaying={isPlaying} 
-              setIsPlaying={handleSetIsPlaying}
-              isLooping={isLooping}
-              onToggleLoop={toggleLoop}
-              onBackToStart={handleBackToStart}
-            />
+            <div className="flex flex-col overflow-y-auto p-6 lg:p-8">
+              
+              <DebugConsole />
 
-            <div className="flex justify-center items-start gap-4 pt-4 flex-wrap">
-              <VolumeControl 
-                isOpen={openControlPanel === 'volume'}
-                onToggle={() => handleToggleControlPanel('volume')}
-                volume={volume}
-                onVolumeChange={setVolume}
-                showAutomation={showVolumeAutomation}
-                onToggleAutomation={setShowVolumeAutomation}
-                automationPoints={volumePoints}
-              />
-              <SpeedControl 
-                isOpen={openControlPanel === 'speed'}
-                onToggle={() => handleToggleControlPanel('speed')}
-                speed={speed}
-                onSpeedChange={setSpeed}
-                showAutomation={showSpeedAutomation}
-                onToggleAutomation={setShowSpeedAutomation}
-                automationPoints={speedPoints}
-              />
-              <MetronomeControl 
-                isOpen={openControlPanel === 'metronome'}
-                onToggle={() => handleToggleControlPanel('metronome')}
-                speed={speed} 
-              />
+              <div className="space-y-6">
+                <div className="flex justify-between items-start">
+                  <div className="space-y-1">
+                    <h2 className="text-2xl font-bold tracking-tight">
+                      {activeTrack?.title ?? "No Track Loaded"}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {activeTrack?.originalName ?? "Import or select a track to begin"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant={showStereo ? 'default' : 'outline'} 
+                      onClick={() => setShowStereo(s => !s)}
+                    >
+                      Stereo
+                    </Button>
+                    <Button variant="outline" size="icon" onClick={handleZoomOut}>
+                      <ZoomOut className="w-4 h-4" />
+                    </Button>
+                    <Button variant="outline" size="icon" onClick={handleZoomIn}>
+                      <ZoomIn className="w-4 h-4" />
+                    </Button>
+                    <Button variant="outline" size="icon" onClick={() => setIsPlaybackMode(true)}>
+                      <Clapperboard className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <WaveformDisplay 
+                  waveformData={waveformData}
+                  showVolumeAutomation={showVolumeAutomation}
+                  showSpeedAutomation={showSpeedAutomation}
+                  durationInSeconds={duration}
+                  zoom={zoom}
+                  progress={progress}
+                  onProgressChange={handleProgressChange}
+                  isPlaying={isPlaying}
+                  onScrubStart={() => isScrubbingRef.current = true}
+                  onScrubEnd={handleScrubEnd}
+                  showStereo={showStereo}
+                  scrollContainerRef={waveformContainerRef}
+                />
+                <PlaybackControls 
+                  isPlaying={isPlaying} 
+                  setIsPlaying={handleSetIsPlaying}
+                  isLooping={isLooping}
+                  onToggleLoop={toggleLoop}
+                  onBackToStart={handleBackToStart}
+                />
+
+                <div className="flex justify-center items-start gap-4 pt-4 flex-wrap">
+                  <VolumeControl 
+                    isOpen={openControlPanel === 'volume'}
+                    onToggle={() => handleToggleControlPanel('volume')}
+                    volume={volume}
+                    onVolumeChange={setVolume}
+                    showAutomation={showVolumeAutomation}
+                    onToggleAutomation={setShowVolumeAutomation}
+                    automationPoints={volumePoints}
+                  />
+                  <SpeedControl 
+                    isOpen={openControlPanel === 'speed'}
+                    onToggle={() => handleToggleControlPanel('speed')}
+                    speed={speed}
+                    onSpeedChange={setSpeed}
+                    showAutomation={showSpeedAutomation}
+                    onToggleAutomation={setShowSpeedAutomation}
+                    automationPoints={speedPoints}
+                  />
+                  <MetronomeControl 
+                    isOpen={openControlPanel === 'metronome'}
+                    onToggle={() => handleToggleControlPanel('metronome')}
+                    speed={speed} 
+                  />
+                </div>
+              </div>
             </div>
-          </div>
+          </main>
         </div>
-      </main>
-    </div>
+      )}
+    </>
   );
 }
+
+    
