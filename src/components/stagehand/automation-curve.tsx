@@ -23,6 +23,8 @@ type ContextMenuData = {
   pointId: string;
 };
 
+const NEUTRAL_VALUE = 75; // Default volume level
+
 export default function AutomationCurve({
   points,
   onPointsChange,
@@ -55,6 +57,9 @@ export default function AutomationCurve({
     sortedPoints.slice(1).forEach(p => {
       pathData += ` L ${timeToX(p.time)} ${valueToY(p.value)}`;
     });
+  } else {
+    // Draw a neutral baseline if no points exist
+    pathData = `M 0 ${valueToY(NEUTRAL_VALUE)} L 100 ${valueToY(NEUTRAL_VALUE)}`;
   }
 
   const getSVGCoordinates = (e: MouseEvent) => {
@@ -73,6 +78,9 @@ export default function AutomationCurve({
 
   const handleMouseMove = (e: MouseEvent) => {
     if (!draggingPointId || !svgRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+
     const { x, y } = getSVGCoordinates(e);
 
     const newTime = Math.max(0, Math.min(duration, (x / 100) * duration));
@@ -89,11 +97,35 @@ export default function AutomationCurve({
   };
 
   const handleAddPoint = (e: MouseEvent<SVGPathElement>) => {
-    if (e.target !== e.currentTarget) return; // Only trigger on the line itself
+    // Only trigger on the line itself, not on the point circles
+    if (e.target !== e.currentTarget) return; 
     
     const { x, y } = getSVGCoordinates(e);
     const newTime = (x / 100) * duration;
-    const newValue = (maxHeight - y) / maxHeight * 100;
+    let newValue = (maxHeight - y) / maxHeight * 100;
+
+    // If adding the first point, find the interpolated value on the existing line
+    if (points.length > 0) {
+        const sorted = [...points].sort((a,b) => a.time - b.time);
+        let p1 = sorted[0];
+        let p2 = sorted[sorted.length - 1];
+        if (newTime < p1.time) {
+            newValue = p1.value;
+        } else if (newTime > p2.time) {
+            newValue = p2.value;
+        } else {
+            for(let i=0; i<sorted.length - 1; i++) {
+                if (newTime >= sorted[i].time && newTime <= sorted[i+1].time) {
+                    p1 = sorted[i];
+                    p2 = sorted[i+1];
+                    const timeFraction = (newTime - p1.time) / (p2.time - p1.time);
+                    newValue = p1.value + timeFraction * (p2.value - p1.value);
+                    break;
+                }
+            }
+        }
+    }
+
 
     const newPoint: AutomationPoint = {
       id: `point_${Date.now()}`,
