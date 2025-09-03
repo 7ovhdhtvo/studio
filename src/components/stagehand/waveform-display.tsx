@@ -147,16 +147,14 @@ export default function WaveformDisplay({
              </div>
           )}
           
-          <div data-automation-element>
-            <AutomationCurve 
-                points={volumePoints}
-                onPointsChange={onVolumePointsChange}
-                duration={durationInSeconds}
-                color="hsl(var(--destructive))"
-                visible={showVolumeAutomation}
-                maxHeight={waveformHeight}
-            />
-          </div>
+          <AutomationCurve 
+              points={volumePoints}
+              onPointsChange={onVolumePointsChange}
+              duration={durationInSeconds}
+              color="hsl(var(--destructive))"
+              visible={showVolumeAutomation}
+              maxHeight={waveformHeight}
+          />
           {/* Speed Automation Curve would go here */}
 
           <div 

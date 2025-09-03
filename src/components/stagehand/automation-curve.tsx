@@ -115,6 +115,7 @@ export default function AutomationCurve({
   
   return (
     <div 
+        data-automation-element
         className="absolute inset-0 w-full h-full pointer-events-auto"
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
