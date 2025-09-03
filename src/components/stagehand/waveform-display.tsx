@@ -3,7 +3,7 @@
 
 import { cn } from '@/lib/utils';
 import { type WaveformData } from '@/lib/waveform';
-import { useRef, type MouseEvent, type RefObject } from 'react';
+import { useRef, type MouseEvent, type RefObject, useState } from 'react';
 import TimeRuler from './time-ruler';
 import type { AutomationPoint } from '@/lib/storage-manager';
 import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, Dot, Tooltip } from 'recharts';
@@ -11,12 +11,10 @@ import { Line, LineChart, ResponsiveContainer, XAxis, YAxis, Dot, Tooltip } from
 const CustomDot = (props: any) => {
     const { cx, cy, stroke, payload, onMouseDown, onMouseUp, onDoubleClick } = props;
 
-    // Only render the dot if it's a user-defined automation point
     if (!payload.isAutomationPoint) {
         return null;
     }
     
-    // Hitbox to make grabbing easier on mobile
     const hitboxSize = 24;
 
     return (
@@ -27,7 +25,6 @@ const CustomDot = (props: any) => {
             onDoubleClick={(e) => { e.stopPropagation(); onDoubleClick(payload); }}
             className="cursor-grab active:cursor-grabbing"
         >
-            {/* Transparent hitbox */}
             <rect 
                 x={-hitboxSize / 2} 
                 y={-hitboxSize / 2} 
@@ -35,7 +32,6 @@ const CustomDot = (props: any) => {
                 height={hitboxSize} 
                 fill="transparent"
             />
-            {/* Visual representation of the dot */}
             <circle r="6" fill={stroke} />
             <circle r="3" fill="hsl(var(--card))" />
         </g>
@@ -126,21 +122,17 @@ export default function WaveformDisplay({
     
     let data = [];
     if (points.length === 0) {
-        // Create a flat line at the baseline volume if no points exist
         data.push({ time: 0, value: baseline, isAutomationPoint: false });
         data.push({ time: durationInSeconds, value: baseline, isAutomationPoint: false });
     } else {
         const sortedPoints = [...points].sort((a, b) => a.time - b.time);
         
-        // Line from start to the first point
         if (sortedPoints[0].time > 0) {
             data.push({ time: 0, value: sortedPoints[0].value, isAutomationPoint: false });
         }
         
-        // Add all user-defined points
         sortedPoints.forEach(p => data.push({ ...p, isAutomationPoint: true }));
         
-        // Line from the last point to the end
         const lastPoint = sortedPoints[sortedPoints.length - 1];
         if (lastPoint.time < durationInSeconds) {
             data.push({ time: durationInSeconds, value: lastPoint.value, isAutomationPoint: false });
@@ -161,7 +153,7 @@ export default function WaveformDisplay({
   
   const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
     if (showVolumeAutomation) {
-      return; // Prevent playhead scrubbing when editing automation
+      return;
     }
     isMouseDownRef.current = true;
     onScrubStart();
@@ -216,7 +208,7 @@ export default function WaveformDisplay({
   };
 
   const handleChartClick = (e: any) => {
-    if (draggingPointIdRef.current || !showVolumeAutomation || !e?.activeCoordinate || !e?.activeLabel || !e.viewBox) {
+    if (draggingPointIdRef.current || !showVolumeAutomation || !e?.activeCoordinate || !e?.activeLabel) {
         return;
     }
     
@@ -225,9 +217,11 @@ export default function WaveformDisplay({
         return;
     }
 
-    const chartY = e.chartY;
+    const { chartY, viewBox } = e;
+    if (viewBox === undefined || chartY === undefined) return;
+
     const clickTime = e.activeLabel;
-    const yValue = Math.max(0, Math.min(100, (1 - ((chartY - e.viewBox.y) / e.viewBox.height)) * 100));
+    const yValue = Math.max(0, Math.min(100, (1 - ((chartY - viewBox.y) / viewBox.height)) * 100));
     
     const newPoint: AutomationPoint = {
         id: `point_${Date.now()}`,
@@ -239,7 +233,6 @@ export default function WaveformDisplay({
     onAutomationPointsChange(newPoints);
     onAutomationDragEnd();
   };
-
 
   const currentTime = (progress / 100) * durationInSeconds;
 
@@ -303,7 +296,6 @@ export default function WaveformDisplay({
                                 strokeWidth={2}
                                 dot={<CustomDot onMouseDown={handlePointMouseDown} onMouseUp={handleMouseUpAndLeave} onDoubleClick={handlePointDoubleClick} />}
                                 isAnimationActive={false}
-                                activeDot={false}
                             />
                         </LineChart>
                     </ResponsiveContainer>
