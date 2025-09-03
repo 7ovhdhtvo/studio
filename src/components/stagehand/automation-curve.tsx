@@ -76,22 +76,21 @@ export default function AutomationCurve({
   if (!visible || duration === 0) return null;
 
   const getPathData = () => {
-    // ALWAYS draw the baseline
-    const baselineY = valueToY(baselineValue);
-    let pathParts = [`M 0 ${baselineY} L 100 ${baselineY}`];
-
-    if (points.length > 0) {
-        const sortedPoints = [...points].sort((a, b) => a.time - b.time);
-        const firstPoint = sortedPoints[0];
-        
-        // Start line from the beginning of the track at the first point's value
-        pathParts = [`M 0 ${valueToY(firstPoint.value)} L ${timeToX(firstPoint.time)} ${valueToY(firstPoint.value)}`];
-        // Connect all the points
-        pathParts.push(...sortedPoints.map(p => `L ${timeToX(p.time)} ${valueToY(p.value)}`));
-        // End line at the end of the track with the last point's value
-        const lastPoint = sortedPoints[sortedPoints.length - 1];
-        pathParts.push(`L 100 ${valueToY(lastPoint.value)}`);
+    if (points.length === 0) {
+      const baselineY = valueToY(baselineValue);
+      return `M 0 ${baselineY} L 100 ${baselineY}`;
     }
+
+    const sortedPoints = [...points].sort((a, b) => a.time - b.time);
+    const firstPoint = sortedPoints[0];
+    
+    // Start line from the beginning of the track at the first point's value
+    let pathParts = [`M 0 ${valueToY(firstPoint.value)} L ${timeToX(firstPoint.time)} ${valueToY(firstPoint.value)}`];
+    // Connect all the points
+    pathParts.push(...sortedPoints.map(p => `L ${timeToX(p.time)} ${valueToY(p.value)}`));
+    // End line at the end of the track with the last point's value
+    const lastPoint = sortedPoints[sortedPoints.length - 1];
+    pathParts.push(`L 100 ${valueToY(lastPoint.value)}`);
 
     return pathParts.join(' ');
   };
@@ -101,36 +100,10 @@ export default function AutomationCurve({
     e.stopPropagation();
 
     if (!svgRef.current) return;
-    const { x, svgWidth } = getSVGCoordinates(e);
+    const { x, y, svgWidth } = getSVGCoordinates(e);
     const time = xToTime(x, svgWidth);
     
-    let value;
-    if (points.length === 0) {
-        // First point takes the value of the master volume line
-        value = baselineValue;
-    } else {
-        // Interpolate value from existing line
-        const sortedPoints = [...points].sort((a, b) => a.time - b.time);
-        let p1 = sortedPoints[0];
-        if (time < p1.time) {
-            value = p1.value;
-        } else {
-            let found = false;
-            for (let i = 0; i < sortedPoints.length - 1; i++) {
-                p1 = sortedPoints[i];
-                const p2 = sortedPoints[i+1];
-                if (time >= p1.time && time <= p2.time) {
-                    const timeFraction = (time - p1.time) / (p2.time - p1.time);
-                    value = p1.value + timeFraction * (p2.value - p1.value);
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                value = sortedPoints[sortedPoints.length-1].value;
-            }
-        }
-    }
+    let value = yToValue(y);
 
     const newPoint: AutomationPoint = {
         id: `point_${Date.now()}`,
@@ -185,10 +158,10 @@ export default function AutomationCurve({
             key={point.id}
             cx={timeToX(point.time)}
             cy={valueToY(point.value)}
-            r="3"
-            fill="hsl(var(--background))"
-            stroke={color}
-            strokeWidth="1.5"
+            r="5"
+            fill={color}
+            stroke={"hsl(var(--background))"}
+            strokeWidth="1"
             className="cursor-grab"
             onMouseDown={(e) => handlePointMouseDown(e, point.id)}
             vectorEffect="non-scaling-stroke"
