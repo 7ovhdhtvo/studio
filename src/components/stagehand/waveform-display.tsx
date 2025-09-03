@@ -155,7 +155,7 @@ export default function WaveformDisplay({
           
           <AutomationCurve 
               duration={durationInSeconds}
-              color="hsl(var(--destructive))"
+              color="hsl(var(--foreground))"
               visible={showVolumeAutomation}
               maxHeight={waveformHeight}
               points={automationPoints}

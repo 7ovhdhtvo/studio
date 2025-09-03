@@ -105,7 +105,9 @@ export default function AutomationCurve({
     // Interpolate value on the line to place the new point accurately
     const sortedPoints = [...points].sort((a, b) => a.time - b.time);
     let value = yToValue(y); // Default to click position
-    if (sortedPoints.length > 0) {
+    if (sortedPoints.length === 0) {
+        value = baselineValue;
+    } else {
         let prevPoint = sortedPoints[0];
         if (time <= prevPoint.time) {
             value = prevPoint.value;
@@ -155,26 +157,15 @@ export default function AutomationCurve({
         viewBox={`0 0 100 ${maxHeight}`}
         preserveAspectRatio="none"
         className="overflow-visible"
-        onClick={points.length > 0 ? handleAddPoint : undefined}
+        onClick={handleAddPoint}
       >
-        {points.length === 0 ? (
-           <path
+        <path
             d={getPathData()}
             stroke="transparent"
             strokeWidth="10"
             fill="none"
             className="cursor-pointer"
-            onClick={handleAddPoint}
-           />
-        ) : (
-           <path
-            d={getPathData()}
-            stroke="transparent"
-            strokeWidth="10"
-            fill="none"
-            className="cursor-pointer"
-           />
-        )}
+        />
         <path
           d={getPathData()}
           stroke={color}
@@ -192,10 +183,8 @@ export default function AutomationCurve({
             >
               <circle r="6" fill="transparent" />
               <circle
-                r="4.5"
+                r="4"
                 fill={color}
-                stroke={"hsl(var(--card))"}
-                strokeWidth="1.5"
                 vectorEffect="non-scaling-stroke"
               />
           </g>
