@@ -57,7 +57,6 @@ export default function Home() {
   const [progress, setProgress] = useState(0); // Progress in percentage
   
   const audioRef = useRef<HTMLAudioElement>(null);
-  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const animationFrameRef = useRef<number>();
   const isScrubbingRef = useRef(false);
 
@@ -100,49 +99,6 @@ export default function Home() {
     }
   }, [isLoading, folders, activeProjectId]);
 
-  useEffect(() => {
-    const requestWakeLock = async () => {
-      if ('wakeLock' in navigator) {
-        try {
-          wakeLockRef.current = await navigator.wakeLock.request('screen');
-          logger.log("Wake Lock acquired.");
-        } catch (err: any) {
-          logger.error(`Failed to acquire wake lock: ${err.name}, ${err.message}`, err);
-        }
-      }
-    };
-
-    const releaseWakeLock = async () => {
-      if (wakeLockRef.current) {
-        try {
-          await wakeLockRef.current.release();
-          wakeLockRef.current = null;
-          logger.log("Wake Lock released.");
-        } catch (err: any) {
-          logger.error(`Failed to release wake lock: ${err.name}, ${err.message}`);
-        }
-      }
-    };
-    
-    if (isPlaying) {
-      requestWakeLock();
-    } else {
-      releaseWakeLock();
-    }
-    
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isPlaying) {
-        requestWakeLock();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      releaseWakeLock();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [isPlaying]);
   
   // Effect for loading new audio source
   useEffect(() => {
