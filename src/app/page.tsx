@@ -63,6 +63,7 @@ export default function Home() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const animationFrameRef = useRef<number>();
   const isScrubbingRef = useRef(false);
+  const waveformContainerRef = useRef<HTMLDivElement>(null);
 
   const duration = audioRef.current?.duration ?? activeTrack?.duration ?? 0;
 
@@ -144,12 +145,18 @@ export default function Home() {
     }
   }, []);
 
+  // Center on playhead when zooming
   useEffect(() => {
-    if (activeTrack) {
-      regenerateWaveform(activeTrack, zoom);
+    if (waveformContainerRef.current) {
+      const scrollContainer = waveformContainerRef.current;
+      const totalWidth = scrollContainer.scrollWidth;
+      const playheadPosition = (progress / 100) * totalWidth;
+      const visibleWidth = scrollContainer.clientWidth;
+      const newScrollLeft = playheadPosition - visibleWidth / 2;
+      
+      scrollContainer.scrollLeft = Math.max(0, newScrollLeft);
     }
-  }, [zoom, activeTrack, regenerateWaveform]);
-
+  }, [zoom, progress]);
 
   const [volumePoints, setVolumePoints] = useState<AutomationPoint[]>([
     { time: 2.5, value: 80 },
@@ -188,8 +195,20 @@ export default function Home() {
     setOpenControlPanel(prev => (prev === panel ? null : panel));
   };
   
-  const handleZoomIn = () => setZoom(prev => Math.min(prev * 1.5, 20));
-  const handleZoomOut = () => setZoom(prev => Math.max(prev / 1.5, 1));
+  const handleZoomIn = () => {
+    const newZoom = Math.min(zoom * 1.5, 20);
+    setZoom(newZoom);
+    if (activeTrack) {
+        regenerateWaveform(activeTrack, newZoom);
+    }
+  };
+  const handleZoomOut = () => {
+    const newZoom = Math.max(zoom / 1.5, 1);
+    setZoom(newZoom);
+    if (activeTrack) {
+        regenerateWaveform(activeTrack, newZoom);
+    }
+  };
 
   const handleSelectTrack = async (track: AudioFile) => {
     logger.log('handleSelectTrack: Track selected.', { trackId: track.id, title: track.title });
@@ -209,6 +228,9 @@ export default function Home() {
       logger.log('handleSelectTrack: Audio URL received.', { url });
       setAudioSrc(url);
       
+      // Regenerate waveform for the new track
+      await regenerateWaveform(track, zoom);
+
       if (wasPlaying) {
         // This will be handled by the useEffect for audioSrc
         handleSetIsPlaying(true);
@@ -352,6 +374,7 @@ export default function Home() {
               onScrubStart={() => isScrubbingRef.current = true}
               onScrubEnd={handleScrubEnd}
               showStereo={showStereo}
+              scrollContainerRef={waveformContainerRef}
             />
             <PlaybackControls 
               isPlaying={isPlaying} 

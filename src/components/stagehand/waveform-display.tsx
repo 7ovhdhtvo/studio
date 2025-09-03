@@ -3,7 +3,7 @@
 
 import { cn } from '@/lib/utils';
 import { type WaveformData } from '@/lib/waveform';
-import { useRef, type MouseEvent } from 'react';
+import { useRef, type MouseEvent, type RefObject } from 'react';
 import { Line, LineChart as RechartsLineChart, ResponsiveContainer } from 'recharts';
 import TimeRuler from './time-ruler';
 
@@ -19,6 +19,7 @@ type WaveformDisplayProps = {
   onScrubStart: () => void;
   onScrubEnd: () => void;
   showStereo: boolean;
+  scrollContainerRef: RefObject<HTMLDivElement>;
 };
 
 const volumeData = [
@@ -93,13 +94,14 @@ export default function WaveformDisplay({
   onScrubStart,
   onScrubEnd,
   showStereo,
+  scrollContainerRef,
 }: WaveformDisplayProps) {
-  const waveformContainerRef = useRef<HTMLDivElement>(null);
+  const waveformInteractionRef = useRef<HTMLDivElement>(null);
   const isMouseDownRef = useRef(false);
 
   const handleInteraction = (e: MouseEvent<HTMLDivElement>) => {
-    if (!waveformContainerRef.current) return;
-    const rect = waveformContainerRef.current.getBoundingClientRect();
+    if (!waveformInteractionRef.current) return;
+    const rect = waveformInteractionRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const newProgress = Math.max(0, Math.min(100, (x / rect.width) * 100));
     onProgressChange(newProgress);
@@ -147,10 +149,11 @@ export default function WaveformDisplay({
           {formatTime(currentTime)}
        </div>
        <div 
+         ref={scrollContainerRef}
          className="w-full overflow-x-auto"
        >
         <div 
-          ref={waveformContainerRef}
+          ref={waveformInteractionRef}
           className="relative h-48 bg-card rounded-lg p-2 shadow-inner cursor-pointer"
           style={{ width: `${100 * zoom}%` }}
           onMouseDown={handleMouseDown}
