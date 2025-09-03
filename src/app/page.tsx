@@ -58,6 +58,7 @@ export default function Home() {
   const [volume, setVolume] = useState(75); // Global volume in % (0-100)
   const [openControlPanel, setOpenControlPanel] = useState<OpenControlPanel>(null);
   const [progress, setProgress] = useState(0); // Progress in percentage
+  const [showMockupCurve, setShowMockupCurve] = useState(false);
   
   const [volumePoints, setVolumePoints] = useState<AutomationPoint[]>([]);
   const [speedPoints, setSpeedPoints] = useState<AutomationPoint[]>([
@@ -517,6 +518,7 @@ export default function Home() {
                   onAutomationPointsChange={handleSetVolumePoints}
                   onAutomationDragStart={handleAutomationDragStart}
                   onAutomationDragEnd={handleAutomationDragEnd}
+                  showMockupCurve={showMockupCurve}
                 />
                 <PlaybackControls 
                   isPlaying={isPlaying} 
@@ -537,6 +539,8 @@ export default function Home() {
                     automationPoints={volumePoints}
                     onUpdatePoint={handleUpdateAutomationPoint}
                     onDeletePoint={handleDeleteAutomationPoint}
+                    showMockupCurve={showMockupCurve}
+                    onToggleMockupCurve={setShowMockupCurve}
                   />
                   <SpeedControl 
                     isOpen={openControlPanel === 'speed'}

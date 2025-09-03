@@ -81,6 +81,8 @@ type VolumeControlProps = {
   automationPoints: AutomationPoint[];
   onUpdatePoint: (id: string, newName: string, newTime: number) => void;
   onDeletePoint: (id: string) => void;
+  showMockupCurve: boolean;
+  onToggleMockupCurve: (value: boolean) => void;
 };
 
 export default function VolumeControl({ 
@@ -93,6 +95,8 @@ export default function VolumeControl({
   automationPoints,
   onUpdatePoint,
   onDeletePoint,
+  showMockupCurve,
+  onToggleMockupCurve,
 }: VolumeControlProps) {
   const isAutomationActive = showAutomation && automationPoints.length > 0;
 
@@ -172,6 +176,16 @@ export default function VolumeControl({
                ) : (
                   <p className="text-xs text-muted-foreground">Click on the automation line to add points.</p>
                )}
+            </div>
+          </div>
+          <div className="grid gap-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="mockup-switch">Show Mockup</Label>
+                <Switch
+                    id="mockup-switch"
+                    checked={showMockupCurve}
+                    onCheckedChange={onToggleMockupCurve}
+                />
             </div>
           </div>
         </CardContent>

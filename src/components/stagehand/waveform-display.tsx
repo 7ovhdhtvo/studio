@@ -8,6 +8,65 @@ import TimeRuler from './time-ruler';
 import AutomationCurve from './automation-curve';
 import type { AutomationPoint } from '@/lib/storage-manager';
 
+const MockupCurve = ({ duration, zoom }: { duration: number, zoom: number }) => {
+    if (duration === 0) return null;
+    const width = 100 * zoom;
+    const height = 192; // h-48
+
+    const mockPoints = [
+        { time: duration * 0.1, value: 80 },
+        { time: duration * 0.4, value: 30 },
+        { time: duration * 0.7, value: 90 },
+        { time: duration * 0.9, value: 50 },
+    ];
+
+    const timeToX = (time: number) => (time / duration) * 100;
+    const valueToY = (value: number) => height - (value / 100) * height;
+
+    const getPathData = () => {
+        const sortedPoints = [...mockPoints].sort((a, b) => a.time - b.time);
+        if (sortedPoints.length === 0) return "";
+        
+        const firstPoint = sortedPoints[0];
+        let pathParts = [`M 0 ${valueToY(firstPoint.value)} L ${timeToX(firstPoint.time)} ${valueToY(firstPoint.value)}`];
+        pathParts.push(...sortedPoints.map(p => `L ${timeToX(p.time)} ${valueToY(p.value)}`));
+        const lastPoint = sortedPoints[sortedPoints.length - 1];
+        pathParts.push(`L 100 ${valueToY(lastPoint.value)}`);
+        return pathParts.join(' ');
+    };
+    
+    return (
+        <div className="absolute inset-0 w-full h-full pointer-events-none">
+            <svg
+                width="100%"
+                height="100%"
+                viewBox={`0 0 100 ${height}`}
+                preserveAspectRatio="none"
+                className="overflow-visible"
+            >
+                <path
+                    d={getPathData()}
+                    stroke="hsl(var(--destructive))"
+                    strokeWidth="2"
+                    fill="none"
+                    vectorEffect="non-scaling-stroke"
+                />
+                {mockPoints.map(point => (
+                    <g key={point.time} transform={`translate(${timeToX(point.time)}, ${valueToY(point.value)})`}>
+                        <circle
+                            r={5}
+                            fill="hsl(var(--destructive))"
+                            stroke="hsl(var(--card))"
+                            strokeWidth="2"
+                            vectorEffect="non-scaling-stroke"
+                        />
+                    </g>
+                ))}
+            </svg>
+        </div>
+    );
+};
+
 type WaveformDisplayProps = {
   waveformData: WaveformData | null;
   speedPoints: AutomationPoint[];
@@ -28,6 +87,7 @@ type WaveformDisplayProps = {
   onAutomationPointsChange: (points: AutomationPoint[]) => void;
   onAutomationDragStart: () => void;
   onAutomationDragEnd: () => void;
+  showMockupCurve: boolean;
 };
 
 const ChannelWaveform = ({ data, progress, isStereo }: { data: number[], progress: number, isStereo: boolean }) => {
@@ -70,6 +130,7 @@ export default function WaveformDisplay({
   onAutomationPointsChange,
   onAutomationDragStart,
   onAutomationDragEnd,
+  showMockupCurve,
 }: WaveformDisplayProps) {
   const waveformInteractionRef = useRef<HTMLDivElement>(null);
   const isMouseDownRef = useRef(false);
@@ -153,17 +214,22 @@ export default function WaveformDisplay({
              </div>
           )}
           
-          <AutomationCurve 
-              duration={durationInSeconds}
-              color="hsl(var(--destructive))"
-              visible={showVolumeAutomation}
-              maxHeight={waveformHeight}
-              points={automationPoints}
-              onPointsChange={onAutomationPointsChange}
-              onDragStart={onAutomationDragStart}
-              onDragEnd={onAutomationDragEnd}
-              baselineValue={masterVolume}
-          />
+          {showMockupCurve ? (
+            <MockupCurve duration={durationInSeconds} zoom={zoom} />
+          ) : (
+            <AutomationCurve 
+                duration={durationInSeconds}
+                color="hsl(var(--destructive))"
+                visible={showVolumeAutomation}
+                maxHeight={waveformHeight}
+                points={automationPoints}
+                onPointsChange={onAutomationPointsChange}
+                onDragStart={onAutomationDragStart}
+                onDragEnd={onAutomationDragEnd}
+                baselineValue={masterVolume}
+            />
+          )}
+
           {/* Speed Automation Curve would go here */}
 
           <div 
