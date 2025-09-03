@@ -76,21 +76,22 @@ export default function AutomationCurve({
   if (!visible || duration === 0) return null;
 
   const getPathData = () => {
-    if (points.length === 0) {
-      // If no points, draw a line at the master volume level
-      return `M 0 ${valueToY(baselineValue)} L 100 ${valueToY(baselineValue)}`;
+    // ALWAYS draw the baseline
+    const baselineY = valueToY(baselineValue);
+    let pathParts = [`M 0 ${baselineY} L 100 ${baselineY}`];
+
+    if (points.length > 0) {
+        const sortedPoints = [...points].sort((a, b) => a.time - b.time);
+        const firstPoint = sortedPoints[0];
+        
+        // Start line from the beginning of the track at the first point's value
+        pathParts = [`M 0 ${valueToY(firstPoint.value)} L ${timeToX(firstPoint.time)} ${valueToY(firstPoint.value)}`];
+        // Connect all the points
+        pathParts.push(...sortedPoints.map(p => `L ${timeToX(p.time)} ${valueToY(p.value)}`));
+        // End line at the end of the track with the last point's value
+        const lastPoint = sortedPoints[sortedPoints.length - 1];
+        pathParts.push(`L 100 ${valueToY(lastPoint.value)}`);
     }
-    
-    const sortedPoints = [...points].sort((a, b) => a.time - b.time);
-    const firstPoint = sortedPoints[0];
-    
-    // Start line from the beginning of the track at the first point's value
-    const pathParts = [`M 0 ${valueToY(firstPoint.value)} L ${timeToX(firstPoint.time)} ${valueToY(firstPoint.value)}`];
-    // Connect all the points
-    pathParts.push(...sortedPoints.map(p => `L ${timeToX(p.time)} ${valueToY(p.value)}`));
-    // End line at the end of the track with the last point's value
-    const lastPoint = sortedPoints[sortedPoints.length - 1];
-    pathParts.push(`L 100 ${valueToY(lastPoint.value)}`);
 
     return pathParts.join(' ');
   };
@@ -100,7 +101,7 @@ export default function AutomationCurve({
     e.stopPropagation();
 
     if (!svgRef.current) return;
-    const { x, y, svgWidth } = getSVGCoordinates(e);
+    const { x, svgWidth } = getSVGCoordinates(e);
     const time = xToTime(x, svgWidth);
     
     let value;
@@ -153,7 +154,6 @@ export default function AutomationCurve({
     <div
       data-automation-element
       className="absolute inset-0 w-full h-full"
-      onClick={handleAddPoint}
     >
       <svg
         ref={svgRef}
@@ -162,6 +162,7 @@ export default function AutomationCurve({
         viewBox={`0 0 100 ${maxHeight}`}
         preserveAspectRatio="none"
         className="overflow-visible"
+        onClick={handleAddPoint}
       >
         {/* Invisible wider path for easier clicking */}
          <path
@@ -184,10 +185,10 @@ export default function AutomationCurve({
             key={point.id}
             cx={timeToX(point.time)}
             cy={valueToY(point.value)}
-            r="4"
+            r="3"
             fill="hsl(var(--background))"
             stroke={color}
-            strokeWidth="2"
+            strokeWidth="1.5"
             className="cursor-grab"
             onMouseDown={(e) => handlePointMouseDown(e, point.id)}
             vectorEffect="non-scaling-stroke"
