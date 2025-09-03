@@ -107,7 +107,7 @@ export default function Home() {
           wakeLockRef.current = await navigator.wakeLock.request('screen');
           logger.log("Wake Lock acquired.");
         } catch (err: any) {
-          logger.error(`Failed to acquire wake lock: ${err.name}, ${err.message}`);
+          logger.error(`Failed to acquire wake lock: ${err.name}, ${err.message}`, err);
         }
       }
     };
@@ -274,12 +274,12 @@ export default function Home() {
 
   const handleAudioEnded = () => {
     logger.log('handleAudioEnded: Audio track ended.', { isLooping });
-    if (!isLooping) {
+    if (isLooping && audioRef.current) {
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch(e => logger.error("Loop playback failed", e));
+    } else {
         setIsPlaying(false);
-        // Don't set progress to 100, let the animation frame handle it
     }
-    // The native loop attribute handles looping, so no extra logic needed here
-    // unless we want custom loop points in the future.
   };
 
   return (
@@ -384,4 +384,5 @@ export default function Home() {
       </main>
     </div>
   );
-}
+
+  
