@@ -70,6 +70,7 @@ export default function Home() {
   const waveformContainerRef = useRef<HTMLDivElement>(null);
 
   const duration = audioRef.current?.duration ?? activeTrack?.duration ?? 0;
+  const currentTime = audioRef.current?.currentTime ?? 0;
 
   const stopProgressLoop = useCallback(() => {
     if (animationFrameRef.current) {
@@ -330,6 +331,9 @@ export default function Home() {
         onExit={() => setIsPlaybackMode(false)}
         trackTitle={activeTrack?.title ?? "No Track Loaded"}
         trackArtist={activeTrack?.originalName ?? ""}
+        onBackToStart={handleBackToStart}
+        currentTime={currentTime}
+        duration={duration}
       />
     );
   }
@@ -461,5 +465,3 @@ export default function Home() {
     </div>
   );
 }
-
-    

@@ -69,7 +69,7 @@ export default function AnalogKnob({
       className="relative flex items-center justify-center cursor-pointer select-none"
       style={{ width: size, height: size }}
       onMouseDown={handleMouseDown}
-      title={`Volume: ${value}%`}
+      title={`Volume: ${Math.round(value)}%`}
     >
       <div
         className="absolute w-full h-full rounded-full bg-secondary shadow-inner"
@@ -84,7 +84,7 @@ export default function AnalogKnob({
         <div className="w-1 h-1/3 bg-primary rounded-full absolute top-[10%]" />
       </div>
       <div className="absolute text-xs bottom-[-20px] font-mono text-muted-foreground">
-        {value}%
+        {Math.round(value)}%
       </div>
     </div>
   );
