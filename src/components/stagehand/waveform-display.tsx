@@ -24,7 +24,8 @@ type WaveformDisplayProps = {
   showStereo: boolean;
   scrollContainerRef: RefObject<HTMLDivElement>;
   masterVolume: number;
-  onMasterVolumeChange: (newVolume: number) => void;
+  automationPoints: AutomationPoint[];
+  onAutomationPointsChange: (points: AutomationPoint[]) => void;
   onAutomationDragStart: () => void;
   onAutomationDragEnd: () => void;
 };
@@ -65,7 +66,8 @@ export default function WaveformDisplay({
   showStereo,
   scrollContainerRef,
   masterVolume,
-  onMasterVolumeChange,
+  automationPoints,
+  onAutomationPointsChange,
   onAutomationDragStart,
   onAutomationDragEnd,
 }: WaveformDisplayProps) {
@@ -156,8 +158,8 @@ export default function WaveformDisplay({
               color="hsl(var(--destructive))"
               visible={showVolumeAutomation}
               maxHeight={waveformHeight}
-              baselineValue={masterVolume}
-              onBaselineChange={onMasterVolumeChange}
+              points={automationPoints}
+              onPointsChange={onAutomationPointsChange}
               onDragStart={onAutomationDragStart}
               onDragEnd={onAutomationDragEnd}
           />

@@ -77,7 +77,6 @@ export default function Home() {
   const getAutomationValue = useCallback((points: AutomationPoint[], time: number): number | null => {
     if (points.length === 0) return null;
     
-    // If only one point exists (baseline), return its value regardless of time.
     if (points.length === 1) return points[0].value;
 
     const sortedPoints = [...points].sort((a, b) => a.time - b.time);
@@ -117,8 +116,9 @@ export default function Home() {
         if (showVolumeAutomation && !isDraggingAutomation) {
             const automationVolume = getAutomationValue(volumePoints, audio.currentTime);
             if (automationVolume !== null) {
-                audio.volume = automationVolume / 100;
-                setVolume(Math.round(automationVolume));
+                const newClampedVolume = Math.max(0, Math.min(100, automationVolume));
+                audio.volume = newClampedVolume / 100;
+                setVolume(Math.round(newClampedVolume));
             }
         }
         animationFrameRef.current = requestAnimationFrame(animate);
@@ -356,6 +356,10 @@ export default function Home() {
     }
   };
 
+  const handleSetVolumePoints = (points: AutomationPoint[]) => {
+    setVolumePoints(points);
+  };
+
   const getTracksInCurrentProject = () => {
     if (!activeProjectId) return [];
     const project = folders.find(f => f.id === activeProjectId);
@@ -477,13 +481,8 @@ export default function Home() {
                   showStereo={showStereo}
                   scrollContainerRef={waveformContainerRef}
                   masterVolume={volume}
-                  onMasterVolumeChange={(newVolume) => {
-                      if (activeTrack) {
-                          const basePoint: AutomationPoint = { id: 'base', time: 0, value: newVolume };
-                          setVolumePoints([basePoint]);
-                      }
-                      setVolume(newVolume);
-                  }}
+                  automationPoints={volumePoints}
+                  onAutomationPointsChange={handleSetVolumePoints}
                   onAutomationDragStart={() => setIsDraggingAutomation(true)}
                   onAutomationDragEnd={handleAutomationDragEnd}
                 />
