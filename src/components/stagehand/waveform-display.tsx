@@ -2,12 +2,13 @@
 "use client";
 
 import { cn } from '@/lib/utils';
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { type WaveformData } from '@/lib/waveform';
+import { useRef, type MouseEvent } from 'react';
 import { Line, LineChart as RechartsLineChart, ResponsiveContainer } from 'recharts';
 import TimeRuler from './time-ruler';
 
 type WaveformDisplayProps = {
-  waveformData: number[];
+  waveformData: WaveformData | null;
   showVolumeAutomation: boolean;
   showSpeedAutomation: boolean;
   durationInSeconds: number;
@@ -17,6 +18,7 @@ type WaveformDisplayProps = {
   isPlaying: boolean;
   onScrubStart: () => void;
   onScrubEnd: () => void;
+  showStereo: boolean;
 };
 
 const volumeData = [
@@ -59,6 +61,26 @@ const AutomationCurve = ({ data, color, visible }: { data: any[], color: string,
   );
 };
 
+const ChannelWaveform = ({ data, progress, isStereo }: { data: number[], progress: number, isStereo: boolean }) => {
+  return (
+    <div className={cn(
+        "w-full flex items-center gap-[1px]",
+        isStereo ? "h-1/2" : "h-full"
+    )}>
+      {data.map((height, index) => (
+        <div
+          key={index}
+          className={cn(
+            "w-full rounded-sm transition-colors duration-200 pointer-events-none",
+            (index / data.length * 100) < progress ? "bg-primary" : "bg-primary/20"
+          )}
+          style={{ height: `${height * 100}%` }}
+        />
+      ))}
+    </div>
+  );
+};
+
 export default function WaveformDisplay({ 
   waveformData,
   showVolumeAutomation, 
@@ -70,6 +92,7 @@ export default function WaveformDisplay({
   isPlaying,
   onScrubStart,
   onScrubEnd,
+  showStereo,
 }: WaveformDisplayProps) {
   const waveformContainerRef = useRef<HTMLDivElement>(null);
   const isMouseDownRef = useRef(false);
@@ -95,8 +118,10 @@ export default function WaveformDisplay({
   };
   
   const handleMouseUp = () => {
-    isMouseDownRef.current = false;
-    onScrubEnd();
+    if (isMouseDownRef.current) {
+        isMouseDownRef.current = false;
+        onScrubEnd();
+    }
   };
   
   const handleMouseLeave = () => {
@@ -126,32 +151,27 @@ export default function WaveformDisplay({
        >
         <div 
           ref={waveformContainerRef}
-          className="relative h-48 bg-card rounded-lg p-2 flex items-center gap-[1px] shadow-inner cursor-pointer"
+          className="relative h-48 bg-card rounded-lg p-2 shadow-inner cursor-pointer"
           style={{ width: `${100 * zoom}%` }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
         >
-          {waveformData.length > 0 ? (
-            waveformData.map((height, index) => (
-              <div
-                key={index}
-                className={cn(
-                  "w-full rounded-sm transition-colors duration-200 pointer-events-none",
-                  (index / waveformData.length * 100) < progress ? "bg-primary" : "bg-primary/20"
-                )}
-                style={{ height: `${height * 100}%` }}
-              />
-            ))
+          {waveformData ? (
+            <div className="w-full h-full flex flex-col justify-center items-center">
+                <ChannelWaveform data={waveformData.left} progress={progress} isStereo={showStereo} />
+                {showStereo && <div className="w-full h-[1px] bg-border my-1" />}
+                {showStereo && <ChannelWaveform data={waveformData.right} progress={progress} isStereo={showStereo} />}
+            </div>
           ) : (
-             <div className="w-full text-center text-muted-foreground">
+             <div className="w-full h-full flex justify-center items-center text-muted-foreground">
                 {durationInSeconds > 0 ? "Generating waveform..." : "No audio loaded"}
              </div>
           )}
           
-          <AutomationCurve data={volumeData} color="hsl(var(--destructive))" visible={showVolumeAutomation} />
-          <AutomationCurve data={speedData} color="#F5B041" visible={showSpeedAutomation} />
+          <AutomationCurve data={volumeData} color="hsl(var(--destructive))" visible={showVolumeAutomation && !showStereo} />
+          <AutomationCurve data={speedData} color="#F5B041" visible={showSpeedAutomation && !showStereo} />
 
           <div 
             className="absolute top-0 h-full w-0.5 bg-foreground/70 pointer-events-none"
@@ -165,5 +185,3 @@ export default function WaveformDisplay({
     </div>
   );
 }
-
-    

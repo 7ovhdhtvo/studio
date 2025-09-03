@@ -16,7 +16,7 @@ import { useAudioStorage } from '@/hooks/useAudioStorage';
 import type { AudioFile, Folder } from '@/lib/storage-manager';
 import DebugConsole from '@/components/stagehand/debug-console';
 import { logger } from '@/lib/logger';
-import { generateWaveformData } from '@/lib/waveform';
+import { generateWaveformData, type WaveformData } from '@/lib/waveform';
 import { storageManager } from '@/lib/storage-manager';
 
 export type AutomationPoint = {
@@ -47,8 +47,9 @@ export default function Home() {
 
   const [activeTrack, setActiveTrack] = useState<AudioFile | null>(null);
   const [audioSrc, setAudioSrc] = useState<string | null>(null);
-  const [waveformData, setWaveformData] = useState<number[]>([]);
+  const [waveformData, setWaveformData] = useState<WaveformData | null>(null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [showStereo, setShowStereo] = useState(false);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLooping, setIsLooping] = useState(false);
@@ -131,6 +132,24 @@ export default function Home() {
     }
   }, [isLooping]);
 
+  const regenerateWaveform = useCallback(async (track: AudioFile, currentZoom: number) => {
+    try {
+      const audioBlob = await storageManager.getAudioBlob(track.id);
+      if (audioBlob) {
+        const data = await generateWaveformData(await audioBlob.arrayBuffer(), currentZoom);
+        setWaveformData(data);
+      }
+    } catch (error) {
+      logger.error('regenerateWaveform: Failed to generate waveform.', { error });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTrack) {
+      regenerateWaveform(activeTrack, zoom);
+    }
+  }, [zoom, activeTrack, regenerateWaveform]);
+
 
   const [volumePoints, setVolumePoints] = useState<AutomationPoint[]>([
     { time: 2.5, value: 80 },
@@ -183,19 +202,12 @@ export default function Home() {
 
     setProgress(0);
     setActiveTrack(track);
-    setWaveformData([]); // Clear old waveform data
+    setWaveformData(null); // Clear old waveform data
 
     try {
       const url = await getAudioUrl(track.id);
       logger.log('handleSelectTrack: Audio URL received.', { url });
       setAudioSrc(url);
-
-      // Generate waveform
-      const audioBlob = await storageManager.getAudioBlob(track.id);
-      if (audioBlob) {
-        const data = await generateWaveformData(await audioBlob.arrayBuffer());
-        setWaveformData(data);
-      }
       
       if (wasPlaying) {
         // This will be handled by the useEffect for audioSrc
@@ -318,6 +330,7 @@ export default function Home() {
                 </p>
               </div>
                <div className="flex items-center gap-2">
+                <Button variant={showStereo ? 'secondary' : 'outline'} onClick={() => setShowStereo(s => !s)}>Stereo</Button>
                 <Button variant="outline" size="icon" onClick={handleZoomOut}>
                   <ZoomOut className="w-4 h-4" />
                 </Button>
@@ -338,6 +351,7 @@ export default function Home() {
               isPlaying={isPlaying}
               onScrubStart={() => isScrubbingRef.current = true}
               onScrubEnd={handleScrubEnd}
+              showStereo={showStereo}
             />
             <PlaybackControls 
               isPlaying={isPlaying} 
@@ -376,5 +390,3 @@ export default function Home() {
     </div>
   );
 }
-
-    

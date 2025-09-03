@@ -5,6 +5,11 @@
 // It is not supported on Node.js environments.
 let audioContext: AudioContext | null = null;
 
+export type WaveformData = {
+  left: number[];
+  right: number[];
+};
+
 function getAudioContext() {
   if (typeof window !== 'undefined') {
     if (!audioContext) {
@@ -27,47 +32,72 @@ function normalize(peaks: number[]): number[] {
 }
 
 /**
- * Generates waveform data from an audio buffer.
- * @param audioBuffer The ArrayBuffer of the audio file.
- * @param targetPoints The number of data points to generate for the waveform.
- * @returns A promise that resolves to an array of numbers representing the waveform.
+ * Extracts peak data from a single audio channel.
+ * @param channelData The Float32Array for the channel.
+ * @param targetPoints The number of data points to generate.
+ * @returns An array of numbers representing the waveform for that channel.
  */
-export async function generateWaveformData(
-  audioBuffer: ArrayBuffer,
-  targetPoints = 150
-): Promise<number[]> {
-  const context = getAudioContext();
-  if (!context) {
-    console.error("AudioContext is not supported in this environment.");
-    return new Array(targetPoints).fill(0.1);
-  }
-
-  try {
-    const decodedBuffer = await context.decodeAudioData(audioBuffer);
-    const channelData = decodedBuffer.getChannelData(0); // Use the first channel
+function getPeaks(channelData: Float32Array, targetPoints: number): number[] {
     const peaks: number[] = [];
-    
-    const sampleRate = decodedBuffer.sampleRate;
     const totalSamples = channelData.length;
     const samplesPerPoint = Math.floor(totalSamples / targetPoints);
 
     for (let i = 0; i < targetPoints; i++) {
-      const start = i * samplesPerPoint;
-      const end = start + samplesPerPoint;
-      let maxPeak = 0;
-      for (let j = start; j < end; j++) {
-        const peak = Math.abs(channelData[j] || 0);
-        if (peak > maxPeak) {
-          maxPeak = peak;
+        const start = i * samplesPerPoint;
+        const end = start + samplesPerPoint;
+        let maxPeak = 0;
+        for (let j = start; j < end; j++) {
+            const peak = Math.abs(channelData[j] || 0);
+            if (peak > maxPeak) {
+                maxPeak = peak;
+            }
         }
-      }
-      peaks.push(maxPeak);
+        peaks.push(maxPeak);
+    }
+    return normalize(peaks);
+}
+
+
+/**
+ * Generates waveform data from an audio buffer.
+ * @param audioBuffer The ArrayBuffer of the audio file.
+ * @param zoom The current zoom level, used to determine resolution.
+ * @returns A promise that resolves to an object with left and right channel waveform data.
+ */
+export async function generateWaveformData(
+  audioBuffer: ArrayBuffer,
+  zoom: number = 1
+): Promise<WaveformData> {
+  const basePoints = 150;
+  const targetPoints = Math.floor(basePoints * zoom);
+  
+  const context = getAudioContext();
+  if (!context) {
+    console.error("AudioContext is not supported in this environment.");
+    const flatLine = new Array(targetPoints).fill(0.1);
+    return { left: flatLine, right: flatLine };
+  }
+
+  try {
+    const decodedBuffer = await context.decodeAudioData(audioBuffer);
+    
+    const leftChannelData = decodedBuffer.getChannelData(0);
+    const leftPeaks = getPeaks(leftChannelData, targetPoints);
+    
+    let rightPeaks: number[];
+    if (decodedBuffer.numberOfChannels > 1) {
+        const rightChannelData = decodedBuffer.getChannelData(1);
+        rightPeaks = getPeaks(rightChannelData, targetPoints);
+    } else {
+        // For mono, just duplicate the left channel
+        rightPeaks = [...leftPeaks];
     }
     
-    return normalize(peaks);
+    return { left: leftPeaks, right: rightPeaks };
   } catch (error) {
     console.error("Failed to generate waveform data:", error);
     // Return a flat line on error
-    return new Array(targetPoints).fill(0.1);
+    const flatLine = new Array(targetPoints).fill(0.1);
+    return { left: flatLine, right: flatLine };
   }
 }
