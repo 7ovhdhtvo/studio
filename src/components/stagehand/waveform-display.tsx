@@ -138,13 +138,13 @@ export default function WaveformDisplay({
     
     const data: any[] = sortedPoints.map(p => ({ ...p, isAutomationPoint: true }));
 
-    if (sortedPoints[0].time > 0) {
+    if (sortedPoints[0].time > 0.01) { // Add a small tolerance
         const firstPointValue = sortedPoints[0].value;
         data.unshift({ time: 0, value: firstPointValue, isAutomationPoint: false });
     }
     
     const lastPoint = sortedPoints[sortedPoints.length - 1];
-    if (lastPoint.time < duration) {
+    if (lastPoint.time < duration - 0.01) { // Add a small tolerance
         const lastPointValue = lastPoint.value;
         data.push({ time: duration, value: lastPointValue, isAutomationPoint: false });
     }
@@ -215,18 +215,15 @@ export default function WaveformDisplay({
   };
 
   const handleChartClick = (e: any) => {
-    setDebugState('Chart clicked');
     if (draggingPointIdRef.current) {
-      setDebugState('Drag in progress, click ignored.');
       return;
     }
     if (e && e.activeDot) {
-      setDebugState('Clicked on an existing point handle.');
       return;
     }
+    
     const container = waveformInteractionRef.current;
     if (!e || !e.activeCoordinate || !container) {
-      setDebugState('Click event missing coordinate data.');
       return;
     }
 
@@ -261,10 +258,6 @@ export default function WaveformDisplay({
     <div className="flex flex-col items-center space-y-2">
        <div className="font-mono text-4xl font-bold text-center w-full bg-secondary text-secondary-foreground py-2 rounded-lg">
           {formatTime(currentTime)}
-       </div>
-        {/* --- DEBUG UI --- */}
-       <div className="w-full text-center bg-yellow-200 text-yellow-800 font-mono text-xs py-1">
-            Debug State: {debugState} | Dragging: {draggingPointIdRef.current || 'none'}
        </div>
        <div 
          ref={scrollContainerRef}
