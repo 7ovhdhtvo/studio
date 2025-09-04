@@ -64,6 +64,7 @@ export default function Home() {
   const [openControlPanel, setOpenControlPanel] = useState<OpenControlPanel>(null);
   const [progress, setProgress] = useState(0); // Progress in percentage
   const [startDelay, setStartDelay] = useState(0);
+  const [applyDelayToLoop, setApplyDelayToLoop] = useState(false);
   
   const [volumePoints, setVolumePoints] = useState<AutomationPoint[]>([]);
   const [speedPoints, setSpeedPoints] = useState<AutomationPoint[]>([
@@ -212,9 +213,10 @@ export default function Home() {
 
   useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.loop = isLooping;
+      // We handle looping manually now to accommodate delay
+      audioRef.current.loop = false;
     }
-  }, [isLooping]);
+  }, []);
 
   useEffect(() => {
     if (audioRef.current && !isAutomationActive) {
@@ -288,8 +290,6 @@ export default function Home() {
         handleSetIsPlaying(!isPlaying);
         return;
     }
-
-    const wasPlaying = isPlaying;
     
     handleSetIsPlaying(false);
     
@@ -379,7 +379,21 @@ export default function Home() {
 
   const handleAudioEnded = () => {
     logger.log('handleAudioEnded: Audio track ended.', { isLooping });
-    if (!isLooping) {
+    if (isLooping) {
+        if (audioRef.current) {
+            audioRef.current.currentTime = 0;
+            setProgress(0);
+
+            if (applyDelayToLoop && startDelay > 0) {
+                // If applying delay to loop, we need to manually pause and restart with delay
+                setIsPlaying(false); // Briefly set to false to trigger useEffect
+                setTimeout(() => setIsPlaying(true), 10); // Then back to true
+            } else {
+                // Otherwise, play immediately
+                audioRef.current.play().catch(e => logger.error("Loop playback failed", e));
+            }
+        }
+    } else {
         handleSetIsPlaying(false);
         setProgress(0);
     }
@@ -589,6 +603,8 @@ export default function Home() {
                   setDebugState={setDebugState}
                   startDelay={startDelay}
                   onStartDelayChange={setStartDelay}
+                  applyDelayToLoop={applyDelayToLoop}
+                  onApplyDelayToLoopChange={setApplyDelayToLoop}
                 />
                 <PlaybackControls 
                   isPlaying={isPlaying} 

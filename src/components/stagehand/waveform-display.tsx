@@ -8,6 +8,7 @@ import TimeRuler from './time-ruler';
 import type { AutomationPoint } from '@/lib/storage-manager';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { Checkbox } from '../ui/checkbox';
 
 const POINT_RADIUS = 6;
 const HITBOX_RADIUS = 12;
@@ -34,6 +35,8 @@ type WaveformDisplayProps = {
   setDebugState: Dispatch<SetStateAction<string>>;
   startDelay: number;
   onStartDelayChange: (delay: number) => void;
+  applyDelayToLoop: boolean;
+  onApplyDelayToLoopChange: (checked: boolean) => void;
 };
 
 const ChannelWaveform = ({ data, progress, isStereo }: { data: number[], progress: number, isStereo: boolean }) => {
@@ -78,6 +81,8 @@ export default function WaveformDisplay({
   setDebugState,
   startDelay,
   onStartDelayChange,
+  applyDelayToLoop,
+  onApplyDelayToLoopChange
 }: WaveformDisplayProps) {
   const waveformInteractionRef = useRef<HTMLDivElement>(null);
   const isMouseDownRef = useRef(false);
@@ -234,21 +239,36 @@ export default function WaveformDisplay({
 
   return (
     <div className="flex flex-col items-center space-y-2">
-       <div className="flex w-full items-center gap-4">
-        <div className="font-mono text-4xl font-bold text-center w-full bg-secondary text-secondary-foreground py-2 rounded-lg">
+       <div className="flex w-full items-stretch gap-4">
+        <div className="font-mono text-4xl font-bold text-center w-full bg-secondary text-secondary-foreground py-2 rounded-lg flex items-center justify-center">
             {formatTime(currentTime)}
         </div>
-        <div className="flex flex-col items-center space-y-1">
-            <Label htmlFor="start-delay" className="text-xs text-muted-foreground whitespace-nowrap">Start Delay (s)</Label>
-            <Input
-                id="start-delay"
-                type="number"
-                value={startDelay}
-                onChange={(e) => onStartDelayChange(parseFloat(e.target.value) || 0)}
-                className="w-24 h-12 text-center text-lg font-mono"
-                min="0"
-                step="0.1"
-            />
+        <div className="flex flex-col items-center justify-between gap-1">
+            <div className='flex flex-col items-center'>
+                <Label htmlFor="start-delay" className="text-xs text-muted-foreground whitespace-nowrap">Start Delay (s)</Label>
+                <Input
+                    id="start-delay"
+                    type="number"
+                    value={startDelay}
+                    onChange={(e) => onStartDelayChange(parseFloat(e.target.value) || 0)}
+                    className="w-24 h-10 text-center text-lg font-mono"
+                    min="0"
+                    step="0.1"
+                />
+            </div>
+             <div className="flex items-center space-x-2">
+                <Checkbox 
+                    id="apply-delay-loop" 
+                    checked={applyDelayToLoop}
+                    onCheckedChange={onApplyDelayToLoopChange}
+                />
+                <label
+                    htmlFor="apply-delay-loop"
+                    className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                    Apply to loop
+                </label>
+            </div>
         </div>
        </div>
        <div 
@@ -350,5 +370,6 @@ export default function WaveformDisplay({
   );
 
     
+
 
 
