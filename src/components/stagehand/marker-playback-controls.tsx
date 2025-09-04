@@ -1,11 +1,13 @@
 
 "use client"
 
-import React, { useRef, useEffect } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronUp, ChevronDown, Flag } from 'lucide-react';
+import { Flag, ListMusic } from 'lucide-react';
 import type { Marker } from '@/lib/storage-manager';
 import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const SkipToFlagIcon = ({ direction = 'left' }: { direction?: 'left' | 'right' }) => (
   <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
@@ -20,65 +22,61 @@ const SkipToFlagIcon = ({ direction = 'left' }: { direction?: 'left' | 'right' }
 type MarkerSelectorProps = {
   markers: Marker[];
   selectedMarkerId: string | null;
-  onSelectMarker: (markerId: string) => void;
+  onSelectMarker: (markerId: string | null) => void;
 };
 
 const MarkerSelector = ({ markers, selectedMarkerId, onSelectMarker }: MarkerSelectorProps) => {
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const selectedMarkerRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (selectedMarkerRef.current && scrollContainerRef.current) {
-      const container = scrollContainerRef.current;
-      const element = selectedMarkerRef.current;
-      const offsetTop = element.offsetTop;
-      const elementHeight = element.offsetHeight;
-      const containerHeight = container.offsetHeight;
-      container.scrollTop = offsetTop - (containerHeight / 2) + (elementHeight / 2);
-    }
-  }, [selectedMarkerId]);
-  
-  const sortedMarkers = [...markers].sort((a,b) => a.time - b.time);
+  const sortedMarkers = [...markers].sort((a, b) => a.time - b.time);
+  const selectedMarker = markers.find(m => m.id === selectedMarkerId);
+  const selectedMarkerName = selectedMarker?.name || (selectedMarker ? `Marker ${sortedMarkers.findIndex(m => m.id === selectedMarkerId) + 1}` : 'Track Start');
 
   return (
-    <div className="relative w-64 h-20 bg-foreground/80 rounded-lg shadow-lg flex flex-col items-center justify-center text-background overflow-hidden">
-       <div ref={scrollContainerRef} className="w-full h-full overflow-y-scroll snap-y snap-mandatory no-scrollbar py-8">
-            <div className="flex flex-col items-center justify-start gap-1">
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className="w-64 h-20 text-lg font-semibold shadow-lg bg-card hover:bg-accent flex-col gap-1"
+        >
+          <span className="text-xs text-muted-foreground font-medium">START FROM</span>
+          <span className="truncate">{selectedMarkerName}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-0">
+        <div className="p-2 border-b">
+            <h4 className="font-medium leading-none">Select Start Marker</h4>
+        </div>
+        <ScrollArea className="h-48">
+          <div className="p-1">
+            <Button
+                variant={!selectedMarkerId ? "secondary" : "ghost"}
+                className="w-full justify-start h-auto py-2"
+                onClick={() => onSelectMarker(null)}
+            >
+                <div className="flex flex-col items-start whitespace-normal text-left">
+                    <span>Track Start</span>
+                    <span className="text-xs text-muted-foreground">0.00s</span>
+                </div>
+            </Button>
+            {sortedMarkers.map((marker, index) => {
+              const isSelected = marker.id === selectedMarkerId;
+              return (
                 <Button
-                    variant="ghost"
-                    className={cn(
-                        "w-full h-8 text-lg font-semibold snap-center transition-all duration-200 text-muted-foreground/50 hover:text-background",
-                        !selectedMarkerId && "text-background scale-110"
-                    )}
-                    onClick={() => onSelectMarker('')}
+                  key={marker.id}
+                  variant={isSelected ? "secondary" : "ghost"}
+                  className="w-full justify-start h-auto py-2"
+                  onClick={() => onSelectMarker(marker.id)}
                 >
-                    Track Start
+                  <div className="flex flex-col items-start whitespace-normal text-left">
+                    <span>{marker.name || `Marker ${index + 1}`}</span>
+                    <span className="text-xs text-muted-foreground">{marker.time.toFixed(2)}s</span>
+                  </div>
                 </Button>
-                {sortedMarkers.map((marker, index) => {
-                    const isSelected = marker.id === selectedMarkerId;
-                    return (
-                        <Button
-                            key={marker.id}
-                            ref={isSelected ? selectedMarkerRef : null}
-                            variant="ghost"
-                            className={cn(
-                                "w-full h-8 text-lg font-semibold snap-center transition-all duration-200 text-muted-foreground/50 hover:text-background",
-                                isSelected && "text-background scale-110"
-                            )}
-                            onClick={() => onSelectMarker(marker.id)}
-                        >
-                            {marker.name || `Marker ${index + 1}`}
-                        </Button>
-                    );
-                })}
-            </div>
-       </div>
-       <div className="absolute inset-0 w-full h-full pointer-events-none">
-            <div className="absolute top-0 left-0 w-full h-1/3 bg-gradient-to-b from-foreground to-transparent"></div>
-            <div className="absolute bottom-0 left-0 w-full h-1/3 bg-gradient-to-t from-foreground to-transparent"></div>
-            <div className="absolute top-1/2 left-4 right-4 h-px -translate-y-1/2 bg-primary/50"></div>
-       </div>
-    </div>
+              );
+            })}
+          </div>
+        </ScrollArea>
+      </PopoverContent>
+    </Popover>
   );
 };
 
@@ -99,10 +97,6 @@ export default function MarkerPlaybackControls({
   selectedStartMarkerId,
 }: MarkerPlaybackControlsProps) {
 
-  const handleSelect = (markerId: string) => {
-    onSelectStartMarker(markerId === '' ? null : markerId);
-  }
-
   return (
     <div className="flex items-center justify-center gap-4 mt-4">
       <Button
@@ -119,7 +113,7 @@ export default function MarkerPlaybackControls({
       <MarkerSelector 
         markers={markers}
         selectedMarkerId={selectedStartMarkerId}
-        onSelectMarker={handleSelect}
+        onSelectMarker={onSelectStartMarker}
       />
 
       <Button
