@@ -641,6 +641,7 @@ export default function Home() {
                   onAutomationDragEnd={handleAutomationDragEnd}
                   markers={markers}
                   showMarkers={showMarkers}
+                  isMarkerModeActive={isMarkerModeActive}
                   onMarkersChange={handleSetMarkers}
                   onMarkerDragEnd={handleMarkerDragEnd}
                   debugState={debugState}

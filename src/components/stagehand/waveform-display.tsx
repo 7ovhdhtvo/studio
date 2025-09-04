@@ -14,6 +14,29 @@ import { Flag } from 'lucide-react';
 const POINT_RADIUS = 6;
 const HITBOX_RADIUS = 12;
 
+const MARKER_COLORS = [
+    'hsl(var(--primary))',
+    'hsl(var(--chart-1))',
+    'hsl(var(--chart-2))',
+    'hsl(var(--chart-3))',
+    'hsl(var(--chart-4))',
+    'hsl(var(--chart-5))',
+    '#3b82f6', // blue-500
+    '#8b5cf6', // violet-500
+    '#ec4899', // pink-500
+];
+
+const getMarkerColor = (markerId: string) => {
+    // Simple hash function to get a consistent color index
+    let hash = 0;
+    for (let i = 0; i < markerId.length; i++) {
+        hash = markerId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash % MARKER_COLORS.length);
+    return MARKER_COLORS[index];
+};
+
+
 type WaveformDisplayProps = {
   waveformData: WaveformData | null;
   durationInSeconds: number;
@@ -34,6 +57,7 @@ type WaveformDisplayProps = {
   onAutomationDragEnd: () => void;
   markers: Marker[];
   showMarkers: boolean;
+  isMarkerModeActive: boolean;
   onMarkersChange: (markers: Marker[]) => void;
   onMarkerDragEnd: () => void;
   debugState: string;
@@ -84,6 +108,7 @@ export default function WaveformDisplay({
   onAutomationDragEnd,
   markers,
   showMarkers,
+  isMarkerModeActive,
   onMarkersChange,
   onMarkerDragEnd,
   debugState,
@@ -273,6 +298,8 @@ export default function WaveformDisplay({
   const automationLineColor = showVolumeAutomation 
     ? 'hsl(var(--destructive))' 
     : '#3b82f6';
+    
+  const isAnyMarkerModeOn = showMarkers || isMarkerModeActive;
 
   return (
     <div className="flex flex-col items-center space-y-2">
@@ -336,7 +363,7 @@ export default function WaveformDisplay({
                </div>
             )}
             
-            {(showVolumeAutomation || isAutomationActive || showMarkers) && durationInSeconds > 0 && waveformInteractionRef.current && (
+            {(showVolumeAutomation || isAutomationActive || isAnyMarkerModeOn) && durationInSeconds > 0 && waveformInteractionRef.current && (
                 <svg
                     width="100%"
                     height="100%"
@@ -377,9 +404,10 @@ export default function WaveformDisplay({
                             </g>
                         );
                     })}
-                     {showMarkers && markers.map(marker => {
+                     {isAnyMarkerModeOn && markers.map((marker, index) => {
                         const { width } = waveformInteractionRef.current!.getBoundingClientRect();
                         const x = timeToX(marker.time, width);
+                        const color = getMarkerColor(marker.id);
                         return (
                            <g 
                             key={marker.id} 
@@ -387,10 +415,13 @@ export default function WaveformDisplay({
                             onMouseDown={(e) => handleMarkerMouseDown(e, marker.id)}
                             transform={`translate(${x}, 0)`}
                            >
-                              <line x1="0" y1="0" x2="0" y2="100%" stroke="hsl(var(--primary))" strokeWidth="2" />
-                              <polygon points="-5,0 5,0 0,5" fill="hsl(var(--primary))" />
-                              <Flag x="-18" y="5" className="w-4 h-4 text-primary fill-primary/20 pointer-events-none" />
+                              <line x1="0" y1="0" x2="0" y2="100%" stroke={color} strokeWidth="2" />
+                              <polygon points="-5,0 5,0 0,5" fill={color} />
+                              <Flag x="-18" y="5" className="w-4 h-4" style={{ color }} fillOpacity={0.2} />
                               <rect data-marker-id={marker.id} x="-12" y="0" width="24" height="100%" fill="transparent" />
+                              <text x="0" y="14" fill={color} textAnchor="middle" className="text-xs font-semibold pointer-events-none select-none">
+                                {marker.name || `Marker ${index + 1}`}
+                              </text>
                            </g>
                         );
                      })}
@@ -412,3 +443,4 @@ export default function WaveformDisplay({
       <div className="h-4 text-xs font-mono text-muted-foreground">{debugState}</div>
     </div>
   );
+}
