@@ -502,26 +502,29 @@ export default function Home() {
       ) : (
         <div className="flex h-screen w-full flex-col bg-background text-foreground">
           <Header onToggleLibrary={() => setIsLibraryOpen(prev => !prev)} />
-          <main className="grid flex-1 grid-cols-1 md:grid-cols-[auto_1fr]">
+          <main className="flex flex-1 overflow-hidden">
             {isMobile ? (
               <Sheet open={isLibraryOpen} onOpenChange={setIsLibraryOpen}>
-                <SheetContent side="left" className="p-0 w-full border-r">
+                <SheetContent side="left" className="p-0 w-full border-r-0">
                   {trackListComponent}
                 </SheetContent>
               </Sheet>
             ) : (
-              <div className={cn(
-                "transition-[width] duration-300 ease-in-out",
-                isLibraryOpen ? "w-[350px]" : "w-[0px]"
-              )}>
-                <div className="w-[350px] h-full overflow-hidden">
-                  {trackListComponent}
-                </div>
+              <div
+                className={cn(
+                  "w-[350px] flex-shrink-0 transition-transform duration-300 ease-in-out",
+                  !isLibraryOpen && "-translate-x-full"
+                )}
+              >
+                {trackListComponent}
               </div>
             )}
 
 
-            <div className="flex flex-col overflow-y-auto p-6 lg:p-8">
+            <div className={cn(
+                "flex flex-col flex-1 overflow-y-auto p-6 lg:p-8 transition-all duration-300 ease-in-out",
+                !isMobile && isLibraryOpen ? "ml-0" : !isMobile && !isLibraryOpen ? "ml-[-350px]" : ""
+              )}>
               
               <DebugConsole />
 
@@ -621,3 +624,5 @@ export default function Home() {
     </>
   );
 }
+
+    
