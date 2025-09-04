@@ -512,7 +512,7 @@ export default function Home() {
             ) : (
               <aside
                 className={cn(
-                  "flex-shrink-0 bg-card transition-transform duration-300 ease-in-out",
+                  "absolute top-0 left-0 h-screen flex-shrink-0 bg-card transition-transform duration-300 ease-in-out z-20",
                   isLibraryOpen ? 'translate-x-0' : '-translate-x-full'
                 )}
                 style={{ width: '350px' }}
@@ -522,7 +522,10 @@ export default function Home() {
             )}
 
 
-            <div className="flex flex-col flex-1 overflow-y-auto p-6 lg:p-8 transition-all duration-300 ease-in-out">
+            <div className={cn(
+                "flex flex-col flex-1 overflow-y-auto p-6 lg:p-8 transition-all duration-300 ease-in-out",
+                isLibraryOpen && !isMobile ? "ml-[350px]" : "ml-0"
+              )}>
               
               <DebugConsole />
 
