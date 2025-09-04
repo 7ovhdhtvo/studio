@@ -221,6 +221,8 @@ export default function WaveformDisplay({
     const ms = Math.floor((seconds - Math.floor(seconds)) * 100);
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(2, '0')}`;
   }
+
+  const automationLineColor = showVolumeAutomation ? 'hsl(var(--destructive))' : 'hsl(var(--ring))';
   
   return (
     <div className="flex flex-col items-center space-y-2">
@@ -267,12 +269,12 @@ export default function WaveformDisplay({
                 >
                     <path
                         d={automationPath}
-                        stroke="hsl(var(--destructive))"
+                        stroke={automationLineColor}
                         strokeWidth="2"
                         fill="none"
                         className="pointer-events-none"
                     />
-                    {automationPoints.map(point => {
+                    {showVolumeAutomation && automationPoints.map(point => {
                         const { width, height } = waveformInteractionRef.current!.getBoundingClientRect();
                         const cx = timeToX(point.time, width);
                         const cy = valueToY(point.value, height);
@@ -293,7 +295,7 @@ export default function WaveformDisplay({
                                     cx={cx}
                                     cy={cy}
                                     r={POINT_RADIUS}
-                                    fill="hsl(var(--destructive))"
+                                    fill={automationLineColor}
                                     className="pointer-events-none"
                                 />
                                 <circle
@@ -322,4 +324,5 @@ export default function WaveformDisplay({
       <div className="h-4 text-xs font-mono text-muted-foreground">{debugState}</div>
     </div>
   );
-}
+
+    
