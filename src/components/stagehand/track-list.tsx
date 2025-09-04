@@ -113,6 +113,27 @@ const TrackItem = ({
   );
 };
 
+type TrackListProps = {
+    tracks: AudioFile[];
+    folders: Folder[];
+    activeTrackId: string | null | undefined;
+    activeProjectId: string | null;
+    onSelectTrack: (track: AudioFile) => void;
+    onSelectProject: (id: string) => void;
+    onDeleteTrack: (id: string) => void;
+    onDeleteFolder: (id: string) => void;
+    onRenameTrack: (id: string, newTitle: string) => void;
+    onCreateFolder: () => void;
+    onCreateProject: () => void;
+    onRenameFolder: (id: string, newName: string) => void;
+    onMoveTrackToFolder: (trackId: string, folderId: string | null) => void;
+    onEmptyTrash: () => void;
+    onRecoverTrack: (id: string) => void;
+    onRecoverFolder: (id: string) => void;
+    onImportTrack: (file: File, folderId: string | null) => void;
+    isPlaying: boolean;
+};
+
 export default function TrackList({
   tracks,
   folders,
@@ -132,7 +153,7 @@ export default function TrackList({
   onRecoverFolder,
   onImportTrack,
   isPlaying,
-}: TrackListProps & { isPlaying: boolean }) {
+}: TrackListProps) {
   const [draggingOverFolder, setDraggingOverFolder] = useState<string | null>(null);
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editingFolderName, setEditingFolderName] = useState('');

@@ -1,6 +1,7 @@
+
 "use client";
 
-import { Speaker, Sun, Moon } from 'lucide-react';
+import { Speaker, Sun, Moon, Library } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
@@ -36,10 +37,18 @@ function ThemeToggle() {
   );
 }
 
-export default function Header() {
+type HeaderProps = {
+  onToggleLibrary: () => void;
+};
+
+export default function Header({ onToggleLibrary }: HeaderProps) {
   return (
     <header className="flex h-16 items-center justify-between border-b bg-card px-6 lg:px-8 flex-shrink-0">
       <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={onToggleLibrary} className="md:hidden">
+          <Library className="h-5 w-5" />
+          <span className="sr-only">Toggle Library</span>
+        </Button>
         <h1 className="text-xl font-bold tracking-wider">
           AD PLAYBACK
         </h1>

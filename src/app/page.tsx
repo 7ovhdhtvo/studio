@@ -8,6 +8,7 @@ import WaveformDisplay from '@/components/stagehand/waveform-display';
 import SpeedControl from '@/components/stagehand/speed-control';
 import VolumeControl from '@/components/stagehand/volume-control';
 import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { ZoomIn, ZoomOut, Clapperboard } from 'lucide-react';
 import ImportDialog from '@/components/stagehand/import-dialog';
 import TrackList from '@/components/stagehand/track-list';
@@ -19,6 +20,8 @@ import { generateWaveformData, type WaveformData } from '@/lib/waveform';
 import { storageManager } from '@/lib/storage-manager';
 import MetronomeControl from '@/components/stagehand/metronome-control';
 import PlaybackModeView from '@/components/stagehand/playback-mode-view';
+import { useMediaQuery } from '@/hooks/use-media-query';
+import { cn } from '@/lib/utils';
 
 export type OpenControlPanel = 'volume' | 'speed' | 'metronome' | null;
 
@@ -48,6 +51,7 @@ export default function Home() {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [showStereo, setShowStereo] = useState(false);
   const [isPlaybackMode, setIsPlaybackMode] = useState(false);
+  const [isLibraryOpen, setIsLibraryOpen] = useState(true);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLooping, setIsLooping] = useState(false);
@@ -72,6 +76,15 @@ export default function Home() {
   const animationFrameRef = useRef<number>();
   const isScrubbingRef = useRef(false);
   const waveformContainerRef = useRef<HTMLDivElement>(null);
+  const isMobile = useMediaQuery("(max-width: 768px)");
+
+  useEffect(() => {
+    if (isMobile) {
+      setIsLibraryOpen(false);
+    } else {
+      setIsLibraryOpen(true);
+    }
+  }, [isMobile]);
 
   const duration = audioRef.current?.duration ?? activeTrack?.duration ?? 0;
   const currentTime = audioRef.current?.currentTime ?? 0;
@@ -425,6 +438,35 @@ export default function Home() {
 
     return tracks.filter(t => t.folderId && folderIdsInProject.includes(t.folderId));
   }
+  
+  const trackListComponent = (
+    <div className="flex flex-col border-r bg-card h-full">
+      <div className="p-4 flex justify-between items-center border-b">
+        <h2 className="text-lg font-semibold">Track Library</h2>
+        <ImportDialog onImportTrack={(file) => importAudio(file, null)} />
+      </div>
+      <TrackList 
+        tracks={tracks}
+        folders={folders}
+        activeTrackId={activeTrack?.id}
+        activeProjectId={activeProjectId}
+        onSelectTrack={handleSelectTrack}
+        onSelectProject={setActiveProjectId}
+        onDeleteTrack={handleDeleteTrack}
+        onDeleteFolder={deleteFolder}
+        onRenameTrack={handleRenameTrack}
+        onCreateFolder={handleCreateFolder}
+        onCreateProject={handleCreateProject}
+        onRenameFolder={renameFolder}
+        onMoveTrackToFolder={moveTrackToFolder}
+        onEmptyTrash={emptyTrash}
+        onRecoverTrack={handleRecoverTrack}
+        onRecoverFolder={recoverFolder}
+        onImportTrack={importAudio}
+        isPlaying={isPlaying}
+      />
+    </div>
+  );
 
   return (
     <>
@@ -459,34 +501,25 @@ export default function Home() {
         />
       ) : (
         <div className="flex h-screen w-full flex-col bg-background text-foreground">
-          <Header />
-          <main className="grid flex-1 grid-cols-1 md:grid-cols-[300px_1fr] lg:grid-cols-[350px_1fr]">
-            <div className="flex flex-col border-r bg-card">
-              <div className="p-4 flex justify-between items-center border-b">
-                <h2 className="text-lg font-semibold">Track Library</h2>
-                <ImportDialog onImportTrack={(file) => importAudio(file, null)} />
+          <Header onToggleLibrary={() => setIsLibraryOpen(prev => !prev)} />
+          <main className="grid flex-1 grid-cols-1 md:grid-cols-[auto_1fr]">
+            {isMobile ? (
+              <Sheet open={isLibraryOpen} onOpenChange={setIsLibraryOpen}>
+                <SheetContent side="left" className="p-0 w-[350px] border-r">
+                  {trackListComponent}
+                </SheetContent>
+              </Sheet>
+            ) : (
+              <div className={cn(
+                "transition-[width] duration-300 ease-in-out",
+                isLibraryOpen ? "w-[350px]" : "w-0"
+              )}>
+                <div className="w-[350px] h-full overflow-hidden">
+                  {trackListComponent}
+                </div>
               </div>
-              <TrackList 
-                tracks={tracks}
-                folders={folders}
-                activeTrackId={activeTrack?.id}
-                activeProjectId={activeProjectId}
-                onSelectTrack={handleSelectTrack}
-                onSelectProject={setActiveProjectId}
-                onDeleteTrack={handleDeleteTrack}
-                onDeleteFolder={deleteFolder}
-                onRenameTrack={handleRenameTrack}
-                onCreateFolder={handleCreateFolder}
-                onCreateProject={handleCreateProject}
-                onRenameFolder={renameFolder}
-                onMoveTrackToFolder={moveTrackToFolder}
-                onEmptyTrash={emptyTrash}
-                onRecoverTrack={handleRecoverTrack}
-                onRecoverFolder={recoverFolder}
-                onImportTrack={importAudio}
-                isPlaying={isPlaying}
-              />
-            </div>
+            )}
+
 
             <div className="flex flex-col overflow-y-auto p-6 lg:p-8">
               
