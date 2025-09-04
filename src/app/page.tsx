@@ -528,6 +528,7 @@ export default function Home() {
                   scrollContainerRef={waveformContainerRef}
                   masterVolume={volume}
                   onMasterVolumeChange={handleBaselineVolumeChange}
+                  isAutomationActive={isAutomationActive}
                   showVolumeAutomation={showVolumeAutomation}
                   automationPoints={volumePoints}
                   onAutomationPointsChange={handleSetVolumePoints}

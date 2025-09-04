@@ -7,9 +7,8 @@ import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAc
 import TimeRuler from './time-ruler';
 import type { AutomationPoint } from '@/lib/storage-manager';
 
-const POINT_RADIUS = 8;
-const HITBOX_RADIUS = 16;
-
+const POINT_RADIUS = 6;
+const HITBOX_RADIUS = 12;
 
 type WaveformDisplayProps = {
   waveformData: WaveformData | null;
@@ -23,6 +22,7 @@ type WaveformDisplayProps = {
   scrollContainerRef: RefObject<HTMLDivElement>;
   masterVolume: number;
   onMasterVolumeChange: (newVolume: number) => void;
+  isAutomationActive: boolean;
   showVolumeAutomation: boolean;
   automationPoints: AutomationPoint[];
   onAutomationPointsChange: (points: AutomationPoint[]) => void;
@@ -64,6 +64,7 @@ export default function WaveformDisplay({
   scrollContainerRef,
   masterVolume,
   onMasterVolumeChange,
+  isAutomationActive,
   showVolumeAutomation, 
   automationPoints,
   onAutomationPointsChange,
@@ -74,7 +75,16 @@ export default function WaveformDisplay({
 }: WaveformDisplayProps) {
   const waveformInteractionRef = useRef<HTMLDivElement>(null);
   const isMouseDownRef = useRef(false);
-  const [draggingPointId, setDraggingPointId] = useState<string | null>(null);
+  const draggingPointIdRef = useRef<string | null>(null);
+
+  const getSvgCoords = (e: MouseEvent<SVGSVGElement>): {x: number, y: number} => {
+    const svg = e.currentTarget as SVGSVGElement;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
+    return { x: svgP.x, y: svgP.y };
+  };
 
   const timeToX = useCallback((time: number, width: number) => {
     if (durationInSeconds === 0) return 0;
@@ -95,12 +105,14 @@ export default function WaveformDisplay({
           return `M 0 ${y} L ${width} ${y}`;
       }
 
-      let d = `M ${timeToX(0, width)} ${valueToY(sortedPoints[0].value, height)}`;
+      // Start path from the value of the first point at time 0
+      let d = `M 0 ${valueToY(sortedPoints[0].value, height)}`;
 
       sortedPoints.forEach(point => {
           d += ` L ${timeToX(point.time, width)} ${valueToY(point.value, height)}`;
       });
       
+      // End path at the value of the last point at the end of the track
       const lastPoint = sortedPoints[sortedPoints.length - 1];
       d += ` L ${width} ${valueToY(lastPoint.value, height)}`;
 
@@ -113,72 +125,24 @@ export default function WaveformDisplay({
     return getAutomationPath(automationPoints, masterVolume, width, height);
   }, [automationPoints, masterVolume, durationInSeconds, getAutomationPath]);
 
+
   const handleInteraction = (e: MouseEvent<HTMLDivElement>) => {
-    if (!waveformInteractionRef.current || draggingPointId) return;
+    if (!waveformInteractionRef.current || draggingPointIdRef.current) return;
     const rect = waveformInteractionRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const newProgress = Math.max(0, Math.min(100, (x / rect.width) * 100));
     onProgressChange(newProgress);
   };
 
-  const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
-    const target = e.target as SVGElement;
-    // If we clicked on a point's hitbox, start dragging that point.
-    if (target.dataset.pointId) {
-      setDebugState(`Dragging point ${target.dataset.pointId}`);
-      onAutomationDragStart();
-      setDraggingPointId(target.dataset.pointId);
-      return;
-    }
-    
-    // If we are in automation mode and clicked the SVG area, create a new point.
-    if (showVolumeAutomation && target.tagName === 'svg') {
-      const rect = waveformInteractionRef.current!.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const clickY = e.clientY - rect.top;
-
-      const clickTime = (clickX / rect.width) * durationInSeconds;
-      const clickValue = 100 - (clickY / rect.height) * 100;
-
-      const newPoint: AutomationPoint = {
-        id: `point_${Date.now()}`,
-        time: Math.max(0, Math.min(durationInSeconds, clickTime)),
-        value: Math.max(0, Math.min(100, clickValue)),
-        name: `${automationPoints.length + 1}`
-      };
-      
-      onAutomationPointsChange([...automationPoints, newPoint]);
-      onAutomationDragStart();
-      setDraggingPointId(newPoint.id); // Start dragging the new point immediately
-      return;
-    }
-
-    // Otherwise, it's a scrub action.
+  const handleScrubMouseDown = (e: MouseEvent<HTMLDivElement>) => {
+    // This function only handles scrubbing, not automation.
+    if (showVolumeAutomation) return;
     isMouseDownRef.current = true;
     onScrubStart();
     handleInteraction(e);
   };
   
-  const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
-    if (draggingPointId) {
-      const rect = waveformInteractionRef.current!.getBoundingClientRect();
-      const moveX = e.clientX - rect.left;
-      const moveY = e.clientY - rect.top;
-
-      const newTime = (moveX / rect.width) * durationInSeconds;
-      const newValue = 100 - (moveY / rect.height) * 100;
-
-      const updatedPoints = automationPoints.map(p =>
-        p.id === draggingPointId ? { 
-            ...p, 
-            time: Math.max(0, Math.min(durationInSeconds, newTime)), 
-            value: Math.max(0, Math.min(100, newValue))
-        } : p
-      );
-      onAutomationPointsChange(updatedPoints);
-      return;
-    }
-
+  const handleScrubMouseMove = (e: MouseEvent<HTMLDivElement>) => {
     if (isMouseDownRef.current) {
       handleInteraction(e);
     }
@@ -189,12 +153,64 @@ export default function WaveformDisplay({
         isMouseDownRef.current = false;
         onScrubEnd();
     }
-    if (draggingPointId) {
+    if (draggingPointIdRef.current) {
         setDebugState('Ready');
+        draggingPointIdRef.current = null;
         onAutomationDragEnd();
-        setDraggingPointId(null);
     }
   };
+
+  const handleSvgMouseDown = (e: MouseEvent<SVGSVGElement>) => {
+    if (!showVolumeAutomation) return;
+
+    // Do not create a point if we clicked on an existing point's hitbox
+    if ((e.target as SVGElement).dataset.pointId) return;
+
+    const { width, height } = e.currentTarget.getBoundingClientRect();
+    const { x, y } = getSvgCoords(e);
+    
+    const clickTime = (x / width) * durationInSeconds;
+    const clickValue = 100 - (y / height) * 100;
+
+    const newPoint: AutomationPoint = {
+      id: `point_${Date.now()}`,
+      time: Math.max(0, Math.min(durationInSeconds, clickTime)),
+      value: Math.max(0, Math.min(100, clickValue)),
+    };
+    
+    onAutomationPointsChange([...automationPoints, newPoint]);
+    draggingPointIdRef.current = newPoint.id;
+    onAutomationDragStart();
+    setDebugState(`Created & Dragging ${newPoint.id}`);
+  };
+
+  const handleSvgMouseMove = (e: MouseEvent<SVGSVGElement>) => {
+    if (draggingPointIdRef.current && showVolumeAutomation) {
+      const { width, height } = e.currentTarget.getBoundingClientRect();
+      const { x, y } = getSvgCoords(e);
+
+      const newTime = (x / width) * durationInSeconds;
+      const newValue = 100 - (y / height) * 100;
+
+      const updatedPoints = automationPoints.map(p =>
+        p.id === draggingPointIdRef.current ? { 
+            ...p, 
+            time: Math.max(0, Math.min(durationInSeconds, newTime)), 
+            value: Math.max(0, Math.min(100, newValue))
+        } : p
+      );
+      onAutomationPointsChange(updatedPoints);
+      setDebugState(`Dragging ${draggingPointIdRef.current}`);
+    }
+  };
+
+  const handlePointMouseDown = (e: MouseEvent, pointId: string) => {
+      e.stopPropagation(); // Prevent SvgMouseDown from firing and creating a new point
+      if (!showVolumeAutomation) return;
+      draggingPointIdRef.current = pointId;
+      onAutomationDragStart();
+      setDebugState(`Dragging ${pointId}`);
+  }
 
   const currentTime = (progress / 100) * durationInSeconds;
 
@@ -222,8 +238,8 @@ export default function WaveformDisplay({
           <div 
             ref={waveformInteractionRef}
             className="absolute inset-0 z-0"
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
+            onMouseDown={handleScrubMouseDown}
+            onMouseMove={handleScrubMouseMove}
             onMouseUp={handleMouseUpAndLeave}
             onMouseLeave={handleMouseUpAndLeave}
           >
@@ -239,11 +255,15 @@ export default function WaveformDisplay({
                </div>
             )}
             
-            {showVolumeAutomation && durationInSeconds > 0 && waveformInteractionRef.current && (
+            {(showVolumeAutomation || isAutomationActive) && durationInSeconds > 0 && waveformInteractionRef.current && (
                 <svg
                     width="100%"
                     height="100%"
                     className="absolute inset-0 z-10 overflow-visible"
+                    onMouseDown={handleSvgMouseDown}
+                    onMouseMove={handleSvgMouseMove}
+                    onMouseUp={handleMouseUpAndLeave}
+                    onMouseLeave={handleMouseUpAndLeave}
                 >
                     <path
                         d={automationPath}
@@ -257,7 +277,11 @@ export default function WaveformDisplay({
                         const cx = timeToX(point.time, width);
                         const cy = valueToY(point.value, height);
                         return (
-                            <g key={point.id} className="cursor-grab active:cursor-grabbing">
+                            <g 
+                              key={point.id}
+                              className={cn(showVolumeAutomation && "cursor-grab active:cursor-grabbing")}
+                              onMouseDown={(e) => handlePointMouseDown(e, point.id)}
+                            >
                                 <circle
                                     data-point-id={point.id}
                                     cx={cx}
@@ -295,6 +319,7 @@ export default function WaveformDisplay({
         </div>
         <TimeRuler duration={durationInSeconds} zoom={zoom} />
       </div>
+      <div className="h-4 text-xs font-mono text-muted-foreground">{debugState}</div>
     </div>
   );
 }

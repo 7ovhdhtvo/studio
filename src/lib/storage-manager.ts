@@ -35,18 +35,16 @@ export interface Folder {
 class StorageManager {
   private metadata: Map<string, AudioFile> = new Map();
   private folders: Map<string, Folder> = new Map();
+  private isInitialized = false;
   
   async initialize() {
+    if (this.isInitialized || typeof window === 'undefined') {
+      return;
+    }
+    this.isInitialized = true;
     logger.log('StorageManager: Initializing...');
     try {
-      // ONE-TIME HARD RESET - This will be removed in the next interaction.
-      if (localStorage.getItem('__NEEDS_RESET__')) {
-        logger.log('PERFORMING ONE-TIME STORAGE RESET.');
-        localStorage.removeItem('audio_metadata');
-        localStorage.removeItem('audio_folders');
-        localStorage.removeItem('__NEEDS_RESET__');
-      }
-
+      this.performOneTimeReset();
 
       await localDB.openDB();
 
@@ -90,6 +88,15 @@ class StorageManager {
       logger.error('StorageManager: Failed to initialize.', { error: e });
       this.metadata = new Map();
       this.folders = new Map();
+    }
+  }
+
+  private performOneTimeReset() {
+    if (localStorage.getItem('__NEEDS_RESET__')) {
+      logger.log('PERFORMING ONE-TIME STORAGE RESET.');
+      localStorage.removeItem('audio_metadata');
+      localStorage.removeItem('audio_folders');
+      localStorage.removeItem('__NEEDS_RESET__');
     }
   }
   
@@ -344,6 +351,7 @@ class StorageManager {
   }
   
   private persistMetadata() {
+    if (typeof window === 'undefined') return;
     try {
       // Create a temporary object without blobUrl before serializing
       const serializableMetadata = new Map<string, Omit<AudioFile, 'blobUrl'>>();
@@ -359,6 +367,7 @@ class StorageManager {
   }
 
   private persistFolders() {
+    if (typeof window === 'undefined') return;
     try {
       const data = Array.from(this.folders.entries());
       localStorage.setItem('audio_folders', JSON.stringify(data));
@@ -368,11 +377,17 @@ class StorageManager {
   }
 }
 
-// Set a flag to perform a hard reset on next load
-if (!localStorage.getItem('__RESET_PERFORMED__')) {
-    localStorage.setItem('__NEEDS_RESET__', 'true');
-    localStorage.setItem('__RESET_PERFORMED__', 'true');
-}
+const initializeOneTimeReset = () => {
+  if (typeof window !== 'undefined') {
+    if (!localStorage.getItem('__RESET_PERFORMED__')) {
+        localStorage.setItem('__NEEDS_RESET__', 'true');
+        localStorage.setItem('__RESET_PERFORMED__', 'true');
+    }
+  }
+};
 
+initializeOneTimeReset();
 
 export const storageManager = new StorageManager();
+
+    
