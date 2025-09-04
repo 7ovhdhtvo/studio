@@ -74,6 +74,7 @@ export default function Home() {
     { id: '2', time: 6.8, value: 125 },
   ]);
   const [markers, setMarkers] = useState<Marker[]>([]);
+  const [playbackStartTime, setPlaybackStartTime] = useState(0);
   const [showMarkers, setShowMarkers] = useState(false);
   const [isMarkerModeActive, setIsMarkerModeActive] = useState(false);
   
@@ -193,26 +194,33 @@ export default function Home() {
     if (!audio) return;
 
     if (isPlaying && audioSrc) {
-      if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
-      const delay = startDelay > 0 ? startDelay * 1000 : 0;
-      
-      playbackTimeoutRef.current = setTimeout(() => {
-        if (audio.paused) {
-          audio.play().catch(error => {
-            logger.error("Playback failed", error);
-            setIsPlaying(false);
-          });
+        if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
+
+        const isAtStartTime = Math.abs(audio.currentTime - playbackStartTime) < 0.1;
+        // Only set currentTime if it's not already at the start, to avoid re-triggering load
+        if (!isAtStartTime) {
+          audio.currentTime = playbackStartTime;
         }
-      }, delay);
+        
+        const delay = startDelay > 0 ? startDelay * 1000 : 0;
+        
+        playbackTimeoutRef.current = setTimeout(() => {
+            if (audio.paused) {
+                audio.play().catch(error => {
+                    logger.error("Playback failed", error);
+                    setIsPlaying(false);
+                });
+            }
+        }, delay);
     } else {
-      if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
-      audio.pause();
+        if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
+        audio.pause();
     }
     
     return () => {
         if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
     }
-  }, [isPlaying, audioSrc, startDelay]);
+  }, [isPlaying, audioSrc, startDelay, playbackStartTime]);
 
 
   useEffect(() => {
@@ -294,10 +302,14 @@ export default function Home() {
     
     handleSetIsPlaying(false);
     
-    setProgress(0);
     setActiveTrack(track);
+    const trackMarkers = track.markers || [];
+    setMarkers(trackMarkers);
+    const startMarker = trackMarkers.find(m => m.isPlaybackStart);
+    setPlaybackStartTime(startMarker ? startMarker.time : 0);
+
+    setProgress(startMarker ? (startMarker.time / track.duration) * 100 : 0);
     setVolumePoints(track.volumeAutomation || []);
-    setMarkers(track.markers || []);
     
     if ((track.volumeAutomation || []).length === 0) {
       setVolume(75);
@@ -372,12 +384,12 @@ export default function Home() {
             audioRef.current.currentTime = targetTime;
             setProgress((targetTime / duration) * 100);
         } else {
-            audioRef.current.currentTime = 0;
-            setProgress(0);
+            audioRef.current.currentTime = playbackStartTime;
+            setProgress((playbackStartTime / duration) * 100);
         }
     } else {
-        audioRef.current.currentTime = 0;
-        setProgress(0);
+        audioRef.current.currentTime = playbackStartTime;
+        setProgress((playbackStartTime / duration) * 100);
     }
   };
 
@@ -393,21 +405,22 @@ export default function Home() {
 
   const handleAudioEnded = () => {
     logger.log('handleAudioEnded: Audio track ended.', { isLooping });
-    if (isLooping) {
-        if (audioRef.current) {
-            audioRef.current.currentTime = 0;
-            setProgress(0);
+    if (isLooping && audioRef.current) {
+        audioRef.current.currentTime = playbackStartTime;
+        setProgress((playbackStartTime / duration) * 100);
 
-            if (applyDelayToLoop && startDelay > 0) {
-                setIsPlaying(false);
-                setTimeout(() => setIsPlaying(true), 10);
-            } else {
-                audioRef.current.play().catch(e => logger.error("Loop playback failed", e));
-            }
+        if (applyDelayToLoop && startDelay > 0) {
+            setIsPlaying(false);
+            setTimeout(() => setIsPlaying(true), 10); // small timeout to re-trigger useEffect
+        } else {
+            audioRef.current.play().catch(e => logger.error("Loop playback failed", e));
         }
     } else {
         handleSetIsPlaying(false);
-        setProgress(0);
+        if (audioRef.current) {
+            audioRef.current.currentTime = playbackStartTime;
+        }
+        setProgress((playbackStartTime / duration) * 100);
     }
   };
   
@@ -468,11 +481,22 @@ export default function Home() {
     updateTrackAutomation(activeTrack.id, []);
   };
 
-  const handleUpdateMarker = (id: string, newName: string, newTime: number) => {
+  const handleUpdateMarker = (id: string, newName: string, newTime: number, isStart: boolean) => {
     if (!activeTrack) return;
-    const updatedMarkers = markers.map(m => 
-        m.id === id ? { ...m, name: newName, time: newTime } : m
-    );
+    let updatedMarkers = markers.map(m => {
+        const isThisMarker = m.id === id;
+        const shouldBeStart = isThisMarker && isStart;
+        return {
+            ...m,
+            name: isThisMarker ? newName : m.name,
+            time: isThisMarker ? newTime : m.time,
+            isPlaybackStart: shouldBeStart ? true : (isStart ? false : m.isPlaybackStart),
+        };
+    });
+
+    const startMarker = updatedMarkers.find(m => m.isPlaybackStart);
+    setPlaybackStartTime(startMarker ? startMarker.time : 0);
+
     setMarkers(updatedMarkers);
     updateTrackMarkers(activeTrack.id, updatedMarkers);
   };
@@ -542,8 +566,8 @@ export default function Home() {
         onPlay={startProgressLoop} 
         onPause={stopProgressLoop} 
         onLoadedData={() => {
-          if (isPlaying && startDelay === 0) {
-            audioRef.current?.play().catch(e => logger.error("Playback failed in onLoadedData", e));
+          if (isPlaying && audioRef.current && startDelay === 0) {
+            audioRef.current.play().catch(e => logger.error("Playback failed in onLoadedData", e));
           }
         }}
       />
@@ -571,7 +595,7 @@ export default function Home() {
           <main className="flex flex-1 overflow-hidden">
             <aside
               className={cn(
-                "absolute top-0 left-0 h-screen flex-shrink-0 bg-card transition-transform duration-300 ease-in-out z-20",
+                "absolute top-16 left-0 h-[calc(100vh-4rem)] flex-shrink-0 bg-card transition-transform duration-300 ease-in-out z-20",
                 isLibraryOpen ? 'translate-x-0' : '-translate-x-full'
               )}
               style={{ width: '350px' }}
@@ -715,3 +739,5 @@ export default function Home() {
     </>
   );
 }
+
+    

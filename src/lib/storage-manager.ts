@@ -15,6 +15,7 @@ export interface Marker {
   id: string;
   time: number;
   name: string;
+  isPlaybackStart?: boolean;
 }
 
 export interface AudioFile {
@@ -393,3 +394,5 @@ const initializeOneTimeReset = () => {
 initializeOneTimeReset();
 
 export const storageManager = new StorageManager();
+
+    

@@ -15,9 +15,7 @@ const POINT_RADIUS = 6;
 const HITBOX_RADIUS = 12;
 
 const MARKER_COLORS = [
-    'hsl(var(--chart-1))',
     'hsl(var(--chart-2))',
-    'hsl(var(--chart-3))',
     'hsl(var(--chart-4))',
     'hsl(var(--chart-5))',
     '#3b82f6', // blue-500
@@ -236,6 +234,7 @@ export default function WaveformDisplay({
               id: `marker_${Date.now()}`,
               time: Math.max(0, Math.min(durationInSeconds, clickTime)),
               name: `Marker ${markers.length + 1}`,
+              isPlaybackStart: false,
           };
           onMarkersChange([...markers, newMarker]);
           draggingMarkerIdRef.current = newMarker.id;
@@ -291,6 +290,7 @@ export default function WaveformDisplay({
   };
 
   const sortedMarkers = useMemo(() => [...markers].sort((a, b) => a.time - b.time), [markers]);
+  const startMarker = useMemo(() => markers.find(m => m.isPlaybackStart), [markers]);
 
   const currentTime = (progress / 100) * durationInSeconds;
 
@@ -421,7 +421,14 @@ export default function WaveformDisplay({
                      {isAnyMarkerModeOn && sortedMarkers.map((marker, index) => {
                         const { width, height } = waveformInteractionRef.current!.getBoundingClientRect();
                         const x = timeToX(marker.time, width);
-                        const color = index === 0 ? 'hsl(var(--primary))' : getMarkerColor(marker.id);
+                        
+                        let color = 'hsl(var(--primary))'; // Default to green for first marker
+                        if (startMarker?.id === marker.id) {
+                            color = 'hsl(var(--destructive))'; // Red for the designated start marker
+                        } else if (startMarker || index > 0) {
+                             color = getMarkerColor(marker.id); // Other colors for other markers
+                        }
+
                         const markerName = marker.name || `Marker ${index + 1}`;
                         const flagYPosition = height - 18; // Position at the bottom
                         return (
@@ -461,3 +468,5 @@ export default function WaveformDisplay({
     </div>
   );
 }
+
+    

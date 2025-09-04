@@ -9,27 +9,29 @@ import { Input } from '../ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { LineChart, Flag, Minus, Trash2, Edit } from 'lucide-react';
 import type { Marker } from '@/lib/storage-manager';
+import { Checkbox } from '../ui/checkbox';
 
 type MarkerEditorProps = {
   marker: Marker;
   markerNumber: number;
-  onUpdate: (id: string, newName: string, newTime: number) => void;
+  onUpdate: (id: string, newName: string, newTime: number, isStart: boolean) => void;
   onDelete: (id: string) => void;
 };
 
 function MarkerEditor({ marker, markerNumber, onUpdate, onDelete }: MarkerEditorProps) {
   const [name, setName] = useState(marker.name || '');
   const [time, setTime] = useState(marker.time.toFixed(2));
+  const [isStart, setIsStart] = useState(marker.isPlaybackStart || false);
 
   const handleSave = () => {
     const timeValue = parseFloat(time);
     if (!isNaN(timeValue)) {
-      onUpdate(marker.id, name, timeValue);
+      onUpdate(marker.id, name, timeValue, isStart);
     }
   };
 
   return (
-    <PopoverContent className="w-56" align="end" side="top">
+    <PopoverContent className="w-64" align="end" side="top">
       <div className="grid gap-4">
         <div className="space-y-2">
           <h4 className="font-medium leading-none">Edit Marker {markerNumber}</h4>
@@ -57,6 +59,19 @@ function MarkerEditor({ marker, markerNumber, onUpdate, onDelete }: MarkerEditor
               className="col-span-2 h-8"
             />
           </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+                id={`start-marker-${marker.id}`} 
+                checked={isStart}
+                onCheckedChange={(checked) => setIsStart(Boolean(checked))}
+            />
+            <label
+                htmlFor={`start-marker-${marker.id}`}
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+                Start from this marker
+            </label>
+        </div>
         </div>
         <div className="flex justify-between">
             <Button size="sm" onClick={handleSave}>Save</Button>
@@ -78,7 +93,7 @@ type MarkerControlProps = {
   onToggleShowMarkers: (value: boolean) => void;
   isMarkerModeActive: boolean;
   onToggleIsMarkerModeActive: (value: boolean) => void;
-  onUpdateMarker: (id: string, newName: string, newTime: number) => void;
+  onUpdateMarker: (id: string, newName: string, newTime: number, isStart: boolean) => void;
   onDeleteMarker: (id: string) => void;
   onDeleteAllMarkers: () => void;
   onJumpToMarker: (time: number) => void;
@@ -189,3 +204,5 @@ export default function MarkerControl({
       </Card>
   );
 }
+
+    
