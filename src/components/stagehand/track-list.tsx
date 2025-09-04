@@ -11,12 +11,6 @@ import { useState, useMemo, type DragEvent, type MouseEvent, useEffect, useRef }
 import { logger } from '@/lib/logger';
 import { Input } from '../ui/input';
 import ImportDialog from './import-dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import RenameDialog from './rename-dialog';
 
 const TRASH_FOLDER_ID = 'trash';
@@ -72,36 +66,19 @@ const TrackItem = ({
       onSelectTrack(track);
     }
   };
-
-  const ContextMenu = (
-    <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                <MoreHorizontal className="h-4 w-4" />
-            </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => onRename(track)}>
-                <Pencil className="mr-2 h-4 w-4" />
-                <span>Rename</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onDelete(track.id)} className="text-destructive">
-                <TrashIcon className="mr-2 h-4 w-4" />
-                <span>Delete</span>
-            </DropdownMenuItem>
-        </DropdownMenuContent>
-    </DropdownMenu>
-  );
+  
+  const handleRenameClick = (e: MouseEvent) => {
+    e.stopPropagation();
+    if (!isTrashed) {
+      onRename(track);
+    }
+  }
 
   return (
     <div
       draggable={!isTrashed}
       onDragStart={handleDragStart}
       onClick={handleClick}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        // Manually trigger the dropdown menu here if needed, but DropdownMenuTrigger should handle it.
-      }}
       className={cn(
         "flex items-center justify-between p-2 rounded-md group",
         !isTrashed && "cursor-pointer hover:bg-accent",
@@ -109,7 +86,7 @@ const TrackItem = ({
         isTrashed && "opacity-70"
       )}
     >
-      <div className="flex-1 overflow-hidden min-w-0">
+      <div className="flex-1 overflow-hidden min-w-0" onClick={handleRenameClick}>
         <p className="font-medium break-words">{track.title}</p>
         <p className="text-sm text-muted-foreground break-words">{track.originalName}</p>
       </div>
@@ -124,7 +101,14 @@ const TrackItem = ({
             <Undo2 className="h-4 w-4" />
         </Button>
       ) : (
-        ContextMenu
+        <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={(e) => { e.stopPropagation(); onDelete(track.id); }}
+        >
+            <TrashIcon className="h-4 w-4" />
+        </Button>
       )}
     </div>
   );
