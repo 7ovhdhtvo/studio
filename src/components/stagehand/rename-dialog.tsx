@@ -57,6 +57,7 @@ export default function RenameDialog({ track, onSave, onClose }: RenameDialogPro
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="col-span-3"
+              onKeyDown={(e) => e.key === 'Enter' && handleSave()}
             />
           </div>
         </div>
@@ -69,3 +70,5 @@ export default function RenameDialog({ track, onSave, onClose }: RenameDialogPro
     </Dialog>
   );
 }
+
+    

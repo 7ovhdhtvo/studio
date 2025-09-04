@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Folder as FolderIcon, FolderPlus, Trash, Undo2, Briefcase, Plus, Import, Clapperboard, ChevronDown } from 'lucide-react';
+import { Folder as FolderIcon, FolderPlus, Trash, Undo2, Briefcase, Plus, Import, Clapperboard, ChevronDown, MoreHorizontal, Pencil, Trash2 as TrashIcon } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '../ui/button';
@@ -11,6 +11,13 @@ import { useState, useMemo, type DragEvent, type MouseEvent, useEffect, useRef }
 import { logger } from '@/lib/logger';
 import { Input } from '../ui/input';
 import ImportDialog from './import-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import RenameDialog from './rename-dialog';
 
 const TRASH_FOLDER_ID = 'trash';
 
@@ -39,11 +46,15 @@ const TrackItem = ({
   isActive,
   onSelectTrack,
   onRecoverTrack,
+  onRename,
+  onDelete,
 }: {
   track: AudioFile;
   isActive: boolean;
   onSelectTrack: (track: AudioFile) => void;
   onRecoverTrack: (id: string) => void;
+  onRename: (track: AudioFile) => void;
+  onDelete: (id: string) => void;
 }) => {
   const isTrashed = track.folderId === TRASH_FOLDER_ID;
 
@@ -62,11 +73,35 @@ const TrackItem = ({
     }
   };
 
+  const ContextMenu = (
+    <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <MoreHorizontal className="h-4 w-4" />
+            </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => onRename(track)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                <span>Rename</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onDelete(track.id)} className="text-destructive">
+                <TrashIcon className="mr-2 h-4 w-4" />
+                <span>Delete</span>
+            </DropdownMenuItem>
+        </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <div
       draggable={!isTrashed}
       onDragStart={handleDragStart}
       onClick={handleClick}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        // Manually trigger the dropdown menu here if needed, but DropdownMenuTrigger should handle it.
+      }}
       className={cn(
         "flex items-center justify-between p-2 rounded-md group",
         !isTrashed && "cursor-pointer hover:bg-accent",
@@ -79,7 +114,7 @@ const TrackItem = ({
         <p className="text-sm text-muted-foreground break-words">{track.originalName}</p>
       </div>
       
-      {isTrashed && (
+      {isTrashed ? (
          <Button
             variant="ghost"
             size="icon"
@@ -88,6 +123,8 @@ const TrackItem = ({
         >
             <Undo2 className="h-4 w-4" />
         </Button>
+      ) : (
+        ContextMenu
       )}
     </div>
   );
@@ -117,6 +154,7 @@ export default function TrackList({
   const [editingFolderName, setEditingFolderName] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [importTargetFolder, setImportTargetFolder] = useState<string | null>(null);
+  const [trackToRename, setTrackToRename] = useState<AudioFile | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -135,6 +173,11 @@ export default function TrackList({
     setEditingFolderId(folder.id);
     setEditingFolderName(folder.name);
   };
+  
+  const handleSaveRename = (id: string, newTitle: string) => {
+    onRenameTrack(id, newTitle);
+    setTrackToRename(null);
+  }
 
   const handleRenameFolder = () => {
     if (editingFolderId && editingFolderName.trim()) {
@@ -259,7 +302,7 @@ export default function TrackList({
         </div>
         {subFolders.map(renderTrashFolder)}
         {tracksInFolder.map(track => (
-            <TrackItem key={track.id} track={track} isActive={false} onSelectTrack={() => {}} onRecoverTrack={onRecoverTrack} />
+            <TrackItem key={track.id} track={track} isActive={false} onSelectTrack={() => {}} onRecoverTrack={onRecoverTrack} onRename={() => {}} onDelete={() => {}} />
         ))}
        </div>
     );
@@ -287,6 +330,8 @@ export default function TrackList({
               isActive={activeTrackId === track.id}
               onSelectTrack={onSelectTrack}
               onRecoverTrack={onRecoverTrack}
+              onRename={setTrackToRename}
+              onDelete={onDeleteTrack}
             />
           ))}
         </div>
@@ -321,7 +366,15 @@ export default function TrackList({
                       </Button>
                     </div>
                     {tracksDirectlyInProject.map(track => (
-                      <TrackItem key={track.id} track={track} isActive={activeTrackId === track.id} onSelectTrack={onSelectTrack} onRecoverTrack={onRecoverTrack} />
+                      <TrackItem 
+                        key={track.id} 
+                        track={track} 
+                        isActive={activeTrackId === track.id} 
+                        onSelectTrack={onSelectTrack} 
+                        onRecoverTrack={onRecoverTrack}
+                        onRename={setTrackToRename}
+                        onDelete={onDeleteTrack}
+                       />
                     ))}
                     <Accordion type="multiple" className="w-full">
                       {subFolders.map(folder => (
@@ -351,7 +404,15 @@ export default function TrackList({
                           >
                             <div className="border-l-2 ml-2 pl-4 space-y-1 min-h-[40px]">
                                 {tracksInProjectFolders.filter(t => t.folderId === folder.id).map(track => (
-                                    <TrackItem key={track.id} track={track} isActive={activeTrackId === track.id} onSelectTrack={onSelectTrack} onRecoverTrack={onRecoverTrack} />
+                                    <TrackItem 
+                                        key={track.id} 
+                                        track={track} 
+                                        isActive={activeTrackId === track.id} 
+                                        onSelectTrack={onSelectTrack} 
+                                        onRecoverTrack={onRecoverTrack} 
+                                        onRename={setTrackToRename}
+                                        onDelete={onDeleteTrack}
+                                    />
                                 ))}
                                 {tracksInProjectFolders.filter(t => t.folderId === folder.id).length === 0 && (
                                     <p className="text-sm text-muted-foreground p-2">Drop tracks here</p>
@@ -402,6 +463,8 @@ export default function TrackList({
                     isActive={activeTrackId === track.id}
                     onSelectTrack={onSelectTrack}
                     onRecoverTrack={onRecoverTrack}
+                    onRename={() => {}} 
+                    onDelete={() => {}}
                     />
                 ))}
                 {(trashTracks.length === 0 && trashRootFolders.length === 0) && (
@@ -412,6 +475,13 @@ export default function TrackList({
           </AccordionItem>
         </Accordion>
       </ScrollArea>
+      
+      <RenameDialog 
+        track={trackToRename}
+        onSave={handleSaveRename}
+        onClose={() => setTrackToRename(null)}
+      />
+
       {isImporting && (
           <ImportDialog
             onImportTrack={(file) => {
@@ -425,3 +495,5 @@ export default function TrackList({
     </>
   );
 }
+
+    
