@@ -195,10 +195,14 @@ export default function Home() {
       const delay = startDelay > 0 ? startDelay * 1000 : 0;
       
       playbackTimeoutRef.current = setTimeout(() => {
-        audio.play().catch(error => {
-          logger.error("Playback failed", error);
-          setIsPlaying(false);
-        });
+        // We now primarily rely on onLoadedData to play for instant feedback,
+        // but this acts as a fallback.
+        if (audio.paused) {
+          audio.play().catch(error => {
+            logger.error("Playback failed", error);
+            setIsPlaying(false);
+          });
+        }
       }, delay);
     } else {
       if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
@@ -499,8 +503,8 @@ export default function Home() {
       <audio 
         ref={audioRef} 
         onEnded={handleAudioEnded} 
-        onPlay={() => startProgressLoop()} 
-        onPause={() => stopProgressLoop()} 
+        onPlay={startProgressLoop} 
+        onPause={stopProgressLoop} 
         onLoadedData={() => {
           if (isPlaying && startDelay === 0) {
             audioRef.current?.play().catch(e => logger.error("Playback failed in onLoadedData", e));
