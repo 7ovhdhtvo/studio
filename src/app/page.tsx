@@ -522,10 +522,7 @@ export default function Home() {
             )}
 
 
-            <div className={cn(
-                "flex flex-col flex-1 overflow-y-auto p-6 lg:p-8 transition-all duration-300 ease-in-out",
-                !isMobile && isLibraryOpen ? "ml-[350px]" : "ml-0"
-              )}>
+            <div className="flex flex-col flex-1 overflow-y-auto p-6 lg:p-8 transition-all duration-300 ease-in-out">
               
               <DebugConsole />
 
@@ -537,6 +534,11 @@ export default function Home() {
                     </h2>
                     <p className="text-sm text-muted-foreground">
                       {activeTrack?.originalName ?? "Import or select a track to begin"}
+                      {!activeTrack && (
+                        <span className="block text-xs mt-1">
+                          Open Sidebar with top left button to import tracks
+                        </span>
+                      )}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
