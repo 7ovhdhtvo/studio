@@ -39,6 +39,15 @@ class StorageManager {
   async initialize() {
     logger.log('StorageManager: Initializing...');
     try {
+      // ONE-TIME HARD RESET - This will be removed in the next interaction.
+      if (localStorage.getItem('__NEEDS_RESET__')) {
+        logger.log('PERFORMING ONE-TIME STORAGE RESET.');
+        localStorage.removeItem('audio_metadata');
+        localStorage.removeItem('audio_folders');
+        localStorage.removeItem('__NEEDS_RESET__');
+      }
+
+
       await localDB.openDB();
 
       const storedMeta = localStorage.getItem('audio_metadata');
@@ -358,5 +367,12 @@ class StorageManager {
     }
   }
 }
+
+// Set a flag to perform a hard reset on next load
+if (!localStorage.getItem('__RESET_PERFORMED__')) {
+    localStorage.setItem('__NEEDS_RESET__', 'true');
+    localStorage.setItem('__RESET_PERFORMED__', 'true');
+}
+
 
 export const storageManager = new StorageManager();
