@@ -1,11 +1,10 @@
 
 "use client";
 
-import { Speaker, Sun, Moon } from 'lucide-react';
+import { Speaker, Sun, Moon, Folder } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
-import LibraryToggleIcon from './library-toggle-icon';
 
 function ThemeToggle() {
   const [mounted, setMounted] = useState(false)
@@ -46,8 +45,12 @@ export default function Header({ onToggleLibrary }: HeaderProps) {
   return (
     <header className="flex h-16 items-center justify-between border-b bg-card px-6 lg:px-8 flex-shrink-0">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={onToggleLibrary}>
-          <LibraryToggleIcon className="h-6 w-6" />
+        <Button 
+          size="icon" 
+          onClick={onToggleLibrary} 
+          className="h-10 w-10 rounded-full bg-primary hover:bg-primary/90"
+        >
+          <Folder className="h-5 w-5 text-primary-foreground" />
           <span className="sr-only">Toggle Library</span>
         </Button>
         <h1 className="text-xl font-bold tracking-wider">
