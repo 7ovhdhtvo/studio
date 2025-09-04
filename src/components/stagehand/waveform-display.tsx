@@ -222,8 +222,10 @@ export default function WaveformDisplay({
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${String(ms).padStart(2, '0')}`;
   }
 
-  const automationLineColor = showVolumeAutomation ? 'hsl(var(--destructive))' : 'hsl(var(--ring))';
-  
+  const automationLineColor = showVolumeAutomation 
+    ? 'hsl(var(--destructive))' 
+    : '#3b82f6'; // Blue for 'active' mode
+
   return (
     <div className="flex flex-col items-center space-y-2">
        <div className="font-mono text-4xl font-bold text-center w-full bg-secondary text-secondary-foreground py-2 rounded-lg">
