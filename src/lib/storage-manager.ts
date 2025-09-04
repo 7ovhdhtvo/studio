@@ -146,42 +146,50 @@ class StorageManager {
   async emptyTrash(): Promise<void> {
     logger.log('StorageManager: emptyTrash method started.');
     
-    const getDescendants = (folderId: string): { files: string[], folders: string[] } => {
-      let files: string[] = [];
-      let folders: string[] = [];
-      const children = Array.from(this.folders.values()).filter(f => f.parentId === folderId);
-      for (const child of children) {
-        folders.push(child.id);
-        const descendants = getDescendants(child.id);
-        files.push(...descendants.files);
-        folders.push(...descendants.folders);
-      }
-      const folderFiles = Array.from(this.metadata.values()).filter(t => t.folderId === folderId).map(t => t.id);
-      files.push(...folderFiles);
-      return { files, folders };
-    }
+    const foldersToDelete = new Set<string>();
+    const tracksToDelete = new Set<string>();
 
-    const trashDescendants = getDescendants(TRASH_FOLDER_ID);
-    const trashedFolders = Array.from(this.folders.values()).filter(f => f.parentId === TRASH_FOLDER_ID).map(f => f.id);
-    const allFoldersToDelete = [...trashDescendants.folders, ...trashedFolders];
-    const allFilesToDelete = [...trashDescendants.files];
-
-    for (const fileId of allFilesToDelete) {
-      await localDB.deleteItem(fileId);
-      const file = this.metadata.get(fileId);
-      if (file?.blobUrl) {
-          URL.revokeObjectURL(file.blobUrl);
+    // Recursive function to find all descendants of a folder
+    const findDescendants = (folderId: string) => {
+      // Find direct child folders
+      const childFolders = Array.from(this.folders.values()).filter(f => f.parentId === folderId);
+      for (const folder of childFolders) {
+        if (!foldersToDelete.has(folder.id)) {
+          foldersToDelete.add(folder.id);
+          findDescendants(folder.id); // Recurse
+        }
       }
-      this.metadata.delete(fileId);
+
+      // Find direct child tracks
+      const childTracks = Array.from(this.metadata.values()).filter(t => t.folderId === folderId);
+      for (const track of childTracks) {
+        tracksToDelete.add(track.id);
+      }
+    };
+    
+    // Start the process with the root trash folder
+    findDescendants(TRASH_FOLDER_ID);
+    
+    logger.log(`Found ${tracksToDelete.size} tracks and ${foldersToDelete.size} folders to delete permanently.`);
+
+    // Delete tracks
+    for (const trackId of tracksToDelete) {
+      await localDB.deleteItem(trackId);
+      const track = this.metadata.get(trackId);
+      if (track?.blobUrl) {
+          URL.revokeObjectURL(track.blobUrl);
+      }
+      this.metadata.delete(trackId);
     }
     
-    for (const folderId of allFoldersToDelete) {
+    // Delete folders
+    for (const folderId of foldersToDelete) {
       this.folders.delete(folderId);
     }
 
     this.persistMetadata();
     this.persistFolders();
-    logger.log(`StorageManager: Emptied trash.`);
+    logger.log('StorageManager: Emptied trash and persisted changes.');
   }
   
   async renameAudioFile(id: string, newTitle: string): Promise<boolean> {

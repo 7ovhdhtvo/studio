@@ -178,29 +178,30 @@ export default function TrackList({
   
   const handleEmptyTrashClick = (e: MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
-    logger.log('TrackList: Empty Trash button clicked.');
     onEmptyTrash();
   };
 
-    const { rootTracks, projectMap, trashRootFolders, trashTracks } = useMemo(() => {
+  const { rootTracks, projectMap, trashRootFolders, trashTracks, trashedFolders } = useMemo(() => {
     const projectMap = new Map<string, { project: Folder; folders: Folder[]; tracks: AudioFile[] }>();
     const rootTracks: AudioFile[] = [];
     
-    const trashRootFolders: Folder[] = [];
-    const trashTracks: AudioFile[] = [];
+    // All trashed items for display
+    const trashedFolders = folders.filter(f => f.parentId === TRASH_FOLDER_ID);
+    const trashTracks: AudioFile[] = tracks.filter(t => t.folderId === TRASH_FOLDER_ID);
 
-    const liveFolders = folders.filter(f => f.parentId !== TRASH_FOLDER_ID && f.id !== TRASH_FOLDER_ID);
-    const trashedItems = folders.filter(f => f.parentId === TRASH_FOLDER_ID || f.id === TRASH_FOLDER_ID);
-    const trashedFolderIds = new Set(trashedItems.map(f => f.id));
-
-    const getFullTrashHierarchy = (folderId: string): Folder[] => {
-      const children = folders.filter(f => f.parentId === folderId);
-      return children.flatMap(child => [child, ...getFullTrashHierarchy(child.id)]);
+    // Get all non-trashed folders and tracks
+    const allTrashedFolderIds = new Set<string>();
+    const getTrashedDescendants = (folderId: string) => {
+        if (allTrashedFolderIds.has(folderId)) return;
+        allTrashedFolderIds.add(folderId);
+        folders.filter(f => f.parentId === folderId).forEach(f => getTrashedDescendants(f.id));
     };
-    
-    const allTrashedFolders = getFullTrashHierarchy(TRASH_FOLDER_ID);
-    allTrashedFolders.forEach(f => trashedFolderIds.add(f.id));
+    folders.filter(f => f.parentId === TRASH_FOLDER_ID).forEach(f => getTrashedDescendants(f.id));
 
+    const liveFolders = folders.filter(f => f.id !== TRASH_FOLDER_ID && f.parentId !== TRASH_FOLDER_ID && !allTrashedFolderIds.has(f.id));
+    const liveTracks = tracks.filter(t => t.folderId !== TRASH_FOLDER_ID && !allTrashedFolderIds.has(t.folderId || ''));
+    
+    // Populate projects
     liveFolders.filter(f => f.isProject).forEach(p => {
       projectMap.set(p.id, { project: p, folders: [], tracks: [] });
     });
@@ -209,8 +210,7 @@ export default function TrackList({
       projectMap.get(f.parentId)!.folders.push(f);
     });
 
-    const liveTracks = tracks.filter(t => !trashedFolderIds.has(t.folderId || ''));
-
+    // Distribute tracks into projects or root
     for (const track of liveTracks) {
       if (track.folderId) {
         const folder = liveFolders.find(f => f.id === track.folderId);
@@ -221,17 +221,16 @@ export default function TrackList({
           } else {
              rootTracks.push(track);
           }
+        } else {
+          // Track in a folder that doesn't exist? Orphaned, show in root.
+          rootTracks.push(track);
         }
       } else {
         rootTracks.push(track);
       }
     }
     
-    trashRootFolders.push(...folders.filter(f => f.parentId === TRASH_FOLDER_ID));
-    trashTracks.push(...tracks.filter(t => t.folderId === TRASH_FOLDER_ID));
-
-
-    return { rootTracks, projectMap, trashRootFolders, trashTracks };
+    return { rootTracks, projectMap, trashRootFolders: trashedFolders, trashTracks, trashedFolders };
   }, [tracks, folders]);
 
   const projects = useMemo(() => {
@@ -405,7 +404,7 @@ export default function TrackList({
                     onRecoverTrack={onRecoverTrack}
                     />
                 ))}
-                {trashTracks.length === 0 && trashRootFolders.length === 0 && (
+                {(trashTracks.length === 0 && trashRootFolders.length === 0) && (
                     <p className="text-sm text-muted-foreground p-2">Trash is empty</p>
                 )}
                </div>
