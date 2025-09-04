@@ -314,12 +314,14 @@ export default function WaveformDisplay({
             )}
           </div>
           
-          <div 
-            className="absolute top-0 h-full w-0.5 bg-foreground/70 pointer-events-none z-20"
-            style={{ left: `${progress}%` }}
-          >
-            <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 bg-foreground/70 rounded-full"></div>
-          </div>
+          {durationInSeconds > 0 && (
+            <div 
+              className="absolute top-0 h-full w-0.5 bg-foreground/70 pointer-events-none z-20"
+              style={{ left: `${progress}%` }}
+            >
+              <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 bg-foreground/70 rounded-full"></div>
+            </div>
+          )}
         </div>
         <TimeRuler duration={durationInSeconds} zoom={zoom} />
       </div>
@@ -328,3 +330,4 @@ export default function WaveformDisplay({
   );
 
     
+
