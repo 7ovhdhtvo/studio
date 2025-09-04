@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Folder as FolderIcon, FolderPlus, Trash, Undo2, Briefcase, Plus, Import, Clapperboard, ChevronDown, MoreHorizontal, Pencil, Trash2 as TrashIcon } from 'lucide-react';
+import { Folder as FolderIcon, FolderPlus, Trash, Undo2, Briefcase, Plus, Import, Clapperboard, ChevronDown, MoreHorizontal, Pencil, Trash2 as TrashIcon, PlayCircle, PauseCircle } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '../ui/button';
@@ -15,41 +15,26 @@ import RenameDialog from './rename-dialog';
 
 const TRASH_FOLDER_ID = 'trash';
 
-type TrackListProps = {
-  tracks: AudioFile[];
-  folders: Folder[];
-  activeTrackId?: string | null;
-  activeProjectId: string | null;
-  onSelectTrack: (track: AudioFile) => void;
-  onSelectProject: (projectId: string) => void;
-  onDeleteTrack: (id: string) => void;
-  onDeleteFolder: (id: string) => void;
-  onRenameTrack: (id: string, newTitle: string) => void;
-  onCreateFolder: () => Promise<void>;
-  onCreateProject: () => Promise<void>;
-  onRenameFolder: (id: string, newName: string) => Promise<void>;
-  onMoveTrackToFolder: (trackId: string, folderId: string | null) => Promise<void>;
-  onEmptyTrash: () => Promise<void>;
-  onRecoverTrack: (id: string) => Promise<void>;
-  onRecoverFolder: (id: string) => Promise<void>;
-  onImportTrack: (file: File, folderId: string | null) => void;
-};
-
-const TrackItem = ({
-  track,
-  isActive,
-  onSelectTrack,
-  onRecoverTrack,
-  onRename,
-  onDelete,
-}: {
+type TrackItemProps = {
   track: AudioFile;
   isActive: boolean;
+  isPlaying: boolean;
   onSelectTrack: (track: AudioFile) => void;
   onRecoverTrack: (id: string) => void;
   onRename: (track: AudioFile) => void;
   onDelete: (id: string) => void;
-}) => {
+};
+
+
+const TrackItem = ({
+  track,
+  isActive,
+  isPlaying,
+  onSelectTrack,
+  onRecoverTrack,
+  onRename,
+  onDelete,
+}: TrackItemProps) => {
   const isTrashed = track.folderId === TRASH_FOLDER_ID;
 
   const handleDragStart = (e: DragEvent<HTMLDivElement>) => {
@@ -61,7 +46,8 @@ const TrackItem = ({
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleClick = () => {
+  const handleSelectClick = (e: MouseEvent) => {
+    e.stopPropagation();
     if (!isTrashed) {
       onSelectTrack(track);
     }
@@ -78,17 +64,30 @@ const TrackItem = ({
     <div
       draggable={!isTrashed}
       onDragStart={handleDragStart}
-      onClick={handleClick}
       className={cn(
         "flex items-center justify-between p-2 rounded-md group",
-        !isTrashed && "cursor-pointer hover:bg-accent",
+        !isTrashed && "hover:bg-accent",
         isActive && !isTrashed && "bg-accent",
         isTrashed && "opacity-70"
       )}
     >
-      <div className="flex-1 overflow-hidden min-w-0" onClick={handleRenameClick}>
-        <p className="font-medium break-words">{track.title}</p>
-        <p className="text-sm text-muted-foreground break-words">{track.originalName}</p>
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        {!isTrashed && (
+          <button onClick={handleSelectClick} className="flex-shrink-0">
+            {isActive && isPlaying ? (
+              <PauseCircle className="w-6 h-6 text-primary" />
+            ) : (
+              <PlayCircle className="w-6 h-6 text-muted-foreground group-hover:text-foreground transition-colors" />
+            )}
+          </button>
+        )}
+        <div 
+          className={cn("flex-1 overflow-hidden min-w-0", !isTrashed && "cursor-pointer")} 
+          onClick={handleRenameClick}
+        >
+          <p className="font-medium break-words">{track.title}</p>
+          <p className="text-sm text-muted-foreground break-words">{track.originalName}</p>
+        </div>
       </div>
       
       {isTrashed ? (
@@ -132,7 +131,8 @@ export default function TrackList({
   onRecoverTrack,
   onRecoverFolder,
   onImportTrack,
-}: TrackListProps) {
+  isPlaying,
+}: TrackListProps & { isPlaying: boolean }) {
   const [draggingOverFolder, setDraggingOverFolder] = useState<string | null>(null);
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editingFolderName, setEditingFolderName] = useState('');
@@ -286,7 +286,7 @@ export default function TrackList({
         </div>
         {subFolders.map(renderTrashFolder)}
         {tracksInFolder.map(track => (
-            <TrackItem key={track.id} track={track} isActive={false} onSelectTrack={() => {}} onRecoverTrack={onRecoverTrack} onRename={() => {}} onDelete={() => {}} />
+            <TrackItem key={track.id} track={track} isActive={false} isPlaying={false} onSelectTrack={() => {}} onRecoverTrack={onRecoverTrack} onRename={() => {}} onDelete={() => {}} />
         ))}
        </div>
     );
@@ -312,6 +312,7 @@ export default function TrackList({
               key={track.id}
               track={track}
               isActive={activeTrackId === track.id}
+              isPlaying={isPlaying}
               onSelectTrack={onSelectTrack}
               onRecoverTrack={onRecoverTrack}
               onRename={setTrackToRename}
@@ -354,6 +355,7 @@ export default function TrackList({
                         key={track.id} 
                         track={track} 
                         isActive={activeTrackId === track.id} 
+                        isPlaying={isPlaying}
                         onSelectTrack={onSelectTrack} 
                         onRecoverTrack={onRecoverTrack}
                         onRename={setTrackToRename}
@@ -392,6 +394,7 @@ export default function TrackList({
                                         key={track.id} 
                                         track={track} 
                                         isActive={activeTrackId === track.id} 
+                                        isPlaying={isPlaying}
                                         onSelectTrack={onSelectTrack} 
                                         onRecoverTrack={onRecoverTrack} 
                                         onRename={setTrackToRename}
@@ -445,6 +448,7 @@ export default function TrackList({
                     key={track.id}
                     track={track}
                     isActive={activeTrackId === track.id}
+                    isPlaying={false}
                     onSelectTrack={onSelectTrack}
                     onRecoverTrack={onRecoverTrack}
                     onRename={() => {}} 
@@ -479,5 +483,3 @@ export default function TrackList({
     </>
   );
 }
-
-    

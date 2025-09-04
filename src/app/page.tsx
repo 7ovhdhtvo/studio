@@ -257,6 +257,13 @@ export default function Home() {
 
   const handleSelectTrack = async (track: AudioFile) => {
     logger.log('handleSelectTrack: Track selected.', { trackId: track.id, title: track.title });
+    
+    // If same track is selected, toggle play/pause
+    if (activeTrack?.id === track.id) {
+        handleSetIsPlaying(!isPlaying);
+        return;
+    }
+
     const wasPlaying = isPlaying;
     
     handleSetIsPlaying(false);
@@ -283,11 +290,8 @@ export default function Home() {
         setAudioSrc(url);
         
         await regenerateWaveform(track, zoom);
+        handleSetIsPlaying(true);
 
-        if (wasPlaying) {
-          // A short delay might be needed for the audio element to be ready
-          setTimeout(() => handleSetIsPlaying(true), 50);
-        }
       } else {
         logger.error('handleSelectTrack: Failed to get audio URL.', { trackId: track.id });
       }
@@ -480,6 +484,7 @@ export default function Home() {
                 onRecoverTrack={handleRecoverTrack}
                 onRecoverFolder={recoverFolder}
                 onImportTrack={importAudio}
+                isPlaying={isPlaying}
               />
             </div>
 
