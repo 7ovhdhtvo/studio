@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { storageManager, type AudioFile, type Folder, type AutomationPoint } from '@/lib/storage-manager';
+import { storageManager, type AudioFile, type Folder, type AutomationPoint, type Marker } from '@/lib/storage-manager';
 import { logger } from '@/lib/logger';
 
 export function useAudioStorage() {
@@ -137,7 +137,15 @@ export function useAudioStorage() {
   const updateTrackAutomation = useCallback(async (trackId: string, points: AutomationPoint[]) => {
     const updatedTrack = await storageManager.updateTrackAutomation(trackId, points);
     if (updatedTrack) {
-      // Instead of refreshing all data, just update the specific track in our local state.
+      setTracks(prevTracks => 
+        prevTracks.map(t => t.id === trackId ? updatedTrack : t)
+      );
+    }
+  }, []);
+
+  const updateTrackMarkers = useCallback(async (trackId: string, markers: Marker[]) => {
+    const updatedTrack = await storageManager.updateTrackMarkers(trackId, markers);
+    if (updatedTrack) {
       setTracks(prevTracks => 
         prevTracks.map(t => t.id === trackId ? updatedTrack : t)
       );
@@ -161,5 +169,6 @@ export function useAudioStorage() {
     recoverFolder,
     getAudioUrl,
     updateTrackAutomation,
+    updateTrackMarkers,
   };
 }

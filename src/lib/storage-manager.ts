@@ -11,6 +11,12 @@ export interface AutomationPoint {
   name?: string;
 }
 
+export interface Marker {
+  id: string;
+  time: number;
+  name: string;
+}
+
 export interface AudioFile {
   id: string;
   title: string;
@@ -20,6 +26,7 @@ export interface AudioFile {
   createdAt: number;
   folderId: string | null;
   volumeAutomation?: AutomationPoint[];
+  markers?: Marker[];
   blobUrl?: string; // This will now be a temporary, in-memory URL
 }
 
@@ -76,14 +83,13 @@ class StorageManager {
         await this.createProject("My First Project");
       }
       
-      // Revoke any old blob URLs from previous sessions
       this.metadata.forEach(file => {
         if (file.blobUrl && file.blobUrl.startsWith('blob:')) {
           URL.revokeObjectURL(file.blobUrl);
           file.blobUrl = undefined;
         }
       });
-      this.persistMetadata(); // Save the cleaned metadata
+      this.persistMetadata();
     } catch (e) {
       logger.error('StorageManager: Failed to initialize.', { error: e });
       this.metadata = new Map();
@@ -146,7 +152,7 @@ class StorageManager {
       createdAt: Date.now(),
       folderId: folderId,
       volumeAutomation: [],
-      // blobUrl is NOT set here, it will be created on demand
+      markers: [],
     };
     
     this.metadata.set(id, audioFile);
@@ -165,25 +171,21 @@ class StorageManager {
     const foldersToDelete = new Set<string>();
     const tracksToDelete = new Set<string>();
 
-    // Recursive function to find all descendants of a folder
     const findDescendants = (folderId: string) => {
-      // Find direct child folders
       const childFolders = Array.from(this.folders.values()).filter(f => f.parentId === folderId);
       for (const folder of childFolders) {
         if (!foldersToDelete.has(folder.id)) {
           foldersToDelete.add(folder.id);
-          findDescendants(folder.id); // Recurse
+          findDescendants(folder.id);
         }
       }
 
-      // Find direct child tracks
       const childTracks = Array.from(this.metadata.values()).filter(t => t.folderId === folderId);
       for (const track of childTracks) {
         tracksToDelete.add(track.id);
       }
     };
     
-    // Start with all items directly in trash
     const rootTrashFolders = Array.from(this.folders.values()).filter(f => f.parentId === TRASH_FOLDER_ID);
     const rootTrashTracks = Array.from(this.metadata.values()).filter(t => t.folderId === TRASH_FOLDER_ID);
 
@@ -197,7 +199,6 @@ class StorageManager {
     
     logger.log(`Found ${tracksToDelete.size} tracks and ${foldersToDelete.size} folders to delete permanently.`);
 
-    // Delete tracks
     for (const trackId of tracksToDelete) {
       await localDB.deleteItem(trackId);
       const track = this.metadata.get(trackId);
@@ -207,7 +208,6 @@ class StorageManager {
       this.metadata.delete(trackId);
     }
     
-    // Delete folders
     for (const folderId of foldersToDelete) {
       this.folders.delete(folderId);
     }
@@ -233,16 +233,14 @@ class StorageManager {
     const fileMeta = this.metadata.get(id);
     if (!fileMeta) return null;
     
-    // If we have a valid URL in memory, use it
     if (fileMeta.blobUrl && fileMeta.blobUrl.startsWith('blob:')) {
       return fileMeta.blobUrl;
     }
     
-    // Otherwise, fetch from IndexedDB
     const blob = await localDB.getItem(id);
     if (blob) {
       const url = URL.createObjectURL(blob);
-      fileMeta.blobUrl = url; // Cache the URL in memory for this session
+      fileMeta.blobUrl = url;
       this.metadata.set(id, fileMeta);
       return url;
     }
@@ -317,11 +315,9 @@ class StorageManager {
     const folder = this.folders.get(folderId);
     if (!folder || folder.parentId !== TRASH_FOLDER_ID) return false;
 
-    // Check if original parent still exists, otherwise recover to root
     const parentExists = folder.originalParentId && this.folders.has(folder.originalParentId);
     folder.parentId = parentExists ? folder.originalParentId : null;
     
-    // If it's a project, it should be a root item.
     if (folder.isProject) {
       folder.parentId = null;
     }
@@ -342,6 +338,15 @@ class StorageManager {
     return track;
   }
 
+  async updateTrackMarkers(trackId: string, markers: Marker[]): Promise<AudioFile | null> {
+    const track = this.metadata.get(trackId);
+    if (!track) return null;
+    track.markers = markers;
+    this.metadata.set(trackId, track);
+    this.persistMetadata();
+    return track;
+  }
+
   getAllTracks(): AudioFile[] {
     return Array.from(this.metadata.values()).sort((a, b) => a.title.localeCompare(b.title));
   }
@@ -353,7 +358,6 @@ class StorageManager {
   private persistMetadata() {
     if (typeof window === 'undefined') return;
     try {
-      // Create a temporary object without blobUrl before serializing
       const serializableMetadata = new Map<string, Omit<AudioFile, 'blobUrl'>>();
       this.metadata.forEach((value, key) => {
           const { blobUrl, ...rest } = value;
@@ -389,5 +393,3 @@ const initializeOneTimeReset = () => {
 initializeOneTimeReset();
 
 export const storageManager = new StorageManager();
-
-    

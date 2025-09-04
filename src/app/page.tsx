@@ -13,7 +13,7 @@ import { ZoomIn, ZoomOut, Clapperboard } from 'lucide-react';
 import ImportDialog from '@/components/stagehand/import-dialog';
 import TrackList from '@/components/stagehand/track-list';
 import { useAudioStorage } from '@/hooks/useAudioStorage';
-import type { AudioFile, Folder, AutomationPoint } from '@/lib/storage-manager';
+import type { AudioFile, Folder, AutomationPoint, Marker } from '@/lib/storage-manager';
 import DebugConsole from '@/components/stagehand/debug-console';
 import { logger } from '@/lib/logger';
 import { generateWaveformData, type WaveformData } from '@/lib/waveform';
@@ -22,8 +22,9 @@ import MetronomeControl from '@/components/stagehand/metronome-control';
 import PlaybackModeView from '@/components/stagehand/playback-mode-view';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { cn } from '@/lib/utils';
+import MarkerControl from '@/components/stagehand/marker-control';
 
-export type OpenControlPanel = 'volume' | 'speed' | 'metronome' | null;
+export type OpenControlPanel = 'volume' | 'speed' | 'metronome' | 'markers' | null;
 
 export default function Home() {
   const { 
@@ -43,6 +44,7 @@ export default function Home() {
     recoverTrack,
     recoverFolder,
     updateTrackAutomation,
+    updateTrackMarkers,
   } = useAudioStorage();
 
   const [activeTrack, setActiveTrack] = useState<AudioFile | null>(null);
@@ -71,6 +73,10 @@ export default function Home() {
     { id: '1', time: 3.2, value: 75 },
     { id: '2', time: 6.8, value: 125 },
   ]);
+  const [markers, setMarkers] = useState<Marker[]>([]);
+  const [showMarkers, setShowMarkers] = useState(false);
+  const [isMarkerModeActive, setIsMarkerModeActive] = useState(false);
+  
   const [isDraggingAutomation, setIsDraggingAutomation] = useState(false);
   const [debugState, setDebugState] = useState('Ready');
 
@@ -95,7 +101,6 @@ export default function Home() {
   const getAutomationValue = useCallback((points: AutomationPoint[], time: number): number | null => {
     if (points.length === 0) return null;
     
-    // Sort points by time to ensure correct interpolation
     const sortedPoints = [...points].sort((a, b) => a.time - b.time);
 
     if (time <= sortedPoints[0].time) return sortedPoints[0].value;
@@ -138,7 +143,6 @@ export default function Home() {
                 setVolume(Math.round(newClampedVolume));
             }
         } else {
-            // No automation active, use master volume
             audio.volume = volume / 100;
         }
         animationFrameRef.current = requestAnimationFrame(animate);
@@ -168,7 +172,6 @@ export default function Home() {
   }, [isLoading, folders, activeProjectId]);
 
   
-  // Effect for loading the audio source
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -185,7 +188,6 @@ export default function Home() {
     }
   }, [audioSrc]);
 
-  // Effect for handling play/pause
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -195,8 +197,6 @@ export default function Home() {
       const delay = startDelay > 0 ? startDelay * 1000 : 0;
       
       playbackTimeoutRef.current = setTimeout(() => {
-        // We now primarily rely on onLoadedData to play for instant feedback,
-        // but this acts as a fallback.
         if (audio.paused) {
           audio.play().catch(error => {
             logger.error("Playback failed", error);
@@ -217,7 +217,6 @@ export default function Home() {
 
   useEffect(() => {
     if (audioRef.current) {
-      // We handle looping manually now to accommodate delay
       audioRef.current.loop = false;
     }
   }, []);
@@ -240,7 +239,6 @@ export default function Home() {
     }
   }, []);
 
-  // Center on playhead when zooming
   useEffect(() => {
     if (waveformContainerRef.current && progress > 0) {
       const scrollContainer = waveformContainerRef.current;
@@ -289,7 +287,6 @@ export default function Home() {
   const handleSelectTrack = async (track: AudioFile) => {
     logger.log('handleSelectTrack: Track selected.', { trackId: track.id, title: track.title });
     
-    // If same track is selected, toggle play/pause
     if (activeTrack?.id === track.id) {
         handleSetIsPlaying(!isPlaying);
         return;
@@ -299,18 +296,18 @@ export default function Home() {
     
     setProgress(0);
     setActiveTrack(track);
-    const trackVolumePoints = track.volumeAutomation || [];
-    setVolumePoints(trackVolumePoints);
-    if (trackVolumePoints.length === 0) {
-      setVolume(75); // Default volume if no automation
+    setVolumePoints(track.volumeAutomation || []);
+    setMarkers(track.markers || []);
+    
+    if ((track.volumeAutomation || []).length === 0) {
+      setVolume(75);
     } else {
-       // If points exist, find the value at time 0
-       const initialVolume = getAutomationValue(trackVolumePoints, 0);
+       const initialVolume = getAutomationValue(track.volumeAutomation!, 0);
        setVolume(initialVolume ?? 75);
     }
 
     setWaveformData(null);
-    setAudioSrc(null); // Clear previous source immediately
+    setAudioSrc(null);
 
     try {
       const url = await getAudioUrl(track.id);
@@ -364,12 +361,25 @@ export default function Home() {
   }
   
   const handleBackToStart = () => {
-    logger.log('handleBackToStart: Triggered.');
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0;
-      setProgress(0);
+    if (!audioRef.current) return;
+
+    if (isMarkerModeActive && markers.length > 0) {
+        const sortedMarkers = [...markers].sort((a, b) => a.time - b.time);
+        const prevMarkers = sortedMarkers.filter(m => m.time < audioRef.current!.currentTime - 0.5);
+
+        if (prevMarkers.length > 0) {
+            const targetTime = prevMarkers[prevMarkers.length - 1].time;
+            audioRef.current.currentTime = targetTime;
+            setProgress((targetTime / duration) * 100);
+        } else {
+            audioRef.current.currentTime = 0;
+            setProgress(0);
+        }
+    } else {
+        audioRef.current.currentTime = 0;
+        setProgress(0);
     }
-  }
+  };
 
   const handleProgressChange = (newProgress: number) => {
     if (audioRef.current && audioRef.current.duration) {
@@ -389,11 +399,9 @@ export default function Home() {
             setProgress(0);
 
             if (applyDelayToLoop && startDelay > 0) {
-                // If applying delay to loop, we need to manually pause and restart with delay
-                setIsPlaying(false); // Briefly set to false to trigger useEffect
-                setTimeout(() => setIsPlaying(true), 10); // Then back to true
+                setIsPlaying(false);
+                setTimeout(() => setIsPlaying(true), 10);
             } else {
-                // Otherwise, play immediately
                 audioRef.current.play().catch(e => logger.error("Loop playback failed", e));
             }
         }
@@ -426,8 +434,17 @@ export default function Home() {
 
   const handleSetVolumePoints = (points: AutomationPoint[]) => {
     setVolumePoints(points);
-    // Defer saving until drag ends
   };
+  
+  const handleSetMarkers = (newMarkers: Marker[]) => {
+    setMarkers(newMarkers);
+  }
+
+  const handleMarkerDragEnd = () => {
+    if (activeTrack) {
+        updateTrackMarkers(activeTrack.id, markers);
+    }
+  }
 
   const handleUpdateAutomationPoint = (id: string, newName: string, newTime: number) => {
     if (!activeTrack) return;
@@ -450,12 +467,31 @@ export default function Home() {
     setVolumePoints([]);
     updateTrackAutomation(activeTrack.id, []);
   };
+
+  const handleUpdateMarker = (id: string, newName: string, newTime: number) => {
+    if (!activeTrack) return;
+    const updatedMarkers = markers.map(m => 
+        m.id === id ? { ...m, name: newName, time: newTime } : m
+    );
+    setMarkers(updatedMarkers);
+    updateTrackMarkers(activeTrack.id, updatedMarkers);
+  };
+
+  const handleDeleteMarker = (id: string) => {
+      if (!activeTrack) return;
+      const updatedMarkers = markers.filter(m => m.id !== id);
+      setMarkers(updatedMarkers);
+      updateTrackMarkers(activeTrack.id, updatedMarkers);
+  };
+
+  const handleDeleteAllMarkers = () => {
+      if (!activeTrack) return;
+      setMarkers([]);
+      updateTrackMarkers(activeTrack.id, []);
+  };
   
   const handleBaselineVolumeChange = (newVolume: number) => {
     setVolume(newVolume);
-    if (activeTrack && volumePoints.length === 0) {
-      // Potentially save this as a "base volume" for the track if needed
-    }
   };
 
   const getTracksInCurrentProject = () => {
@@ -546,7 +582,7 @@ export default function Home() {
 
             <div className={cn(
                 "flex flex-col flex-1 overflow-y-auto p-6 lg:p-8 transition-all duration-300 ease-in-out",
-                isLibraryOpen && !isMobile ? "ml-[350px]" : "ml-0"
+                 isLibraryOpen && !isMobile ? "ml-[350px]" : "ml-0"
               )}>
               
               <DebugConsole />
@@ -603,6 +639,10 @@ export default function Home() {
                   onAutomationPointsChange={handleSetVolumePoints}
                   onAutomationDragStart={handleAutomationDragStart}
                   onAutomationDragEnd={handleAutomationDragEnd}
+                  markers={markers}
+                  showMarkers={showMarkers}
+                  onMarkersChange={handleSetMarkers}
+                  onMarkerDragEnd={handleMarkerDragEnd}
                   debugState={debugState}
                   setDebugState={setDebugState}
                   startDelay={startDelay}
@@ -616,6 +656,7 @@ export default function Home() {
                   isLooping={isLooping}
                   onToggleLoop={toggleLoop}
                   onBackToStart={handleBackToStart}
+                  onOpenMarkers={() => handleToggleControlPanel('markers')}
                 />
 
                 <div className="flex justify-center items-start gap-4 pt-4 flex-wrap">
@@ -641,6 +682,23 @@ export default function Home() {
                     showAutomation={showSpeedAutomation}
                     onToggleAutomation={setShowSpeedAutomation}
                     automationPoints={speedPoints}
+                  />
+                   <MarkerControl 
+                      isOpen={openControlPanel === 'markers'}
+                      onToggle={() => handleToggleControlPanel('markers')}
+                      markers={markers}
+                      showMarkers={showMarkers}
+                      onToggleShowMarkers={setShowMarkers}
+                      isMarkerModeActive={isMarkerModeActive}
+                      onToggleIsMarkerModeActive={setIsMarkerModeActive}
+                      onUpdateMarker={handleUpdateMarker}
+                      onDeleteMarker={handleDeleteMarker}
+                      onDeleteAllMarkers={handleDeleteAllMarkers}
+                      onJumpToMarker={(time) => {
+                        if (audioRef.current) {
+                          handleProgressChange((time / duration) * 100);
+                        }
+                      }}
                   />
                   <MetronomeControl 
                     isOpen={openControlPanel === 'metronome'}
