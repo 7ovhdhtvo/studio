@@ -52,13 +52,13 @@ export default function Header({ onToggleLibrary, isLibraryOpen }: HeaderProps) 
           onClick={onToggleLibrary} 
           className={cn(
             "h-10 w-10 rounded-full transition-colors",
-            isLibraryOpen ? "bg-secondary hover:bg-secondary/80" : "bg-primary hover:bg-primary/90"
+            isLibraryOpen ? "bg-secondary hover:bg-secondary/80" : "bg-orange-500 hover:bg-orange-600 text-white"
           )}
         >
           {isLibraryOpen ? (
-              <PanelLeftClose className="h-5 w-5 text-secondary-foreground" />
+              <PanelLeftClose className="h-5 w-5" />
           ) : (
-              <PanelLeftOpen className="h-5 w-5 text-primary-foreground" />
+              <PanelLeftOpen className="h-5 w-5" />
           )}
           <span className="sr-only">Toggle Library</span>
         </Button>
