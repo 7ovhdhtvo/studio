@@ -505,7 +505,7 @@ export default function Home() {
           <main className="grid flex-1 grid-cols-1 md:grid-cols-[auto_1fr]">
             {isMobile ? (
               <Sheet open={isLibraryOpen} onOpenChange={setIsLibraryOpen}>
-                <SheetContent side="left" className="p-0 w-[350px] border-r">
+                <SheetContent side="left" className="p-0 w-full border-r">
                   {trackListComponent}
                 </SheetContent>
               </Sheet>

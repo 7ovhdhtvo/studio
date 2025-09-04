@@ -45,7 +45,7 @@ export default function Header({ onToggleLibrary }: HeaderProps) {
   return (
     <header className="flex h-16 items-center justify-between border-b bg-card px-6 lg:px-8 flex-shrink-0">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={onToggleLibrary} className="md:hidden">
+        <Button variant="ghost" size="icon" onClick={onToggleLibrary}>
           <Library className="h-5 w-5" />
           <span className="sr-only">Toggle Library</span>
         </Button>
