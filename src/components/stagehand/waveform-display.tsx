@@ -3,7 +3,7 @@
 
 import { cn } from '@/lib/utils';
 import { type WaveformData } from '@/lib/waveform';
-import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAction, useMemo, useCallback } from 'react';
+import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAction, useMemo, useCallback, TouchEvent } from 'react';
 import TimeRuler from './time-ruler';
 import type { AutomationPoint, Marker } from '@/lib/storage-manager';
 import { Input } from '../ui/input';
@@ -15,7 +15,6 @@ const POINT_RADIUS = 6;
 const HITBOX_RADIUS = 12;
 
 const MARKER_COLORS = [
-    'hsl(var(--primary))',
     'hsl(var(--chart-1))',
     'hsl(var(--chart-2))',
     'hsl(var(--chart-3))',
@@ -123,11 +122,13 @@ export default function WaveformDisplay({
   const draggingPointIdRef = useRef<string | null>(null);
   const draggingMarkerIdRef = useRef<string | null>(null);
 
-  const getSvgCoords = (e: MouseEvent<SVGSVGElement>): {x: number, y: number} => {
+  const getSvgCoords = (e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>): {x: number, y: number} => {
     const svg = e.currentTarget as SVGSVGElement;
     const pt = svg.createSVGPoint();
-    pt.x = e.clientX;
-    pt.y = e.clientY;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    pt.x = clientX;
+    pt.y = clientY;
     const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
     return { x: svgP.x, y: svgP.y };
   };
@@ -191,7 +192,7 @@ export default function WaveformDisplay({
     }
   };
   
-  const handleMouseUpAndLeave = () => {
+  const handleEndDrag = () => {
     if (isMouseDownRef.current) {
         isMouseDownRef.current = false;
         onScrubEnd();
@@ -208,69 +209,73 @@ export default function WaveformDisplay({
     }
   };
 
-  const handleSvgMouseDown = (e: MouseEvent<SVGSVGElement>) => {
-    if ((e.target as SVGElement).dataset.pointId || (e.target as SVGElement).dataset.markerId) return;
+  const handleSvgInteractionStart = (e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>) => {
+      if ((e.target as SVGElement).dataset.pointId || (e.target as SVGElement).dataset.markerId) return;
+      e.preventDefault();
 
-    const { width, height } = e.currentTarget.getBoundingClientRect();
-    const { x } = getSvgCoords(e);
-    const clickTime = (x / width) * durationInSeconds;
+      const { width, height } = e.currentTarget.getBoundingClientRect();
+      const { x } = getSvgCoords(e);
+      const clickTime = (x / width) * durationInSeconds;
 
-    if (showVolumeAutomation) {
-      const { y } = getSvgCoords(e);
-      const clickValue = 100 - (y / height) * 100;
+      if (showVolumeAutomation) {
+        const { y } = getSvgCoords(e);
+        const clickValue = 100 - (y / height) * 100;
 
-      const newPoint: AutomationPoint = {
-        id: `point_${Date.now()}`,
-        time: Math.max(0, Math.min(durationInSeconds, clickTime)),
-        value: Math.max(0, Math.min(100, clickValue)),
-      };
-      
-      onAutomationPointsChange([...automationPoints, newPoint]);
-      draggingPointIdRef.current = newPoint.id;
-      onAutomationDragStart();
-      setDebugState(`Created & Dragging ${newPoint.id}`);
-    } else if (showMarkers) {
-        const newMarker: Marker = {
-            id: `marker_${Date.now()}`,
-            time: Math.max(0, Math.min(durationInSeconds, clickTime)),
-            name: `Marker ${markers.length + 1}`,
+        const newPoint: AutomationPoint = {
+          id: `point_${Date.now()}`,
+          time: Math.max(0, Math.min(durationInSeconds, clickTime)),
+          value: Math.max(0, Math.min(100, clickValue)),
         };
-        onMarkersChange([...markers, newMarker]);
-        draggingMarkerIdRef.current = newMarker.id;
-        setDebugState(`Created & Dragging ${newMarker.id}`);
-    }
+        
+        onAutomationPointsChange([...automationPoints, newPoint]);
+        draggingPointIdRef.current = newPoint.id;
+        onAutomationDragStart();
+        setDebugState(`Created & Dragging ${newPoint.id}`);
+      } else if (showMarkers) {
+          const newMarker: Marker = {
+              id: `marker_${Date.now()}`,
+              time: Math.max(0, Math.min(durationInSeconds, clickTime)),
+              name: `Marker ${markers.length + 1}`,
+          };
+          onMarkersChange([...markers, newMarker]);
+          draggingMarkerIdRef.current = newMarker.id;
+          setDebugState(`Created & Dragging ${newMarker.id}`);
+      }
   };
 
-  const handleSvgMouseMove = (e: MouseEvent<SVGSVGElement>) => {
-    const { width, height } = e.currentTarget.getBoundingClientRect();
-    const { x } = getSvgCoords(e);
-    const newTime = (x / width) * durationInSeconds;
+  const handleSvgInteractionMove = (e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>) => {
+      if (!draggingPointIdRef.current && !draggingMarkerIdRef.current) return;
+      e.preventDefault();
 
-    if (draggingPointIdRef.current && showVolumeAutomation) {
-      const { y } = getSvgCoords(e);
-      const newValue = 100 - (y / height) * 100;
-      const updatedPoints = automationPoints.map(p =>
-        p.id === draggingPointIdRef.current ? { 
-            ...p, 
-            time: Math.max(0, Math.min(durationInSeconds, newTime)), 
-            value: Math.max(0, Math.min(100, newValue))
-        } : p
-      );
-      onAutomationPointsChange(updatedPoints);
-      setDebugState(`Dragging ${draggingPointIdRef.current}`);
-    } else if (draggingMarkerIdRef.current && showMarkers) {
-        const updatedMarkers = markers.map(m =>
-            m.id === draggingMarkerIdRef.current ? {
-                ...m,
-                time: Math.max(0, Math.min(durationInSeconds, newTime)),
-            } : m
+      const { width, height } = e.currentTarget.getBoundingClientRect();
+      const { x } = getSvgCoords(e);
+      const newTime = (x / width) * durationInSeconds;
+
+      if (draggingPointIdRef.current && showVolumeAutomation) {
+        const { y } = getSvgCoords(e);
+        const newValue = 100 - (y / height) * 100;
+        const updatedPoints = automationPoints.map(p =>
+          p.id === draggingPointIdRef.current ? { 
+              ...p, 
+              time: Math.max(0, Math.min(durationInSeconds, newTime)), 
+              value: Math.max(0, Math.min(100, newValue))
+          } : p
         );
-        onMarkersChange(updatedMarkers);
-        setDebugState(`Dragging Marker ${draggingMarkerIdRef.current}`);
-    }
+        onAutomationPointsChange(updatedPoints);
+        setDebugState(`Dragging ${draggingPointIdRef.current}`);
+      } else if (draggingMarkerIdRef.current && showMarkers) {
+          const updatedMarkers = markers.map(m =>
+              m.id === draggingMarkerIdRef.current ? {
+                  ...m,
+                  time: Math.max(0, Math.min(durationInSeconds, newTime)),
+              } : m
+          );
+          onMarkersChange(updatedMarkers);
+          setDebugState(`Dragging Marker ${draggingMarkerIdRef.current}`);
+      }
   };
 
-  const handlePointMouseDown = (e: MouseEvent, pointId: string) => {
+  const handlePointInteractionStart = (e: MouseEvent | TouchEvent, pointId: string) => {
       e.stopPropagation();
       if (!showVolumeAutomation) return;
       draggingPointIdRef.current = pointId;
@@ -278,12 +283,14 @@ export default function WaveformDisplay({
       setDebugState(`Dragging ${pointId}`);
   }
 
-  const handleMarkerMouseDown = (e: MouseEvent, markerId: string) => {
+  const handleMarkerInteractionStart = (e: MouseEvent | TouchEvent, markerId: string) => {
     e.stopPropagation();
     if (!showMarkers) return;
     draggingMarkerIdRef.current = markerId;
     setDebugState(`Dragging Marker ${markerId}`);
   };
+
+  const sortedMarkers = useMemo(() => [...markers].sort((a, b) => a.time - b.time), [markers]);
 
   const currentTime = (progress / 100) * durationInSeconds;
 
@@ -348,8 +355,10 @@ export default function WaveformDisplay({
             className="absolute inset-0 z-0"
             onMouseDown={handleScrubMouseDown}
             onMouseMove={handleScrubMouseMove}
-            onMouseUp={handleMouseUpAndLeave}
-            onMouseLeave={handleMouseUpAndLeave}
+            onMouseUp={handleEndDrag}
+            onMouseLeave={handleEndDrag}
+            onTouchEnd={handleEndDrag}
+            onTouchCancel={handleEndDrag}
           >
             {waveformData ? (
               <div className="w-full h-full flex flex-col justify-center items-center pointer-events-none">
@@ -368,10 +377,14 @@ export default function WaveformDisplay({
                     width="100%"
                     height="100%"
                     className="absolute inset-0 z-10 overflow-visible"
-                    onMouseDown={handleSvgMouseDown}
-                    onMouseMove={handleSvgMouseMove}
-                    onMouseUp={handleMouseUpAndLeave}
-                    onMouseLeave={handleMouseUpAndLeave}
+                    onMouseDown={handleSvgInteractionStart}
+                    onMouseMove={handleSvgInteractionMove}
+                    onMouseUp={handleEndDrag}
+                    onMouseLeave={handleEndDrag}
+                    onTouchStart={handleSvgInteractionStart}
+                    onTouchMove={handleSvgInteractionMove}
+                    onTouchEnd={handleEndDrag}
+                    onTouchCancel={handleEndDrag}
                 >
                     {(showVolumeAutomation || isAutomationActive) && (
                       <path
@@ -390,7 +403,8 @@ export default function WaveformDisplay({
                             <g 
                               key={point.id}
                               className={cn(showVolumeAutomation && "cursor-grab active:cursor-grabbing")}
-                              onMouseDown={(e) => handlePointMouseDown(e, point.id)}
+                              onMouseDown={(e) => handlePointInteractionStart(e, point.id)}
+                              onTouchStart={(e) => handlePointInteractionStart(e, point.id)}
                             >
                                 <circle
                                     data-point-id={point.id}
@@ -404,17 +418,18 @@ export default function WaveformDisplay({
                             </g>
                         );
                     })}
-                     {isAnyMarkerModeOn && markers.map((marker, index) => {
+                     {isAnyMarkerModeOn && sortedMarkers.map((marker, index) => {
                         const { width, height } = waveformInteractionRef.current!.getBoundingClientRect();
                         const x = timeToX(marker.time, width);
-                        const color = getMarkerColor(marker.id);
+                        const color = index === 0 ? 'hsl(var(--primary))' : getMarkerColor(marker.id);
                         const markerName = marker.name || `Marker ${index + 1}`;
                         const flagYPosition = height - 18; // Position at the bottom
                         return (
                            <g 
                             key={marker.id} 
                             className={cn(showMarkers && "cursor-grab active:cursor-grabbing")}
-                            onMouseDown={(e) => handleMarkerMouseDown(e, marker.id)}
+                            onMouseDown={(e) => handleMarkerInteractionStart(e, marker.id)}
+                            onTouchStart={(e) => handleMarkerInteractionStart(e, marker.id)}
                             transform={`translate(${x}, 0)`}
                            >
                               <line x1="0" y1="0" x2="0" y2="100%" stroke={color} strokeWidth="2" />

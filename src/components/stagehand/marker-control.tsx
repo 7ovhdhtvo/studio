@@ -131,7 +131,7 @@ export default function MarkerControl({
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <Label htmlFor="marker-active-switch">Marker Mode Active</Label>
+              <Label htmlFor="marker-active-switch">Marker active</Label>
               <Switch
                   id="marker-active-switch"
                   checked={isMarkerModeActive}
