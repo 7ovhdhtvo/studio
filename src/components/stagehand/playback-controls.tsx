@@ -3,7 +3,7 @@
 
 import type { Dispatch, SetStateAction } from 'react';
 import { Button } from '@/components/ui/button';
-import { Pause, Play, Repeat, SkipBack, Flag } from 'lucide-react';
+import { Pause, Play, Repeat, SkipBack } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type PlaybackControlsProps = {
@@ -12,10 +12,9 @@ type PlaybackControlsProps = {
   isLooping: boolean;
   onToggleLoop: () => void;
   onBackToStart: () => void;
-  onOpenMarkers: () => void;
 };
 
-export default function PlaybackControls({ isPlaying, setIsPlaying, isLooping, onToggleLoop, onBackToStart, onOpenMarkers }: PlaybackControlsProps) {
+export default function PlaybackControls({ isPlaying, setIsPlaying, isLooping, onToggleLoop, onBackToStart }: PlaybackControlsProps) {
   const togglePlay = () => setIsPlaying(!isPlaying);
 
   return (
@@ -57,16 +56,6 @@ export default function PlaybackControls({ isPlaying, setIsPlaying, isLooping, o
         aria-label="Back to Start"
       >
         <SkipBack className="h-10 w-10 text-background fill-background" />
-      </Button>
-
-      <Button
-        variant="outline"
-        size="icon"
-        className="h-20 w-20 rounded-full bg-foreground/80 hover:bg-foreground shadow-lg transition-transform transform hover:scale-105"
-        onClick={onOpenMarkers}
-        aria-label="Markers"
-      >
-        <Flag className="h-10 w-10 text-background" />
       </Button>
     </div>
   );

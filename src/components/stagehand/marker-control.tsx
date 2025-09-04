@@ -155,7 +155,7 @@ export default function MarkerControl({
             </div>
           </div>
           <div className="grid gap-2">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center mb-1">
               <Label>Markers</Label>
               <Button 
                 variant="destructive" 
@@ -163,7 +163,7 @@ export default function MarkerControl({
                 onClick={onDeleteAllMarkers}
                 disabled={markers.length === 0}
               >
-                  <Trash2 className="h-4 w-4 mr-2"/>
+                  <Trash2 className="h-4 w-4 mr-1"/>
                   Clear All
               </Button>
             </div>
@@ -204,5 +204,3 @@ export default function MarkerControl({
       </Card>
   );
 }
-
-    

@@ -681,7 +681,6 @@ export default function Home() {
                   isLooping={isLooping}
                   onToggleLoop={toggleLoop}
                   onBackToStart={handleBackToStart}
-                  onOpenMarkers={() => handleToggleControlPanel('markers')}
                 />
 
                 <div className="flex justify-center items-start gap-4 pt-4 flex-wrap">
@@ -739,5 +738,3 @@ export default function Home() {
     </>
   );
 }
-
-    
