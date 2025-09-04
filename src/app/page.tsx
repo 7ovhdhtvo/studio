@@ -512,7 +512,7 @@ export default function Home() {
             ) : (
               <div className={cn(
                 "transition-[width] duration-300 ease-in-out",
-                isLibraryOpen ? "w-[350px]" : "w-0"
+                isLibraryOpen ? "w-[350px]" : "w-[0px]"
               )}>
                 <div className="w-[350px] h-full overflow-hidden">
                   {trackListComponent}
