@@ -122,7 +122,7 @@ export default function MarkerControl({
   }
 
   return (
-      <Card>
+      <Card className="w-80">
         <CardHeader className="flex-row items-center justify-center relative py-4">
             <div className="flex items-center gap-2">
                 <Flag className="w-5 h-5" />
