@@ -405,9 +405,11 @@ export default function WaveformDisplay({
                         );
                     })}
                      {isAnyMarkerModeOn && markers.map((marker, index) => {
-                        const { width } = waveformInteractionRef.current!.getBoundingClientRect();
+                        const { width, height } = waveformInteractionRef.current!.getBoundingClientRect();
                         const x = timeToX(marker.time, width);
                         const color = getMarkerColor(marker.id);
+                        const markerName = marker.name || `Marker ${index + 1}`;
+                        const flagYPosition = height - 18; // Position at the bottom
                         return (
                            <g 
                             key={marker.id} 
@@ -417,10 +419,10 @@ export default function WaveformDisplay({
                            >
                               <line x1="0" y1="0" x2="0" y2="100%" stroke={color} strokeWidth="2" />
                               <polygon points="-5,0 5,0 0,5" fill={color} />
-                              <Flag x="-18" y="5" className="w-4 h-4" style={{ color }} fillOpacity={0.2} />
+                              <Flag x="4" y={flagYPosition} className="w-4 h-4" style={{ color }} fillOpacity={0.2} />
                               <rect data-marker-id={marker.id} x="-12" y="0" width="24" height="100%" fill="transparent" />
-                              <text x="0" y="14" fill={color} textAnchor="middle" className="text-xs font-semibold pointer-events-none select-none">
-                                {marker.name || `Marker ${index + 1}`}
+                              <text x="4" y="14" fill={color} textAnchor="start" className="text-xs font-semibold pointer-events-none select-none">
+                                {markerName}
                               </text>
                            </g>
                         );
