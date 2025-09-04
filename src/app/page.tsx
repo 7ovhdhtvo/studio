@@ -501,7 +501,7 @@ export default function Home() {
         />
       ) : (
         <div className="flex h-screen w-full flex-col bg-background text-foreground">
-          <Header onToggleLibrary={() => setIsLibraryOpen(prev => !prev)} />
+          <Header onToggleLibrary={() => setIsLibraryOpen(prev => !prev)} isLibraryOpen={isLibraryOpen} />
           <main className="flex flex-1 overflow-hidden">
             {isMobile ? (
               <Sheet open={isLibraryOpen} onOpenChange={setIsLibraryOpen}>
@@ -510,20 +510,21 @@ export default function Home() {
                 </SheetContent>
               </Sheet>
             ) : (
-              <div
+              <aside
                 className={cn(
-                  "w-[350px] flex-shrink-0 transition-transform duration-300 ease-in-out",
-                  !isLibraryOpen && "-translate-x-full"
+                  "flex-shrink-0 bg-card transition-transform duration-300 ease-in-out",
+                  isLibraryOpen ? 'translate-x-0' : '-translate-x-full'
                 )}
+                style={{ width: '350px' }}
               >
                 {trackListComponent}
-              </div>
+              </aside>
             )}
 
 
             <div className={cn(
                 "flex flex-col flex-1 overflow-y-auto p-6 lg:p-8 transition-all duration-300 ease-in-out",
-                !isMobile && isLibraryOpen ? "ml-0" : !isMobile && !isLibraryOpen ? "ml-[-350px]" : ""
+                !isMobile && isLibraryOpen ? "ml-[350px]" : "ml-0"
               )}>
               
               <DebugConsole />
@@ -624,5 +625,3 @@ export default function Home() {
     </>
   );
 }
-
-    

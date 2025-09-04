@@ -1,10 +1,11 @@
 
 "use client";
 
-import { Speaker, Sun, Moon, Folder } from 'lucide-react';
+import { Speaker, Sun, Moon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
+import { cn } from '@/lib/utils';
 
 function ThemeToggle() {
   const [mounted, setMounted] = useState(false)
@@ -39,18 +40,26 @@ function ThemeToggle() {
 
 type HeaderProps = {
   onToggleLibrary: () => void;
+  isLibraryOpen: boolean;
 };
 
-export default function Header({ onToggleLibrary }: HeaderProps) {
+export default function Header({ onToggleLibrary, isLibraryOpen }: HeaderProps) {
   return (
     <header className="flex h-16 items-center justify-between border-b bg-card px-6 lg:px-8 flex-shrink-0">
       <div className="flex items-center gap-4">
         <Button 
           size="icon" 
           onClick={onToggleLibrary} 
-          className="h-10 w-10 rounded-full bg-primary hover:bg-primary/90"
+          className={cn(
+            "h-10 w-10 rounded-full transition-colors",
+            isLibraryOpen ? "bg-primary/90 hover:bg-primary" : "bg-secondary hover:bg-secondary/80"
+          )}
         >
-          <Folder className="h-5 w-5 text-primary-foreground" />
+          {isLibraryOpen ? (
+              <PanelLeftClose className="h-5 w-5 text-primary-foreground" />
+          ) : (
+              <PanelLeftOpen className="h-5 w-5 text-secondary-foreground" />
+          )}
           <span className="sr-only">Toggle Library</span>
         </Button>
         <h1 className="text-xl font-bold tracking-wider">
