@@ -51,8 +51,8 @@ export default function Header({ onToggleLibrary, isLibraryOpen }: HeaderProps) 
           size="icon" 
           onClick={onToggleLibrary} 
           className={cn(
-            "h-10 w-10 rounded-full transition-colors",
-            isLibraryOpen ? "bg-secondary hover:bg-secondary/80" : "bg-primary hover:bg-primary/90 text-primary-foreground"
+            "h-10 w-10 rounded-full transition-colors text-white",
+            isLibraryOpen ? "bg-secondary hover:bg-secondary/80 text-secondary-foreground" : "bg-orange-500 hover:bg-orange-600"
           )}
         >
           {isLibraryOpen ? (
