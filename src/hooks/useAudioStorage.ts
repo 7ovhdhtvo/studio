@@ -135,11 +135,14 @@ export function useAudioStorage() {
   }, []);
   
   const updateTrackAutomation = useCallback(async (trackId: string, points: AutomationPoint[]) => {
-    const success = await storageManager.updateTrackAutomation(trackId, points);
-    if (success) {
-      refreshData();
+    const updatedTrack = await storageManager.updateTrackAutomation(trackId, points);
+    if (updatedTrack) {
+      // Instead of refreshing all data, just update the specific track in our local state.
+      setTracks(prevTracks => 
+        prevTracks.map(t => t.id === trackId ? updatedTrack : t)
+      );
     }
-  }, [refreshData]);
+  }, []);
 
   return {
     tracks,

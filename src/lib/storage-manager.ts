@@ -167,8 +167,17 @@ class StorageManager {
       }
     };
     
-    // Start the process with the root trash folder
-    findDescendants(TRASH_FOLDER_ID);
+    // Start with all items directly in trash
+    const rootTrashFolders = Array.from(this.folders.values()).filter(f => f.parentId === TRASH_FOLDER_ID);
+    const rootTrashTracks = Array.from(this.metadata.values()).filter(t => t.folderId === TRASH_FOLDER_ID);
+
+    for (const folder of rootTrashFolders) {
+        foldersToDelete.add(folder.id);
+        findDescendants(folder.id);
+    }
+    for (const track of rootTrashTracks) {
+        tracksToDelete.add(track.id);
+    }
     
     logger.log(`Found ${tracksToDelete.size} tracks and ${foldersToDelete.size} folders to delete permanently.`);
 
@@ -308,13 +317,13 @@ class StorageManager {
     return true;
   }
   
-  async updateTrackAutomation(trackId: string, points: AutomationPoint[]): Promise<boolean> {
+  async updateTrackAutomation(trackId: string, points: AutomationPoint[]): Promise<AudioFile | null> {
     const track = this.metadata.get(trackId);
-    if (!track) return false;
+    if (!track) return null;
     track.volumeAutomation = points;
     this.metadata.set(trackId, track);
     this.persistMetadata();
-    return true;
+    return track;
   }
 
   getAllTracks(): AudioFile[] {
