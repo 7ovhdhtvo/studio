@@ -99,7 +99,11 @@ export default function MarkerControl({
 }: MarkerControlProps) {
 
   if (!isOpen) {
-    return null; // The button is now in PlaybackControls
+    return (
+      <Button variant="outline" size="icon" className="w-16 h-16" onClick={onToggle}>
+        <Flag className="w-6 h-6" />
+      </Button>
+    )
   }
 
   return (
