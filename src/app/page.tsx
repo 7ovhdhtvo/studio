@@ -63,6 +63,7 @@ export default function Home() {
   const [volume, setVolume] = useState(75); // Global volume in % (0-100)
   const [openControlPanel, setOpenControlPanel] = useState<OpenControlPanel>(null);
   const [progress, setProgress] = useState(0); // Progress in percentage
+  const [startDelay, setStartDelay] = useState(0);
   
   const [volumePoints, setVolumePoints] = useState<AutomationPoint[]>([]);
   const [speedPoints, setSpeedPoints] = useState<AutomationPoint[]>([
@@ -74,6 +75,7 @@ export default function Home() {
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const animationFrameRef = useRef<number>();
+  const playbackTimeoutRef = useRef<NodeJS.Timeout>();
   const isScrubbingRef = useRef(false);
   const waveformContainerRef = useRef<HTMLDivElement>(null);
   const isMobile = useMediaQuery("(max-width: 768px)");
@@ -188,14 +190,24 @@ export default function Home() {
     if (!audio) return;
 
     if (isPlaying && audioSrc) {
-      audio.play().catch(error => {
-        logger.error("Playback failed", error);
-        setIsPlaying(false);
-      });
+      if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
+      const delay = startDelay > 0 ? startDelay * 1000 : 0;
+      
+      playbackTimeoutRef.current = setTimeout(() => {
+        audio.play().catch(error => {
+          logger.error("Playback failed", error);
+          setIsPlaying(false);
+        });
+      }, delay);
     } else {
+      if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
       audio.pause();
     }
-  }, [isPlaying, audioSrc]);
+    
+    return () => {
+        if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
+    }
+  }, [isPlaying, audioSrc, startDelay]);
 
 
   useEffect(() => {
@@ -476,7 +488,7 @@ export default function Home() {
         onPlay={() => startProgressLoop()} 
         onPause={() => stopProgressLoop()} 
         onLoadedData={() => {
-          if (isPlaying) {
+          if (isPlaying && startDelay === 0) {
             audioRef.current?.play().catch(e => logger.error("Playback failed in onLoadedData", e));
           }
         }}
@@ -503,23 +515,15 @@ export default function Home() {
         <div className="flex h-screen w-full flex-col bg-background text-foreground">
           <Header onToggleLibrary={() => setIsLibraryOpen(prev => !prev)} isLibraryOpen={isLibraryOpen} />
           <main className="flex flex-1 overflow-hidden">
-            {isMobile ? (
-              <Sheet open={isLibraryOpen} onOpenChange={setIsLibraryOpen}>
-                <SheetContent side="left" className="p-0 w-full border-r-0">
-                  {trackListComponent}
-                </SheetContent>
-              </Sheet>
-            ) : (
-              <aside
-                className={cn(
-                  "absolute top-0 left-0 h-screen flex-shrink-0 bg-card transition-transform duration-300 ease-in-out z-20",
-                  isLibraryOpen ? 'translate-x-0' : '-translate-x-full'
-                )}
-                style={{ width: '350px' }}
-              >
-                {trackListComponent}
-              </aside>
-            )}
+            <aside
+              className={cn(
+                "absolute top-0 left-0 h-screen flex-shrink-0 bg-card transition-transform duration-300 ease-in-out z-20",
+                isLibraryOpen ? 'translate-x-0' : '-translate-x-full'
+              )}
+              style={{ width: '350px' }}
+            >
+              {trackListComponent}
+            </aside>
 
 
             <div className={cn(
@@ -583,6 +587,8 @@ export default function Home() {
                   onAutomationDragEnd={handleAutomationDragEnd}
                   debugState={debugState}
                   setDebugState={setDebugState}
+                  startDelay={startDelay}
+                  onStartDelayChange={setStartDelay}
                 />
                 <PlaybackControls 
                   isPlaying={isPlaying} 

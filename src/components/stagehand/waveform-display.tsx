@@ -6,6 +6,8 @@ import { type WaveformData } from '@/lib/waveform';
 import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAction, useMemo, useCallback } from 'react';
 import TimeRuler from './time-ruler';
 import type { AutomationPoint } from '@/lib/storage-manager';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
 
 const POINT_RADIUS = 6;
 const HITBOX_RADIUS = 12;
@@ -30,6 +32,8 @@ type WaveformDisplayProps = {
   onAutomationDragEnd: () => void;
   debugState: string;
   setDebugState: Dispatch<SetStateAction<string>>;
+  startDelay: number;
+  onStartDelayChange: (delay: number) => void;
 };
 
 const ChannelWaveform = ({ data, progress, isStereo }: { data: number[], progress: number, isStereo: boolean }) => {
@@ -72,6 +76,8 @@ export default function WaveformDisplay({
   onAutomationDragEnd,
   debugState,
   setDebugState,
+  startDelay,
+  onStartDelayChange,
 }: WaveformDisplayProps) {
   const waveformInteractionRef = useRef<HTMLDivElement>(null);
   const isMouseDownRef = useRef(false);
@@ -228,8 +234,22 @@ export default function WaveformDisplay({
 
   return (
     <div className="flex flex-col items-center space-y-2">
-       <div className="font-mono text-4xl font-bold text-center w-full bg-secondary text-secondary-foreground py-2 rounded-lg">
-          {formatTime(currentTime)}
+       <div className="flex w-full items-center gap-4">
+        <div className="font-mono text-4xl font-bold text-center w-full bg-secondary text-secondary-foreground py-2 rounded-lg">
+            {formatTime(currentTime)}
+        </div>
+        <div className="flex flex-col items-center space-y-1">
+            <Label htmlFor="start-delay" className="text-xs text-muted-foreground whitespace-nowrap">Start Delay (s)</Label>
+            <Input
+                id="start-delay"
+                type="number"
+                value={startDelay}
+                onChange={(e) => onStartDelayChange(parseFloat(e.target.value) || 0)}
+                className="w-24 h-12 text-center text-lg font-mono"
+                min="0"
+                step="0.1"
+            />
+        </div>
        </div>
        <div 
          ref={scrollContainerRef}
@@ -330,4 +350,5 @@ export default function WaveformDisplay({
   );
 
     
+
 
