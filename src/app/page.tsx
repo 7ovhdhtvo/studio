@@ -23,6 +23,7 @@ import PlaybackModeView from '@/components/stagehand/playback-mode-view';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { cn } from '@/lib/utils';
 import MarkerControl from '@/components/stagehand/marker-control';
+import MarkerPlaybackControls from '@/components/stagehand/marker-playback-controls';
 
 export type OpenControlPanel = 'volume' | 'speed' | 'metronome' | 'markers' | null;
 
@@ -374,22 +375,35 @@ export default function Home() {
   
   const handleBackToStart = () => {
     if (!audioRef.current) return;
+    audioRef.current.currentTime = playbackStartTime;
+    setProgress((playbackStartTime / duration) * 100);
+  };
+  
+  const handleJumpToPreviousMarker = () => {
+    if (!audioRef.current || markers.length === 0) return handleBackToStart();
 
-    if (isMarkerModeActive && markers.length > 0) {
-        const sortedMarkers = [...markers].sort((a, b) => a.time - b.time);
-        const prevMarkers = sortedMarkers.filter(m => m.time < audioRef.current!.currentTime - 0.5);
+    const sortedMarkers = [...markers].sort((a, b) => a.time - b.time);
+    const prevMarkers = sortedMarkers.filter(m => m.time < audioRef.current!.currentTime - 0.5);
 
-        if (prevMarkers.length > 0) {
-            const targetTime = prevMarkers[prevMarkers.length - 1].time;
-            audioRef.current.currentTime = targetTime;
-            setProgress((targetTime / duration) * 100);
-        } else {
-            audioRef.current.currentTime = playbackStartTime;
-            setProgress((playbackStartTime / duration) * 100);
-        }
+    if (prevMarkers.length > 0) {
+        const targetTime = prevMarkers[prevMarkers.length - 1].time;
+        audioRef.current.currentTime = targetTime;
+        setProgress((targetTime / duration) * 100);
     } else {
-        audioRef.current.currentTime = playbackStartTime;
-        setProgress((playbackStartTime / duration) * 100);
+        handleBackToStart();
+    }
+  };
+
+  const handleJumpToNextMarker = () => {
+    if (!audioRef.current || markers.length === 0) return;
+
+    const sortedMarkers = [...markers].sort((a, b) => a.time - b.time);
+    const nextMarkers = sortedMarkers.filter(m => m.time > audioRef.current!.currentTime + 0.5);
+
+    if (nextMarkers.length > 0) {
+        const targetTime = nextMarkers[0].time;
+        audioRef.current.currentTime = targetTime;
+        setProgress((targetTime / duration) * 100);
     }
   };
 
@@ -500,6 +514,20 @@ export default function Home() {
     setMarkers(updatedMarkers);
     updateTrackMarkers(activeTrack.id, updatedMarkers);
   };
+  
+  const handleSelectStartMarker = (markerId: string | null) => {
+    if (!activeTrack) return;
+    const updatedMarkers = markers.map(m => ({
+        ...m,
+        isPlaybackStart: m.id === markerId
+    }));
+    
+    const startMarker = updatedMarkers.find(m => m.isPlaybackStart);
+    setPlaybackStartTime(startMarker ? startMarker.time : 0);
+    
+    setMarkers(updatedMarkers);
+    updateTrackMarkers(activeTrack.id, updatedMarkers);
+  }
 
   const handleDeleteMarker = (id: string) => {
       if (!activeTrack) return;
@@ -682,6 +710,16 @@ export default function Home() {
                   onToggleLoop={toggleLoop}
                   onBackToStart={handleBackToStart}
                 />
+
+                {isMarkerModeActive && (
+                  <MarkerPlaybackControls 
+                    markers={markers}
+                    onJumpToPrevious={handleJumpToPreviousMarker}
+                    onJumpToNext={handleJumpToNextMarker}
+                    onSelectStartMarker={handleSelectStartMarker}
+                    selectedStartMarkerId={markers.find(m => m.isPlaybackStart)?.id || null}
+                  />
+                )}
 
                 <div className="flex justify-center items-start gap-4 pt-4 flex-wrap">
                   <VolumeControl 

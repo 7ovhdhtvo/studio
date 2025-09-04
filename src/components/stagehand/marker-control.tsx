@@ -14,19 +14,18 @@ import { Checkbox } from '../ui/checkbox';
 type MarkerEditorProps = {
   marker: Marker;
   markerNumber: number;
-  onUpdate: (id: string, newName: string, newTime: number, isStart: boolean) => void;
+  onUpdate: (id: string, newName: string, newTime: number) => void;
   onDelete: (id: string) => void;
 };
 
 function MarkerEditor({ marker, markerNumber, onUpdate, onDelete }: MarkerEditorProps) {
   const [name, setName] = useState(marker.name || '');
   const [time, setTime] = useState(marker.time.toFixed(2));
-  const [isStart, setIsStart] = useState(marker.isPlaybackStart || false);
 
   const handleSave = () => {
     const timeValue = parseFloat(time);
     if (!isNaN(timeValue)) {
-      onUpdate(marker.id, name, timeValue, isStart);
+      onUpdate(marker.id, name, timeValue);
     }
   };
 
@@ -59,19 +58,6 @@ function MarkerEditor({ marker, markerNumber, onUpdate, onDelete }: MarkerEditor
               className="col-span-2 h-8"
             />
           </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox 
-                id={`start-marker-${marker.id}`} 
-                checked={isStart}
-                onCheckedChange={(checked) => setIsStart(Boolean(checked))}
-            />
-            <label
-                htmlFor={`start-marker-${marker.id}`}
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-                Start from this marker
-            </label>
-        </div>
         </div>
         <div className="flex justify-between">
             <Button size="sm" onClick={handleSave}>Save</Button>
@@ -112,6 +98,13 @@ export default function MarkerControl({
   onDeleteAllMarkers,
   onJumpToMarker,
 }: MarkerControlProps) {
+
+  const handleUpdate = (id: string, newName: string, newTime: number) => {
+    const marker = markers.find(m => m.id === id);
+    if (marker) {
+        onUpdateMarker(id, newName, newTime, !!marker.isPlaybackStart);
+    }
+  }
 
   if (!isOpen) {
     return (
@@ -176,21 +169,21 @@ export default function MarkerControl({
                         <div key={marker.id} className="flex items-center justify-between gap-2">
                             <Button 
                                 variant="ghost" 
-                                className="flex-1 justify-start text-left h-auto py-1.5"
+                                className="flex-1 justify-start text-left h-auto py-1.5 min-w-0"
                                 onClick={() => onJumpToMarker(marker.time)}
                             >
-                                <div className="flex flex-col">
-                                    <span className="font-semibold">{displayName}</span>
+                                <div className="flex flex-col overflow-hidden">
+                                    <span className="font-semibold truncate">{displayName}</span>
                                     <span className="font-mono text-xs text-muted-foreground">{marker.time.toFixed(2)}s</span>
                                 </div>
                             </Button>
                             <Popover>
                                 <PopoverTrigger asChild>
-                                    <Button variant="outline" size="icon" className="h-8 w-8">
+                                    <Button variant="outline" size="icon" className="h-8 w-8 flex-shrink-0">
                                         <Edit className="h-4 w-4" />
                                     </Button>
                                 </PopoverTrigger>
-                                <MarkerEditor marker={marker} markerNumber={markerNumber} onUpdate={onUpdateMarker} onDelete={onDeleteMarker} />
+                                <MarkerEditor marker={marker} markerNumber={markerNumber} onUpdate={handleUpdate} onDelete={onDeleteMarker} />
                             </Popover>
                         </div>
                     )
