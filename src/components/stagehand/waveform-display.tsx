@@ -3,7 +3,8 @@
 
 import { cn } from '@/lib/utils';
 import { type WaveformData } from '@/lib/waveform';
-import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAction, useMemo, useCallback, TouchEvent, useEffect } from 'react';
+import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAction, useMemo, useCallback } from 'react';
+import type { TouchEvent } from 'react';
 import TimeRuler from './time-ruler';
 import type { AutomationPoint, Marker } from '@/lib/storage-manager';
 import { Input } from '../ui/input';
@@ -19,7 +20,6 @@ const MARKER_COLORS = [
     '#f59e0b', // amber-500
     '#3b82f6', // blue-500
     '#eab308', // yellow-500
-    '#ef4444', // red-500
 ];
 
 const getMarkerColor = (markerId: string) => {
@@ -287,21 +287,27 @@ export default function WaveformDisplay({
           );
           onMarkersChange(updatedMarkers);
 
-          // Auto-scroll logic
+          // Auto-scroll logic based on viewport
           if (scrollContainerRef.current) {
             const scrollRect = scrollContainerRef.current.getBoundingClientRect();
-            const relativeX = ('touches' in e ? e.touches[0].clientX : e.clientX) - scrollRect.left;
-            const scrollThreshold = 50; // pixels from edge
-            const scrollSpeed = Math.max(1, (scrollThreshold - relativeX) / 5) / zoom;
+            const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+            const relativeX = clientX - scrollRect.left;
             
-            if (relativeX < scrollThreshold) {
-              scrollContainerRef.current.scrollLeft -= scrollSpeed;
-            } else if (relativeX > scrollRect.width - scrollThreshold) {
-              const rightScrollSpeed = Math.max(1, (relativeX - (scrollRect.width - scrollThreshold)) / 5) / zoom;
-              scrollContainerRef.current.scrollLeft += rightScrollSpeed;
+            // Define a zone at the edges for scrolling, e.g., 10% of the viewport width
+            const scrollZone = scrollRect.width * 0.1; 
+            
+            if (relativeX < scrollZone) {
+              // Scrolling left
+              const intensity = (scrollZone - relativeX) / scrollZone; // 0 to 1
+              const scrollAmount = intensity * (scrollRect.width * 0.02); // Scroll up to 2% of viewport width per frame
+              scrollContainerRef.current.scrollLeft -= scrollAmount;
+            } else if (relativeX > scrollRect.width - scrollZone) {
+              // Scrolling right
+              const intensity = (relativeX - (scrollRect.width - scrollZone)) / scrollZone; // 0 to 1
+              const scrollAmount = intensity * (scrollRect.width * 0.02); // Scroll up to 2% of viewport width per frame
+              scrollContainerRef.current.scrollLeft += scrollAmount;
             }
           }
-
       }
   };
 
@@ -380,12 +386,12 @@ export default function WaveformDisplay({
          className="w-full overflow-x-auto"
        >
         <div 
-          className="relative h-48 bg-card rounded-lg pt-6 shadow-inner"
+          className="relative h-48 bg-card rounded-lg pt-8 shadow-inner"
           style={{ width: `${100 * zoom}%` }}
         >
           <div 
             ref={waveformInteractionRef}
-            className="absolute inset-0 top-6 bottom-0 z-0"
+            className="absolute inset-0 top-8 bottom-0 z-0"
             onMouseDown={handleScrubMouseDown}
             onMouseMove={handleScrubMouseMove}
             onMouseUp={handleEndDrag}
@@ -467,6 +473,7 @@ export default function WaveformDisplay({
                      {isAnyMarkerModeOn && sortedMarkers.map((marker, index) => {
                         const { width, height } = waveformInteractionRef.current!.getBoundingClientRect();
                         const x = timeToX(marker.time, width);
+                        const isStartMarker = marker.isPlaybackStart || (!markers.some(m => m.isPlaybackStart) && index === 0);
                         const color = getMarkerColor(marker.id);
                         const markerName = marker.name || `Marker ${index + 1}`;
 
@@ -499,7 +506,7 @@ export default function WaveformDisplay({
           
           {durationInSeconds > 0 && (
             <div 
-              className="absolute top-6 h-[calc(100%-1.5rem)] w-0.5 bg-foreground/70 pointer-events-none z-20"
+              className="absolute top-8 h-[calc(100%-2rem)] w-0.5 bg-foreground/70 pointer-events-none z-20"
               style={{ left: `${progress}%` }}
             >
               <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 bg-foreground/70 rounded-full"></div>
