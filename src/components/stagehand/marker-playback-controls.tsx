@@ -3,11 +3,18 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Flag, SkipBack, SkipForward } from 'lucide-react';
+import { Flag, SkipBack, SkipForward, Play } from 'lucide-react';
 import type { Marker } from '@/lib/storage-manager';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+
+type StaticOption = {
+  id: string;
+  name: string;
+  description: string;
+  icon?: React.ComponentType<{ className?: string }>;
+};
 
 type MarkerSelectorProps = {
   markers: Marker[];
@@ -18,6 +25,7 @@ type MarkerSelectorProps = {
   label: string;
   defaultOptionLabel: string;
   showDefaultOption: boolean;
+  staticOptions?: StaticOption[];
 };
 
 const MarkerSelector = ({ 
@@ -29,10 +37,23 @@ const MarkerSelector = ({
   label,
   defaultOptionLabel,
   showDefaultOption,
+  staticOptions = [],
 }: MarkerSelectorProps) => {
   const sortedMarkers = [...markers].sort((a, b) => a.time - b.time);
-  const selectedMarker = markers.find(m => m.id === selectedMarkerId);
-  const selectedMarkerName = selectedMarker?.name || (selectedMarker ? `Marker ${sortedMarkers.findIndex(m => m.id === selectedMarkerId) + 1}` : defaultOptionLabel);
+  
+  const getSelectedItemName = () => {
+    const staticOption = staticOptions.find(o => o.id === selectedMarkerId);
+    if (staticOption) return staticOption.name;
+    
+    const selectedMarker = markers.find(m => m.id === selectedMarkerId);
+    if (selectedMarker) {
+      return selectedMarker.name || `Marker ${sortedMarkers.findIndex(m => m.id === selectedMarkerId) + 1}`;
+    }
+    
+    return defaultOptionLabel;
+  };
+
+  const selectedItemName = getSelectedItemName();
 
   const handleSelect = (markerId: string | null) => {
     onSelectMarker(markerId);
@@ -47,7 +68,7 @@ const MarkerSelector = ({
           className="w-64 h-20 text-lg font-semibold shadow-lg bg-card hover:bg-accent flex-col gap-1"
         >
           <span className="text-xs text-muted-foreground font-medium">{label}</span>
-          <span className="truncate">{selectedMarkerName}</span>
+          <span className="truncate">{selectedItemName}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0">
@@ -56,6 +77,19 @@ const MarkerSelector = ({
         </div>
         <ScrollArea className="h-48">
           <div className="p-1">
+            {staticOptions.map(option => (
+              <Button
+                  key={option.id}
+                  variant={option.id === selectedMarkerId ? "secondary" : "ghost"}
+                  className="w-full justify-start h-auto py-2"
+                  onClick={() => handleSelect(option.id)}
+              >
+                  <div className="flex flex-col items-start whitespace-normal text-left">
+                      <span>{option.name}</span>
+                      <span className="text-xs text-muted-foreground">{option.description}</span>
+                  </div>
+              </Button>
+            ))}
             {showDefaultOption && (
               <Button
                   variant={!selectedMarkerId ? "secondary" : "ghost"}
@@ -116,6 +150,10 @@ export default function MarkerPlaybackControls({
   const [isStartPopoverOpen, setIsStartPopoverOpen] = useState(false);
   const [isEndPopoverOpen, setIsEndPopoverOpen] = useState(false);
 
+  const startStaticOptions: StaticOption[] = [
+    { id: 'playhead', name: 'Playhead', description: 'Current position' },
+  ];
+
   return (
     <div className="flex flex-col items-center gap-4 mt-4">
       <div className="flex items-center justify-center gap-4">
@@ -142,6 +180,7 @@ export default function MarkerPlaybackControls({
           label="START FROM"
           defaultOptionLabel="Track Start"
           showDefaultOption={true}
+          staticOptions={startStaticOptions}
         />
 
         <Button

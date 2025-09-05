@@ -78,6 +78,7 @@ export default function Home() {
   const [showMarkers, setShowMarkers] = useState(false);
   const [isMarkerModeActive, setIsMarkerModeActive] = useState(false);
   const [isMarkerLoopActive, setIsMarkerLoopActive] = useState(false);
+  const [selectedStartMarkerId, setSelectedStartMarkerId] = useState<string | null>('playhead');
   
   const [isDraggingAutomation, setIsDraggingAutomation] = useState(false);
   const [debugState, setDebugState] = useState('Ready');
@@ -95,13 +96,20 @@ export default function Home() {
   const currentTime = audioRef.current?.currentTime ?? 0;
 
   const { playbackStartTime, playbackEndTime } = useMemo(() => {
-    const startMarker = markers.find(m => m.isPlaybackStart);
+    let startTime = 0;
+    if (selectedStartMarkerId === 'playhead') {
+      startTime = currentTime;
+    } else {
+      const startMarker = markers.find(m => m.id === selectedStartMarkerId);
+      startTime = startMarker?.time ?? 0;
+    }
+
     const endMarker = markers.find(m => m.isLoopEnd);
     return {
-      playbackStartTime: startMarker?.time ?? 0,
+      playbackStartTime: startTime,
       playbackEndTime: endMarker?.time ?? duration,
     };
-  }, [markers, duration]);
+  }, [markers, duration, selectedStartMarkerId, currentTime]);
 
   useEffect(() => {
     if (isMobile) {
@@ -220,9 +228,8 @@ export default function Home() {
     if (isPlaying && audioSrc) {
         if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
 
-        // If starting from the very beginning, apply delay. Otherwise, play immediately.
-        const isNearStart = Math.abs(audio.currentTime - playbackStartTime) < 0.1;
-        const delay = (startDelay > 0 && isNearStart) ? startDelay * 1000 : 0;
+        const isStartingPlayback = Math.abs(audio.currentTime - playbackStartTime) < 0.1;
+        const delay = (startDelay > 0 && isStartingPlayback) ? startDelay * 1000 : 0;
         
         playbackTimeoutRef.current = setTimeout(() => {
             if (audio.paused) {
@@ -284,6 +291,10 @@ export default function Home() {
           const intensity = (relativePlayheadX - (scrollRect.width - scrollZone)) / scrollZone;
           const scrollAmount = intensity * (scrollRect.width * 0.02);
           scrollContainer.scrollLeft += scrollAmount;
+      } else if (relativePlayheadX < scrollZone) {
+          const intensity = (scrollZone - relativePlayheadX) / scrollZone;
+          const scrollAmount = intensity * (scrollRect.width * 0.02);
+          scrollContainer.scrollLeft -= scrollAmount;
       }
     }
   }, [progress, isPlaying]);
@@ -401,6 +412,7 @@ export default function Home() {
   
   const handleBackToStart = () => {
     if (!audioRef.current) return;
+    if (selectedStartMarkerId === 'playhead') return;
     audioRef.current.currentTime = playbackStartTime;
     setProgress((playbackStartTime / duration) * 100);
   };
@@ -552,13 +564,17 @@ export default function Home() {
   };
   
   const handleSelectStartMarker = (markerId: string | null) => {
-    if (!activeTrack) return;
-    const updatedMarkers = markers.map(m => ({
-        ...m,
-        isPlaybackStart: m.id === markerId
-    }));
-    setMarkers(updatedMarkers);
-    updateTrackMarkers(activeTrack.id, updatedMarkers);
+    setSelectedStartMarkerId(markerId);
+    if (markerId !== 'playhead' && markerId !== null) {
+        const marker = markers.find(m => m.id === markerId);
+        if (marker && audioRef.current) {
+            audioRef.current.currentTime = marker.time;
+            setProgress((marker.time / duration) * 100);
+        }
+    } else if (markerId === null && audioRef.current) { // Track Start
+        audioRef.current.currentTime = 0;
+        setProgress(0);
+    }
   }
   
   const handleSelectEndMarker = (markerId: string | null) => {
@@ -761,7 +777,7 @@ export default function Home() {
                     onJumpToPrevious={handleJumpToPreviousMarker}
                     onJumpToNext={handleJumpToNextMarker}
                     onSelectStartMarker={handleSelectStartMarker}
-                    selectedStartMarkerId={markers.find(m => m.isPlaybackStart)?.id || null}
+                    selectedStartMarkerId={selectedStartMarkerId}
                     onSelectEndMarker={handleSelectEndMarker}
                     selectedEndMarkerId={markers.find(m => m.isLoopEnd)?.id || null}
                     isLoopActive={isMarkerLoopActive}
