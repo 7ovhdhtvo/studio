@@ -9,7 +9,7 @@ import type { AutomationPoint, Marker } from '@/lib/storage-manager';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Checkbox } from '../ui/checkbox';
-import { Flag, SkipBack, SkipForward } from 'lucide-react';
+import { Flag } from 'lucide-react';
 
 const POINT_RADIUS = 6;
 const HITBOX_RADIUS = 12;
@@ -323,7 +323,7 @@ export default function WaveformDisplay({
                     onChange={(e) => onStartDelayChange(parseFloat(e.target.value) || 0)}
                     className="w-24 h-10 text-center text-lg font-mono"
                     min="0"
-                    step="0.1"
+                    step="1"
                 />
             </div>
              <div className="flex items-center space-x-2">

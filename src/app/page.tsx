@@ -144,7 +144,14 @@ export default function Home() {
       const audio = audioRef.current;
       if (audio && !isScrubbingRef.current && !audio.paused) {
         if (isMarkerLoopActive && audio.currentTime >= playbackEndTime) {
-          audio.currentTime = playbackStartTime;
+          if (applyDelayToLoop && startDelay > 0) {
+            setIsPlaying(false);
+            audio.currentTime = playbackStartTime;
+            setProgress((playbackStartTime / duration) * 100);
+            setTimeout(() => setIsPlaying(true), 10);
+          } else {
+            audio.currentTime = playbackStartTime;
+          }
         }
 
         const newProgress = (audio.currentTime / audio.duration) * 100;
@@ -164,7 +171,7 @@ export default function Home() {
       }
     };
     animationFrameRef.current = requestAnimationFrame(animate);
-  }, [stopProgressLoop, isAutomationActive, volumePoints, getAutomationValue, isDraggingAutomation, volume, isMarkerLoopActive, playbackStartTime, playbackEndTime]);
+  }, [stopProgressLoop, isAutomationActive, volumePoints, getAutomationValue, isDraggingAutomation, volume, isMarkerLoopActive, playbackStartTime, playbackEndTime, applyDelayToLoop, startDelay, duration]);
 
 
   useEffect(() => {
