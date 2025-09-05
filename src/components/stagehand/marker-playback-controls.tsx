@@ -3,21 +3,10 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Flag, ListMusic } from 'lucide-react';
+import { Flag, ListMusic, SkipBack, SkipForward } from 'lucide-react';
 import type { Marker } from '@/lib/storage-manager';
-import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
-
-const SkipToFlagIcon = ({ direction = 'left' }: { direction?: 'left' | 'right' }) => (
-  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
-    className={cn("h-10 w-10", direction === 'right' && 'transform scale-x-[-1]')}
-  >
-    <path d="M18 16.5V6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M18 9H13.2C13.2 9 12.6 9 12.6 9.6C12.6 10.2 13.2 10.2 13.2 10.2H18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M5 17.5L12 12L5 6.5V17.5Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" fill="currentColor"/>
-  </svg>
-);
 
 type MarkerSelectorProps = {
   markers: Marker[];
@@ -102,12 +91,13 @@ export default function MarkerPlaybackControls({
       <Button
         variant="outline"
         size="icon"
-        className="h-20 w-20 rounded-full bg-foreground/80 hover:bg-foreground shadow-lg transition-transform transform hover:scale-105 text-background"
+        className="h-20 w-20 rounded-full bg-foreground/80 hover:bg-foreground shadow-lg transition-transform transform hover:scale-105 text-background relative"
         onClick={onJumpToPrevious}
         aria-label="Jump to Previous Marker"
         disabled={markers.length === 0}
       >
-        <SkipToFlagIcon direction="left" />
+        <SkipBack className="h-10 w-10 absolute" />
+        <Flag className="h-5 w-5 absolute -translate-x-0.5 fill-background" />
       </Button>
 
       <MarkerSelector 
@@ -119,12 +109,13 @@ export default function MarkerPlaybackControls({
       <Button
         variant="outline"
         size="icon"
-        className="h-20 w-20 rounded-full bg-foreground/80 hover:bg-foreground shadow-lg transition-transform transform hover:scale-105 text-background"
+        className="h-20 w-20 rounded-full bg-foreground/80 hover:bg-foreground shadow-lg transition-transform transform hover:scale-105 text-background relative"
         onClick={onJumpToNext}
         aria-label="Jump to Next Marker"
         disabled={markers.length === 0}
       >
-        <SkipToFlagIcon direction="right" />
+        <SkipForward className="h-10 w-10 absolute" />
+        <Flag className="h-5 w-5 absolute translate-x-0.5 fill-background" />
       </Button>
     </div>
   );
