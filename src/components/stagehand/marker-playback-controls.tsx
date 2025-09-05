@@ -91,13 +91,15 @@ export default function MarkerPlaybackControls({
       <Button
         variant="outline"
         size="icon"
-        className="h-20 w-20 rounded-full bg-foreground/80 hover:bg-foreground shadow-lg transition-transform transform hover:scale-105 text-background relative"
+        className="h-20 w-20 rounded-full bg-foreground/80 hover:bg-foreground shadow-lg transition-transform transform hover:scale-105 text-background"
         onClick={onJumpToPrevious}
         aria-label="Jump to Previous Marker"
         disabled={markers.length === 0}
       >
-        <SkipBack className="h-10 w-10 absolute" />
-        <Flag className="h-5 w-5 absolute -translate-x-0.5 fill-background" />
+        <div className="flex items-center justify-center">
+            <Flag className="h-6 w-6" />
+            <SkipBack className="h-10 w-10" />
+        </div>
       </Button>
 
       <MarkerSelector 
@@ -109,13 +111,15 @@ export default function MarkerPlaybackControls({
       <Button
         variant="outline"
         size="icon"
-        className="h-20 w-20 rounded-full bg-foreground/80 hover:bg-foreground shadow-lg transition-transform transform hover:scale-105 text-background relative"
+        className="h-20 w-20 rounded-full bg-foreground/80 hover:bg-foreground shadow-lg transition-transform transform hover:scale-105 text-background"
         onClick={onJumpToNext}
         aria-label="Jump to Next Marker"
         disabled={markers.length === 0}
       >
-        <SkipForward className="h-10 w-10 absolute" />
-        <Flag className="h-5 w-5 absolute translate-x-0.5 fill-background" />
+        <div className="flex items-center justify-center">
+            <SkipForward className="h-10 w-10" />
+            <Flag className="h-6 w-6" />
+        </div>
       </Button>
     </div>
   );
