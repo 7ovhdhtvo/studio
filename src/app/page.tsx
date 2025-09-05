@@ -62,6 +62,7 @@ export default function Home() {
   const [isAutomationActive, setIsAutomationActive] = useState(false);
   const [showSpeedAutomation, setShowSpeedAutomation] = useState(false);
   const [zoom, setZoom] = useState(1); // 1 = 100%
+  const [zoomBeforeDrag, setZoomBeforeDrag] = useState(1);
   const [speed, setSpeed] = useState(100); // Global speed in %
   const [volume, setVolume] = useState(75); // Global volume in % (0-100)
   const [openControlPanel, setOpenControlPanel] = useState<OpenControlPanel>(null);
@@ -85,6 +86,7 @@ export default function Home() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const animationFrameRef = useRef<number>();
   const playbackTimeoutRef = useRef<NodeJS.Timeout>();
+  const previewTimeoutRef = useRef<NodeJS.Timeout>();
   const isScrubbingRef = useRef(false);
   const waveformContainerRef = useRef<HTMLDivElement>(null);
   const isMobile = useMediaQuery("(max-width: 768px)");
@@ -144,14 +146,13 @@ export default function Home() {
       const audio = audioRef.current;
       if (audio && !isScrubbingRef.current && !audio.paused) {
         if (isMarkerLoopActive && audio.currentTime >= playbackEndTime) {
-          if (applyDelayToLoop && startDelay > 0) {
-            setIsPlaying(false);
             audio.currentTime = playbackStartTime;
-            setProgress((playbackStartTime / duration) * 100);
-            setTimeout(() => setIsPlaying(true), 10);
-          } else {
-            audio.currentTime = playbackStartTime;
-          }
+            if (applyDelayToLoop && startDelay > 0) {
+              setIsPlaying(false);
+              setProgress((playbackStartTime / duration) * 100);
+              setTimeout(() => setIsPlaying(true), 10);
+              return; // Exit animation loop until delay is over
+            }
         }
 
         const newProgress = (audio.currentTime / audio.duration) * 100;
@@ -235,11 +236,13 @@ export default function Home() {
         }, delay);
     } else {
         if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
+        if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
         audio.pause();
     }
     
     return () => {
         if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
+        if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
     }
   }, [isPlaying, audioSrc, startDelay, playbackStartTime]);
 
@@ -325,7 +328,7 @@ export default function Home() {
     
     setActiveTrack(track);
     setMarkers(track.markers || []);
-    setProgress((playbackStartTime / track.duration) * 100);
+    setProgress(0); // Reset progress on new track
     setVolumePoints(track.volumeAutomation || []);
     
     if ((track.volumeAutomation || []).length === 0) {
@@ -483,9 +486,31 @@ export default function Home() {
     setMarkers(newMarkers);
   }
 
-  const handleMarkerDragEnd = () => {
+  const handleMarkerDragStart = () => {
+    setZoomBeforeDrag(zoom);
+    setZoom(15);
+  };
+
+  const handleMarkerDragEnd = (newTime: number) => {
+    setZoom(zoomBeforeDrag);
     if (activeTrack) {
         updateTrackMarkers(activeTrack.id, markers);
+    }
+    
+    // Play preview
+    if (audioRef.current) {
+        if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
+        const wasPlaying = isPlaying;
+        setIsPlaying(false); // Pause main playback
+        audioRef.current.currentTime = newTime;
+        audioRef.current.play().catch(e => logger.error("Preview playback failed", e));
+        
+        previewTimeoutRef.current = setTimeout(() => {
+            audioRef.current?.pause();
+            if (wasPlaying) {
+              setIsPlaying(true); // Resume main playback if it was active
+            }
+        }, 1000); // Play for 1 second
     }
   }
 
@@ -706,6 +731,7 @@ export default function Home() {
                   showMarkers={showMarkers}
                   isMarkerModeActive={isMarkerModeActive}
                   onMarkersChange={handleSetMarkers}
+                  onMarkerDragStart={handleMarkerDragStart}
                   onMarkerDragEnd={handleMarkerDragEnd}
                   debugState={debugState}
                   setDebugState={setDebugState}
