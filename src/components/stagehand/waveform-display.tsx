@@ -3,7 +3,7 @@
 
 import { cn } from '@/lib/utils';
 import { type WaveformData } from '@/lib/waveform';
-import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAction, useMemo, useCallback, TouchEvent, useEffect } from 'react';
+import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAction, useMemo, useCallback, TouchEvent } from 'react';
 import TimeRuler from './time-ruler';
 import type { AutomationPoint, Marker } from '@/lib/storage-manager';
 import { Input } from '../ui/input';
@@ -19,7 +19,9 @@ const MARKER_COLORS = [
     '#f59e0b', // amber-500
     '#3b82f6', // blue-500
     '#eab308', // yellow-500
+    '#ef4444', // red-500
 ];
+
 
 const getMarkerColor = (markerId: string) => {
     // Simple hash function to get a consistent color index
@@ -36,6 +38,7 @@ type WaveformDisplayProps = {
   waveformData: WaveformData | null;
   durationInSeconds: number;
   zoom: number;
+  setZoom: (zoom: number) => void;
   progress: number;
   onProgressChange: (newProgress: number) => void;
   onScrubStart: () => void;
@@ -56,8 +59,6 @@ type WaveformDisplayProps = {
   onMarkersChange: (markers: Marker[]) => void;
   onMarkerDragStart: (markerId: string) => void;
   onMarkerDragEnd: (newTime: number) => void;
-  onEnterMarkerEditMode: (markerId: string) => void;
-  editingMarkerId: string | null;
   debugState: string;
   setDebugState: Dispatch<SetStateAction<string>>;
   startDelay: number;
@@ -90,6 +91,7 @@ export default function WaveformDisplay({
   waveformData,
   durationInSeconds,
   zoom,
+  setZoom,
   progress,
   onProgressChange,
   onScrubStart,
@@ -110,8 +112,6 @@ export default function WaveformDisplay({
   onMarkersChange,
   onMarkerDragStart,
   onMarkerDragEnd,
-  onEnterMarkerEditMode,
-  editingMarkerId,
   debugState,
   setDebugState,
   startDelay,
@@ -123,6 +123,8 @@ export default function WaveformDisplay({
   const isMouseDownRef = useRef(false);
   const draggingPointIdRef = useRef<string | null>(null);
   const draggingMarkerIdRef = useRef<string | null>(null);
+  const startDragYRef = useRef(0);
+  const startZoomRef = useRef(1);
 
   const getSvgCoords = (e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>): {x: number, y: number} => {
     const svg = e.currentTarget as SVGSVGElement;
@@ -214,7 +216,7 @@ export default function WaveformDisplay({
   };
 
   const handleSvgInteractionStart = (e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>) => {
-      if (editingMarkerId || (e.target as SVGElement).dataset.pointId || (e.target as SVGElement).dataset.markerId) return;
+      if ((e.target as SVGElement).dataset.pointId || (e.target as SVGElement).dataset.markerId) return;
       e.preventDefault();
 
       const { width, height } = e.currentTarget.getBoundingClientRect();
@@ -252,11 +254,10 @@ export default function WaveformDisplay({
       e.preventDefault();
 
       const { width, height } = e.currentTarget.getBoundingClientRect();
-      const { x } = getSvgCoords(e);
+      const { x, y } = getSvgCoords(e);
       const newTime = (x / width) * durationInSeconds;
 
       if (draggingPointIdRef.current && showVolumeAutomation) {
-        const { y } = getSvgCoords(e);
         const newValue = 100 - (y / height) * 100;
         const updatedPoints = automationPoints.map(p =>
           p.id === draggingPointIdRef.current ? { 
@@ -268,6 +269,13 @@ export default function WaveformDisplay({
         onAutomationPointsChange(updatedPoints);
         setDebugState(`Dragging ${draggingPointIdRef.current}`);
       } else if (draggingMarkerIdRef.current && showMarkers) {
+          // Vertical drag for zoom
+          const deltaY = startDragYRef.current - y;
+          const zoomSensitivity = 0.01;
+          const newZoom = Math.max(1, Math.min(20, startZoomRef.current + deltaY * zoomSensitivity));
+          setZoom(newZoom);
+
+          // Horizontal drag for time
           const updatedMarkers = markers.map(m =>
               m.id === draggingMarkerIdRef.current ? {
                   ...m,
@@ -275,6 +283,20 @@ export default function WaveformDisplay({
               } : m
           );
           onMarkersChange(updatedMarkers);
+
+          // Auto-scroll logic
+          if (scrollContainerRef.current) {
+            const scrollRect = scrollContainerRef.current.getBoundingClientRect();
+            const relativeX = ('touches' in e ? e.touches[0].clientX : e.clientX) - scrollRect.left;
+            const scrollThreshold = 50; // pixels from edge
+
+            if (relativeX < scrollThreshold) {
+              scrollContainerRef.current.scrollLeft -= (scrollThreshold - relativeX);
+            } else if (relativeX > scrollRect.width - scrollThreshold) {
+              scrollContainerRef.current.scrollLeft += (relativeX - (scrollRect.width - scrollThreshold));
+            }
+          }
+
       }
   };
 
@@ -286,39 +308,19 @@ export default function WaveformDisplay({
       setDebugState(`Dragging ${pointId}`);
   }
 
-  const handleMarkerInteractionStart = (e: MouseEvent | TouchEvent, markerId: string) => {
+  const handleMarkerInteractionStart = (e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>, markerId: string) => {
     e.stopPropagation();
     if (!showMarkers) return;
     
-    if (editingMarkerId === markerId) {
-        // Already in edit mode, start dragging
-        draggingMarkerIdRef.current = markerId;
-        onMarkerDragStart(markerId);
-    } else {
-        // Enter edit mode
-        onEnterMarkerEditMode(markerId);
-    }
+    draggingMarkerIdRef.current = markerId;
+    startDragYRef.current = getSvgCoords(e).y;
+    startZoomRef.current = zoom;
+    onMarkerDragStart(markerId);
   };
 
   const sortedMarkers = useMemo(() => [...markers].sort((a, b) => a.time - b.time), [markers]);
-  const startMarker = useMemo(() => markers.find(m => m.isPlaybackStart), [markers]);
 
   const currentTime = (progress / 100) * durationInSeconds;
-  
-  useEffect(() => {
-    if (editingMarkerId && scrollContainerRef.current) {
-        const marker = markers.find(m => m.id === editingMarkerId);
-        if (marker) {
-            const scrollContainer = scrollContainerRef.current;
-            const totalWidth = scrollContainer.scrollWidth;
-            const markerPosition = (marker.time / durationInSeconds) * totalWidth;
-            const visibleWidth = scrollContainer.clientWidth;
-            const newScrollLeft = markerPosition - visibleWidth / 2;
-            scrollContainer.scrollLeft = Math.max(0, newScrollLeft);
-        }
-    }
-  }, [editingMarkerId, markers, durationInSeconds, zoom, scrollContainerRef]);
-
 
   const formatTime = (seconds: number) => {
     if (isNaN(seconds) || seconds < 0) seconds = 0;
@@ -459,22 +461,13 @@ export default function WaveformDisplay({
                      {isAnyMarkerModeOn && sortedMarkers.map((marker, index) => {
                         const { width, height } = waveformInteractionRef.current!.getBoundingClientRect();
                         const x = timeToX(marker.time, width);
-                        
-                        let color: string;
-                        if ((startMarker && startMarker.id === marker.id) || (!startMarker && index === 0)) {
-                           color = 'hsl(var(--destructive))';
-                        } else {
-                            color = getMarkerColor(marker.id);
-                        }
-
+                        const color = getMarkerColor(marker.id);
                         const markerName = marker.name || `Marker ${index + 1}`;
-                        const isEditing = editingMarkerId === marker.id;
 
                         return (
                            <g 
                             key={marker.id} 
                             transform={`translate(${x}, 0)`}
-                            className={cn(isEditing && 'opacity-50')}
                            >
                               <line x1="0" y1="20" y2="100%" stroke={color} strokeWidth="2" />
                               <polygon points="-5,20 5,20 0,25" fill={color} />
@@ -500,10 +493,7 @@ export default function WaveformDisplay({
           
           {durationInSeconds > 0 && (
             <div 
-              className={cn(
-                  "absolute top-0 h-full w-0.5 bg-foreground/70 pointer-events-none z-20",
-                  editingMarkerId && "opacity-50"
-              )}
+              className="absolute top-0 h-full w-0.5 bg-foreground/70 pointer-events-none z-20"
               style={{ left: `${progress}%` }}
             >
               <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 bg-foreground/70 rounded-full"></div>

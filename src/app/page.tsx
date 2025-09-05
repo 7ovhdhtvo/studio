@@ -24,7 +24,6 @@ import { useMediaQuery } from '@/hooks/use-media-query';
 import { cn } from '@/lib/utils';
 import MarkerControl from '@/components/stagehand/marker-control';
 import MarkerPlaybackControls from '@/components/stagehand/marker-playback-controls';
-import MarkerEditOverlay from '@/components/stagehand/marker-edit-overlay';
 
 export type OpenControlPanel = 'volume' | 'speed' | 'metronome' | 'markers' | null;
 
@@ -63,7 +62,6 @@ export default function Home() {
   const [isAutomationActive, setIsAutomationActive] = useState(false);
   const [showSpeedAutomation, setShowSpeedAutomation] = useState(false);
   const [zoom, setZoom] = useState(1); // 1 = 100%
-  const [zoomBeforeDrag, setZoomBeforeDrag] = useState(1);
   const [speed, setSpeed] = useState(100); // Global speed in %
   const [volume, setVolume] = useState(75); // Global volume in % (0-100)
   const [openControlPanel, setOpenControlPanel] = useState<OpenControlPanel>(null);
@@ -80,7 +78,6 @@ export default function Home() {
   const [showMarkers, setShowMarkers] = useState(false);
   const [isMarkerModeActive, setIsMarkerModeActive] = useState(false);
   const [isMarkerLoopActive, setIsMarkerLoopActive] = useState(false);
-  const [editingMarkerId, setEditingMarkerId] = useState<string | null>(null);
   
   const [isDraggingAutomation, setIsDraggingAutomation] = useState(false);
   const [debugState, setDebugState] = useState('Ready');
@@ -104,10 +101,6 @@ export default function Home() {
       playbackEndTime: endMarker?.time ?? duration,
     };
   }, [markers, duration]);
-  
-  const editingMarker = useMemo(() => {
-    return markers.find(m => m.id === editingMarkerId) || null;
-  }, [markers, editingMarkerId]);
 
   useEffect(() => {
     if (isMobile) {
@@ -280,16 +273,19 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (waveformContainerRef.current && progress > 0 && !editingMarkerId) {
+    if (waveformContainerRef.current && progress > 0) {
       const scrollContainer = waveformContainerRef.current;
       const totalWidth = scrollContainer.scrollWidth;
       const playheadPosition = (progress / 100) * totalWidth;
       const visibleWidth = scrollContainer.clientWidth;
-      const newScrollLeft = playheadPosition - visibleWidth / 2;
       
-      scrollContainer.scrollLeft = Math.max(0, newScrollLeft);
+      // Only scroll if playhead is outside the middle 50% of the view
+      if (playheadPosition < scrollContainer.scrollLeft + visibleWidth * 0.25 || playheadPosition > scrollContainer.scrollLeft + visibleWidth * 0.75) {
+        const newScrollLeft = playheadPosition - visibleWidth / 2;
+        scrollContainer.scrollLeft = Math.max(0, newScrollLeft);
+      }
     }
-  }, [zoom, progress, editingMarkerId]);
+  }, [progress]);
 
   const handleSetIsPlaying = (playing: boolean) => {
     if (!audioSrc && playing) {
@@ -310,19 +306,18 @@ export default function Home() {
   };
   
   const handleZoomIn = () => {
-    const newZoom = Math.min(zoom * 1.5, 20);
-    setZoom(newZoom);
-    if (activeTrack) {
-        regenerateWaveform(activeTrack, newZoom);
-    }
+    setZoomAndRegenerate(Math.min(zoom * 1.5, 20));
   };
   const handleZoomOut = () => {
-    const newZoom = Math.max(zoom / 1.5, 1);
+    setZoomAndRegenerate(Math.max(zoom / 1.5, 1));
+  };
+
+  const setZoomAndRegenerate = (newZoom: number) => {
     setZoom(newZoom);
     if (activeTrack) {
         regenerateWaveform(activeTrack, newZoom);
     }
-  };
+  }
 
   const handleSelectTrack = async (track: AudioFile) => {
     logger.log('handleSelectTrack: Track selected.', { trackId: track.id, title: track.title });
@@ -495,12 +490,10 @@ export default function Home() {
   }
 
   const handleMarkerDragStart = (markerId: string) => {
-    if (editingMarkerId !== markerId) return;
     setDebugState(`Dragging Marker ${markerId}`);
   };
 
   const handleMarkerDragEnd = (newTime: number) => {
-    if (!editingMarkerId) return;
     setDebugState('Ready');
 
     if (activeTrack) {
@@ -522,21 +515,6 @@ export default function Home() {
       }, 6000);
     }
   };
-  
-  const handleEnterMarkerEditMode = (markerId: string) => {
-    setEditingMarkerId(markerId);
-    setZoomBeforeDrag(zoom);
-    setZoom(15);
-  };
-  
-  const handleExitMarkerEditMode = () => {
-    if (activeTrack && editingMarkerId) {
-      updateTrackMarkers(activeTrack.id, markers);
-    }
-    setEditingMarkerId(null);
-    setZoom(zoomBeforeDrag);
-  };
-
 
   const handleUpdateAutomationPoint = (id: string, newName: string, newTime: number) => {
     if (!activeTrack) return;
@@ -566,7 +544,7 @@ export default function Home() {
       m.id === id ? { ...m, name: newName, time: newTime } : m
     );
     setMarkers(updatedMarkers);
-    // Persisting is handled by handleExitMarkerEditMode or dragEnd
+    updateTrackMarkers(activeTrack.id, updatedMarkers);
   };
   
   const handleSelectStartMarker = (markerId: string | null) => {
@@ -732,20 +710,12 @@ export default function Home() {
                     </Button>
                   </div>
                 </div>
-
-                {editingMarker && (
-                  <MarkerEditOverlay 
-                    marker={editingMarker}
-                    onUpdate={handleUpdateMarker}
-                    onExit={handleExitMarkerEditMode}
-                    duration={duration}
-                  />
-                )}
                 
                 <WaveformDisplay 
                   waveformData={waveformData}
                   durationInSeconds={duration}
                   zoom={zoom}
+                  setZoom={setZoomAndRegenerate}
                   progress={progress}
                   onProgressChange={handleProgressChange}
                   onScrubStart={() => isScrubbingRef.current = true}
@@ -766,8 +736,6 @@ export default function Home() {
                   onMarkersChange={handleSetMarkers}
                   onMarkerDragStart={handleMarkerDragStart}
                   onMarkerDragEnd={handleMarkerDragEnd}
-                  onEnterMarkerEditMode={handleEnterMarkerEditMode}
-                  editingMarkerId={editingMarkerId}
                   debugState={debugState}
                   setDebugState={setDebugState}
                   startDelay={startDelay}
@@ -827,21 +795,14 @@ export default function Home() {
                       showMarkers={showMarkers}
                       onToggleShowMarkers={(val) => {
                         setShowMarkers(val);
-                        if (!val) setEditingMarkerId(null); // Exit edit mode if marker editing is turned off
                       }}
                       isMarkerModeActive={isMarkerModeActive}
                       onToggleIsMarkerModeActive={setIsMarkerModeActive}
                       isLoopActive={isMarkerLoopActive}
                       onToggleIsLoopActive={setIsMarkerLoopActive}
                       onUpdateMarker={handleUpdateMarker}
-                      onDeleteMarker={(id) => {
-                        if (editingMarkerId === id) setEditingMarkerId(null);
-                        handleDeleteMarker(id);
-                      }}
-                      onDeleteAllMarkers={() => {
-                        setEditingMarkerId(null);
-                        handleDeleteAllMarkers();
-                      }}
+                      onDeleteMarker={handleDeleteMarker}
+                      onDeleteAllMarkers={handleDeleteAllMarkers}
                       onJumpToMarker={(time) => {
                         if (audioRef.current) {
                           handleProgressChange((time / duration) * 100);
