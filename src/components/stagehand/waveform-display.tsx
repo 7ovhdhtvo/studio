@@ -19,8 +19,8 @@ const MARKER_COLORS = [
     '#eab308', // yellow-500
     '#3b82f6', // blue-500
     '#f59e0b', // amber-500
-    '#6366f1', // indigo-500
     '#d946ef', // fuchsia-500
+    '#f43f5e', // rose-500
 ];
 
 const getMarkerColor = (markerId: string) => {
@@ -435,10 +435,8 @@ export default function WaveformDisplay({
                         const x = timeToX(marker.time, width);
                         
                         let color: string;
-                        if (startMarker?.id === marker.id) {
+                        if (startMarker?.id === marker.id || (!startMarker && index === 0)) {
                             color = 'hsl(var(--destructive))';
-                        } else if (!startMarker && index === 0) {
-                            color = 'hsl(var(--primary))';
                         } else {
                             color = getMarkerColor(marker.id);
                         }
@@ -481,5 +479,3 @@ export default function WaveformDisplay({
     </div>
   );
 }
-
-    
