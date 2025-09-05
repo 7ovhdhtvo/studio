@@ -3,7 +3,7 @@
 
 import { cn } from '@/lib/utils';
 import { type WaveformData } from '@/lib/waveform';
-import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAction, useMemo, useCallback, TouchEvent } from 'react';
+import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAction, useMemo, useCallback, TouchEvent, useEffect } from 'react';
 import TimeRuler from './time-ruler';
 import type { AutomationPoint, Marker } from '@/lib/storage-manager';
 import { Input } from '../ui/input';
@@ -54,8 +54,10 @@ type WaveformDisplayProps = {
   showMarkers: boolean;
   isMarkerModeActive: boolean;
   onMarkersChange: (markers: Marker[]) => void;
-  onMarkerDragStart: () => void;
+  onMarkerDragStart: (markerId: string) => void;
   onMarkerDragEnd: (newTime: number) => void;
+  onEnterMarkerEditMode: (markerId: string) => void;
+  editingMarkerId: string | null;
   debugState: string;
   setDebugState: Dispatch<SetStateAction<string>>;
   startDelay: number;
@@ -108,6 +110,8 @@ export default function WaveformDisplay({
   onMarkersChange,
   onMarkerDragStart,
   onMarkerDragEnd,
+  onEnterMarkerEditMode,
+  editingMarkerId,
   debugState,
   setDebugState,
   startDelay,
@@ -201,7 +205,6 @@ export default function WaveformDisplay({
         onAutomationDragEnd();
     }
     if (draggingMarkerIdRef.current) {
-        setDebugState('Ready');
         const draggedMarker = markers.find(m => m.id === draggingMarkerIdRef.current);
         draggingMarkerIdRef.current = null;
         if (draggedMarker) {
@@ -211,7 +214,7 @@ export default function WaveformDisplay({
   };
 
   const handleSvgInteractionStart = (e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>) => {
-      if ((e.target as SVGElement).dataset.pointId || (e.target as SVGElement).dataset.markerId) return;
+      if (editingMarkerId || (e.target as SVGElement).dataset.pointId || (e.target as SVGElement).dataset.markerId) return;
       e.preventDefault();
 
       const { width, height } = e.currentTarget.getBoundingClientRect();
@@ -240,9 +243,7 @@ export default function WaveformDisplay({
               isPlaybackStart: false,
           };
           onMarkersChange([...markers, newMarker]);
-          draggingMarkerIdRef.current = newMarker.id;
-          onMarkerDragStart();
-          setDebugState(`Created & Dragging ${newMarker.id}`);
+          setDebugState(`Created Marker ${newMarker.id}`);
       }
   };
 
@@ -274,7 +275,6 @@ export default function WaveformDisplay({
               } : m
           );
           onMarkersChange(updatedMarkers);
-          setDebugState(`Dragging Marker ${draggingMarkerIdRef.current}`);
       }
   };
 
@@ -288,16 +288,37 @@ export default function WaveformDisplay({
 
   const handleMarkerInteractionStart = (e: MouseEvent | TouchEvent, markerId: string) => {
     e.stopPropagation();
-    if (!showMarkers) return; // Only allow dragging in edit mode
-    draggingMarkerIdRef.current = markerId;
-    onMarkerDragStart();
-    setDebugState(`Dragging Marker ${markerId}`);
+    if (!showMarkers) return;
+    
+    if (editingMarkerId === markerId) {
+        // Already in edit mode, start dragging
+        draggingMarkerIdRef.current = markerId;
+        onMarkerDragStart(markerId);
+    } else {
+        // Enter edit mode
+        onEnterMarkerEditMode(markerId);
+    }
   };
 
   const sortedMarkers = useMemo(() => [...markers].sort((a, b) => a.time - b.time), [markers]);
   const startMarker = useMemo(() => markers.find(m => m.isPlaybackStart), [markers]);
 
   const currentTime = (progress / 100) * durationInSeconds;
+  
+  useEffect(() => {
+    if (editingMarkerId && scrollContainerRef.current) {
+        const marker = markers.find(m => m.id === editingMarkerId);
+        if (marker) {
+            const scrollContainer = scrollContainerRef.current;
+            const totalWidth = scrollContainer.scrollWidth;
+            const markerPosition = (marker.time / durationInSeconds) * totalWidth;
+            const visibleWidth = scrollContainer.clientWidth;
+            const newScrollLeft = markerPosition - visibleWidth / 2;
+            scrollContainer.scrollLeft = Math.max(0, newScrollLeft);
+        }
+    }
+  }, [editingMarkerId, markers, durationInSeconds, zoom, scrollContainerRef]);
+
 
   const formatTime = (seconds: number) => {
     if (isNaN(seconds) || seconds < 0) seconds = 0;
@@ -352,7 +373,7 @@ export default function WaveformDisplay({
          className="w-full overflow-x-auto"
        >
         <div 
-          className="relative h-48 bg-card rounded-lg p-2 pt-6 shadow-inner"
+          className="relative h-48 bg-card rounded-lg pt-6 shadow-inner"
           style={{ width: `${100 * zoom}%` }}
         >
           <div 
@@ -441,16 +462,19 @@ export default function WaveformDisplay({
                         
                         let color: string;
                         if ((startMarker && startMarker.id === marker.id) || (!startMarker && index === 0)) {
-                           color = '#ef4444'; // red-500 for explicit start or first marker
+                           color = 'hsl(var(--destructive))';
                         } else {
                             color = getMarkerColor(marker.id);
                         }
 
                         const markerName = marker.name || `Marker ${index + 1}`;
+                        const isEditing = editingMarkerId === marker.id;
+
                         return (
                            <g 
                             key={marker.id} 
                             transform={`translate(${x}, 0)`}
+                            className={cn(isEditing && 'opacity-50')}
                            >
                               <line x1="0" y1="20" y2="100%" stroke={color} strokeWidth="2" />
                               <polygon points="-5,20 5,20 0,25" fill={color} />
@@ -458,14 +482,13 @@ export default function WaveformDisplay({
                               <text x="0" y="15" fill={color} textAnchor="middle" className="text-xs font-semibold pointer-events-none select-none">
                                 {markerName}
                               </text>
-
-                              {/* Interaction Group for Dragging */}
+                             
                               <g 
                                 className={cn(showMarkers && "cursor-grab active:cursor-grabbing")}
                                 onMouseDown={(e) => handleMarkerInteractionStart(e, marker.id)}
                                 onTouchStart={(e) => handleMarkerInteractionStart(e, marker.id)}
                               >
-                                <rect data-marker-id={marker.id} x="-12" y="0" width="24" height="100%" fill="transparent" />
+                                <rect data-marker-id={marker.id} x="-12" y={height - 32} width="24" height="32" fill="transparent" />
                                 <Flag x="-8" y={height - 24} className="w-4 h-4" style={{ color }} fillOpacity={0.2} />
                               </g>
                            </g>
@@ -477,7 +500,10 @@ export default function WaveformDisplay({
           
           {durationInSeconds > 0 && (
             <div 
-              className="absolute top-0 h-full w-0.5 bg-foreground/70 pointer-events-none z-20"
+              className={cn(
+                  "absolute top-0 h-full w-0.5 bg-foreground/70 pointer-events-none z-20",
+                  editingMarkerId && "opacity-50"
+              )}
               style={{ left: `${progress}%` }}
             >
               <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 bg-foreground/70 rounded-full"></div>

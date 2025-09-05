@@ -24,6 +24,7 @@ import { useMediaQuery } from '@/hooks/use-media-query';
 import { cn } from '@/lib/utils';
 import MarkerControl from '@/components/stagehand/marker-control';
 import MarkerPlaybackControls from '@/components/stagehand/marker-playback-controls';
+import MarkerEditOverlay from '@/components/stagehand/marker-edit-overlay';
 
 export type OpenControlPanel = 'volume' | 'speed' | 'metronome' | 'markers' | null;
 
@@ -79,6 +80,7 @@ export default function Home() {
   const [showMarkers, setShowMarkers] = useState(false);
   const [isMarkerModeActive, setIsMarkerModeActive] = useState(false);
   const [isMarkerLoopActive, setIsMarkerLoopActive] = useState(false);
+  const [editingMarkerId, setEditingMarkerId] = useState<string | null>(null);
   
   const [isDraggingAutomation, setIsDraggingAutomation] = useState(false);
   const [debugState, setDebugState] = useState('Ready');
@@ -102,6 +104,10 @@ export default function Home() {
       playbackEndTime: endMarker?.time ?? duration,
     };
   }, [markers, duration]);
+  
+  const editingMarker = useMemo(() => {
+    return markers.find(m => m.id === editingMarkerId) || null;
+  }, [markers, editingMarkerId]);
 
   useEffect(() => {
     if (isMobile) {
@@ -150,7 +156,9 @@ export default function Home() {
             if (applyDelayToLoop && startDelay > 0) {
               setIsPlaying(false);
               setProgress((playbackStartTime / duration) * 100);
-              setTimeout(() => setIsPlaying(true), 10);
+              setTimeout(() => {
+                setIsPlaying(true)
+              }, startDelay * 1000);
               return; // Exit animation loop until delay is over
             }
         }
@@ -272,7 +280,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (waveformContainerRef.current && progress > 0) {
+    if (waveformContainerRef.current && progress > 0 && !editingMarkerId) {
       const scrollContainer = waveformContainerRef.current;
       const totalWidth = scrollContainer.scrollWidth;
       const playheadPosition = (progress / 100) * totalWidth;
@@ -281,7 +289,7 @@ export default function Home() {
       
       scrollContainer.scrollLeft = Math.max(0, newScrollLeft);
     }
-  }, [zoom, progress]);
+  }, [zoom, progress, editingMarkerId]);
 
   const handleSetIsPlaying = (playing: boolean) => {
     if (!audioSrc && playing) {
@@ -486,33 +494,49 @@ export default function Home() {
     setMarkers(newMarkers);
   }
 
-  const handleMarkerDragStart = () => {
-    setZoomBeforeDrag(zoom);
-    setZoom(15);
+  const handleMarkerDragStart = (markerId: string) => {
+    if (editingMarkerId !== markerId) return;
+    setDebugState(`Dragging Marker ${markerId}`);
   };
 
   const handleMarkerDragEnd = (newTime: number) => {
-    setZoom(zoomBeforeDrag);
+    if (!editingMarkerId) return;
+    setDebugState('Ready');
+
     if (activeTrack) {
-        updateTrackMarkers(activeTrack.id, markers);
+      updateTrackMarkers(activeTrack.id, markers);
     }
-    
-    // Play preview
+
     if (audioRef.current) {
-        if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
-        const wasPlaying = isPlaying;
-        setIsPlaying(false); // Pause main playback
-        audioRef.current.currentTime = newTime;
-        audioRef.current.play().catch(e => logger.error("Preview playback failed", e));
-        
-        previewTimeoutRef.current = setTimeout(() => {
-            audioRef.current?.pause();
-            if (wasPlaying) {
-              setIsPlaying(true); // Resume main playback if it was active
-            }
-        }, 1000); // Play for 1 second
+      if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
+      const wasPlaying = isPlaying;
+      setIsPlaying(false);
+      audioRef.current.currentTime = newTime;
+      audioRef.current.play().catch(e => logger.error("Preview playback failed", e));
+
+      previewTimeoutRef.current = setTimeout(() => {
+        audioRef.current?.pause();
+        if (wasPlaying) {
+          setIsPlaying(true);
+        }
+      }, 6000);
     }
-  }
+  };
+  
+  const handleEnterMarkerEditMode = (markerId: string) => {
+    setEditingMarkerId(markerId);
+    setZoomBeforeDrag(zoom);
+    setZoom(15);
+  };
+  
+  const handleExitMarkerEditMode = () => {
+    if (activeTrack && editingMarkerId) {
+      updateTrackMarkers(activeTrack.id, markers);
+    }
+    setEditingMarkerId(null);
+    setZoom(zoomBeforeDrag);
+  };
+
 
   const handleUpdateAutomationPoint = (id: string, newName: string, newTime: number) => {
     if (!activeTrack) return;
@@ -542,7 +566,7 @@ export default function Home() {
       m.id === id ? { ...m, name: newName, time: newTime } : m
     );
     setMarkers(updatedMarkers);
-    updateTrackMarkers(activeTrack.id, updatedMarkers);
+    // Persisting is handled by handleExitMarkerEditMode or dragEnd
   };
   
   const handleSelectStartMarker = (markerId: string | null) => {
@@ -709,6 +733,15 @@ export default function Home() {
                   </div>
                 </div>
 
+                {editingMarker && (
+                  <MarkerEditOverlay 
+                    marker={editingMarker}
+                    onUpdate={handleUpdateMarker}
+                    onExit={handleExitMarkerEditMode}
+                    duration={duration}
+                  />
+                )}
+                
                 <WaveformDisplay 
                   waveformData={waveformData}
                   durationInSeconds={duration}
@@ -733,6 +766,8 @@ export default function Home() {
                   onMarkersChange={handleSetMarkers}
                   onMarkerDragStart={handleMarkerDragStart}
                   onMarkerDragEnd={handleMarkerDragEnd}
+                  onEnterMarkerEditMode={handleEnterMarkerEditMode}
+                  editingMarkerId={editingMarkerId}
                   debugState={debugState}
                   setDebugState={setDebugState}
                   startDelay={startDelay}
@@ -790,14 +825,23 @@ export default function Home() {
                       onToggle={() => handleToggleControlPanel('markers')}
                       markers={markers}
                       showMarkers={showMarkers}
-                      onToggleShowMarkers={setShowMarkers}
+                      onToggleShowMarkers={(val) => {
+                        setShowMarkers(val);
+                        if (!val) setEditingMarkerId(null); // Exit edit mode if marker editing is turned off
+                      }}
                       isMarkerModeActive={isMarkerModeActive}
                       onToggleIsMarkerModeActive={setIsMarkerModeActive}
                       isLoopActive={isMarkerLoopActive}
                       onToggleIsLoopActive={setIsMarkerLoopActive}
                       onUpdateMarker={handleUpdateMarker}
-                      onDeleteMarker={handleDeleteMarker}
-                      onDeleteAllMarkers={handleDeleteAllMarkers}
+                      onDeleteMarker={(id) => {
+                        if (editingMarkerId === id) setEditingMarkerId(null);
+                        handleDeleteMarker(id);
+                      }}
+                      onDeleteAllMarkers={() => {
+                        setEditingMarkerId(null);
+                        handleDeleteAllMarkers();
+                      }}
                       onJumpToMarker={(time) => {
                         if (audioRef.current) {
                           handleProgressChange((time / duration) * 100);
