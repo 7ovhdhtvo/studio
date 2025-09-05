@@ -1,9 +1,9 @@
 
 "use client"
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Flag, ListMusic, SkipBack, SkipForward } from 'lucide-react';
+import { Flag, SkipBack, SkipForward } from 'lucide-react';
 import type { Marker } from '@/lib/storage-manager';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -12,15 +12,22 @@ type MarkerSelectorProps = {
   markers: Marker[];
   selectedMarkerId: string | null;
   onSelectMarker: (markerId: string | null) => void;
+  isPopoverOpen: boolean;
+  onPopoverOpenChange: (isOpen: boolean) => void;
 };
 
-const MarkerSelector = ({ markers, selectedMarkerId, onSelectMarker }: MarkerSelectorProps) => {
+const MarkerSelector = ({ markers, selectedMarkerId, onSelectMarker, isPopoverOpen, onPopoverOpenChange }: MarkerSelectorProps) => {
   const sortedMarkers = [...markers].sort((a, b) => a.time - b.time);
   const selectedMarker = markers.find(m => m.id === selectedMarkerId);
   const selectedMarkerName = selectedMarker?.name || (selectedMarker ? `Marker ${sortedMarkers.findIndex(m => m.id === selectedMarkerId) + 1}` : 'Track Start');
 
+  const handleSelect = (markerId: string | null) => {
+    onSelectMarker(markerId);
+    onPopoverOpenChange(false); // Close popover on selection
+  }
+
   return (
-    <Popover>
+    <Popover open={isPopoverOpen} onOpenChange={onPopoverOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -39,7 +46,7 @@ const MarkerSelector = ({ markers, selectedMarkerId, onSelectMarker }: MarkerSel
             <Button
                 variant={!selectedMarkerId ? "secondary" : "ghost"}
                 className="w-full justify-start h-auto py-2"
-                onClick={() => onSelectMarker(null)}
+                onClick={() => handleSelect(null)}
             >
                 <div className="flex flex-col items-start whitespace-normal text-left">
                     <span>Track Start</span>
@@ -53,7 +60,7 @@ const MarkerSelector = ({ markers, selectedMarkerId, onSelectMarker }: MarkerSel
                   key={marker.id}
                   variant={isSelected ? "secondary" : "ghost"}
                   className="w-full justify-start h-auto py-2"
-                  onClick={() => onSelectMarker(marker.id)}
+                  onClick={() => handleSelect(marker.id)}
                 >
                   <div className="flex flex-col items-start whitespace-normal text-left">
                     <span>{marker.name || `Marker ${index + 1}`}</span>
@@ -85,6 +92,7 @@ export default function MarkerPlaybackControls({
   onSelectStartMarker,
   selectedStartMarkerId,
 }: MarkerPlaybackControlsProps) {
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
   return (
     <div className="flex items-center justify-center gap-4 mt-4">
@@ -96,7 +104,7 @@ export default function MarkerPlaybackControls({
         aria-label="Jump to Previous Marker"
         disabled={markers.length === 0}
       >
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-center gap-1">
             <Flag className="h-6 w-6" />
             <SkipBack className="h-10 w-10" />
         </div>
@@ -106,6 +114,8 @@ export default function MarkerPlaybackControls({
         markers={markers}
         selectedMarkerId={selectedStartMarkerId}
         onSelectMarker={onSelectStartMarker}
+        isPopoverOpen={isPopoverOpen}
+        onPopoverOpenChange={setIsPopoverOpen}
       />
 
       <Button
@@ -116,7 +126,7 @@ export default function MarkerPlaybackControls({
         aria-label="Jump to Next Marker"
         disabled={markers.length === 0}
       >
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-center gap-1">
             <SkipForward className="h-10 w-10" />
             <Flag className="h-6 w-6" />
         </div>
