@@ -3,7 +3,7 @@
 
 import { cn } from '@/lib/utils';
 import { type WaveformData } from '@/lib/waveform';
-import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAction, useMemo, useCallback, TouchEvent, useEffect } from 'react';
+import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAction, useMemo, useCallback } from 'react';
 import type { AutomationPoint, Marker } from '@/lib/storage-manager';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -15,12 +15,12 @@ const POINT_RADIUS = 6;
 const HITBOX_RADIUS = 12;
 
 const MARKER_COLORS = [
-    '#d946ef', // fuchsia-500
+    '#ec4899', // pink-500
     '#f59e0b', // amber-500
     '#3b82f6', // blue-500
-    '#eab308', // yellow-500
     '#10b981', // emerald-500
-    '#6366f1', // indigo-500
+    '#8b5cf6', // violet-500
+    '#ef4444', // red-500
 ];
 
 const getMarkerColor = (markerId: string) => {
@@ -55,7 +55,6 @@ type WaveformDisplayProps = {
   onAutomationDragEnd: () => void;
   markers: Marker[];
   showMarkers: boolean;
-  isMarkerModeActive: boolean;
   onMarkersChange: (markers: Marker[]) => void;
   onMarkerDragStart: (markerId: string) => void;
   onMarkerDragEnd: (newTime: number) => void;
@@ -108,7 +107,6 @@ export default function WaveformDisplay({
   onAutomationDragEnd,
   markers,
   showMarkers,
-  isMarkerModeActive,
   onMarkersChange,
   onMarkerDragStart,
   onMarkerDragEnd,
@@ -126,9 +124,8 @@ export default function WaveformDisplay({
   const draggingMarkerIdRef = useRef<string | null>(null);
   const startDragYRef = useRef(0);
   const startZoomRef = useRef(1);
-  const lastZoomAppliedRef = useRef(1);
 
-  const getSvgCoords = useCallback((e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>): {x: number, y: number} => {
+  const getSvgCoords = useCallback((e: MouseEvent<SVGSVGElement | SVGGElement | SVGLineElement> | TouchEvent<SVGSVGElement | SVGGElement | SVGLineElement>): {x: number, y: number} => {
     const svg = svgRef.current;
     if (!svg) return { x: 0, y: 0 };
 
@@ -246,7 +243,6 @@ export default function WaveformDisplay({
               id: `marker_${Date.now()}`,
               time: Math.max(0, Math.min(durationInSeconds, clickTime)),
               name: `Marker ${markers.length + 1}`,
-              isPlaybackStart: false,
           };
           onMarkersChange([...markers, newMarker]);
           setDebugState(`Created Marker ${newMarker.id}`);
@@ -278,12 +274,35 @@ export default function WaveformDisplay({
       } else if (draggingMarkerIdRef.current && showMarkers) {
           // Vertical drag for zoom
           const deltaY = startDragYRef.current - y;
-          const zoomSensitivity = 0.02; // Increased sensitivity for smoother feel
+          const zoomSensitivity = 0.02;
           const proposedZoom = startZoomRef.current + deltaY * zoomSensitivity;
           const newZoom = Math.max(1, Math.min(20, proposedZoom));
           
           if (Math.abs(newZoom - zoom) > 0.01) {
-            setZoom(newZoom);
+            const scrollContainer = scrollContainerRef.current;
+            if (scrollContainer) {
+              const markerToDrag = markers.find(m => m.id === draggingMarkerIdRef.current);
+              if (markerToDrag) {
+                  const markerTime = markerToDrag.time;
+                  
+                  // Calculate marker's absolute pixel position before zoom
+                  const totalWidthBefore = scrollContainer.scrollWidth;
+                  const markerXBefore = (markerTime / durationInSeconds) * totalWidthBefore;
+                  const markerRatioInView = (markerXBefore - scrollContainer.scrollLeft) / scrollContainer.clientWidth;
+
+                  setZoom(newZoom);
+                  // Use a timeout to allow the DOM to update with the new zoom level (new scrollWidth)
+                  setTimeout(() => {
+                      const totalWidthAfter = scrollContainer.scrollWidth;
+                      const markerXAfter = (markerTime / durationInSeconds) * totalWidthAfter;
+                      
+                      const newScrollLeft = markerXAfter - (scrollContainer.clientWidth * markerRatioInView);
+                      scrollContainer.scrollLeft = newScrollLeft;
+                  }, 0);
+              }
+            } else {
+               setZoom(newZoom);
+            }
           }
           
           // Horizontal drag for time
@@ -301,11 +320,11 @@ export default function WaveformDisplay({
             const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
             const relativeX = clientX - scrollRect.left;
             
-            const scrollZone = scrollRect.width * 0.1; // 10% of viewport width
+            const scrollZone = scrollRect.width * 0.1;
             
             if (relativeX < scrollZone) {
-                const intensity = (scrollZone - relativeX) / scrollZone; // 0 to 1
-                const scrollAmount = intensity * (scrollRect.width * 0.02); // max 2% of width per frame
+                const intensity = (scrollZone - relativeX) / scrollZone;
+                const scrollAmount = intensity * (scrollRect.width * 0.02);
                 scrollContainerRef.current.scrollLeft -= scrollAmount;
             } else if (relativeX > scrollRect.width - scrollZone) {
                 const intensity = (relativeX - (scrollRect.width - scrollZone)) / scrollZone;
@@ -324,7 +343,7 @@ export default function WaveformDisplay({
       setDebugState(`Dragging ${pointId}`);
   }
 
-  const handleMarkerInteractionStart = (e: MouseEvent<SVGGElement> | TouchEvent<SVGGElement>, markerId: string) => {
+  const handleMarkerInteractionStart = (e: MouseEvent<SVGGElement | SVGLineElement> | TouchEvent<SVGGElement | SVGLineElement>, markerId: string) => {
     e.stopPropagation();
     if (!showMarkers) return;
     
@@ -349,8 +368,6 @@ export default function WaveformDisplay({
   const automationLineColor = showVolumeAutomation 
     ? 'hsl(var(--destructive))' 
     : '#3b82f6';
-    
-  const isAnyMarkerModeOn = showMarkers || isMarkerModeActive;
 
   return (
     <div className="flex flex-col items-center space-y-2">
@@ -428,7 +445,7 @@ export default function WaveformDisplay({
                </div>
             )}
             
-            {(showVolumeAutomation || isAutomationActive || isAnyMarkerModeOn) && durationInSeconds > 0 && waveformInteractionRef.current && (
+            {(showVolumeAutomation || showMarkers) && durationInSeconds > 0 && waveformInteractionRef.current && (
                 <svg
                     ref={svgRef}
                     width="100%"
@@ -475,7 +492,7 @@ export default function WaveformDisplay({
                             </g>
                         );
                     })}
-                     {isAnyMarkerModeOn && sortedMarkers.map((marker, index) => {
+                     {showMarkers && sortedMarkers.map((marker, index) => {
                         const { width, height } = waveformInteractionRef.current!.getBoundingClientRect();
                         const x = timeToX(marker.time, width);
                         const color = getMarkerColor(marker.id);
@@ -485,17 +502,23 @@ export default function WaveformDisplay({
                            <g 
                               key={marker.id} 
                               transform={`translate(${x}, 0)`}
-                              className={cn(showMarkers && "cursor-grab active:cursor-grabbing")}
+                              className={cn(showMarkers && "cursor-ew-resize")}
                               onMouseDown={(e) => handleMarkerInteractionStart(e, marker.id)}
                               onTouchStart={(e) => handleMarkerInteractionStart(e, marker.id)}
                            >
-                              {/* This is the grab handle area */}
-                              <rect data-marker-id={marker.id} x="-12" y="0" width="24" height={height} fill="transparent" />
-                              <line x1="0" y1={-8} y2={height} stroke={color} strokeWidth="2" />
-                              <Flag x="4" y={-23} className="w-4 h-4 pointer-events-none" style={{ color }} />
-                              <text x="-4" y={-12} fill={color} textAnchor="end" className="text-xs font-semibold select-none">
-                                {markerName}
-                              </text>
+                              <line 
+                                data-marker-id={marker.id} 
+                                x1="0" y1="0" x2="0" y2={height} 
+                                stroke={color} 
+                                strokeWidth="2"
+                                className="cursor-grab active:cursor-grabbing"
+                              />
+                               <g className="pointer-events-none">
+                                <Flag x="4" y={2} className="w-4 h-4" style={{ color }} />
+                                <text x="22" y={14} fill={color} className="text-xs font-semibold select-none">
+                                  {markerName}
+                                </text>
+                               </g>
                            </g>
                         );
                      })}
