@@ -81,6 +81,7 @@ export default function Home() {
   
   const [isDraggingAutomation, setIsDraggingAutomation] = useState(false);
   const [debugState, setDebugState] = useState('Ready');
+  const [zoomBeforeDrag, setZoomBeforeDrag] = useState(1);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const animationFrameRef = useRef<number>();
@@ -149,7 +150,7 @@ export default function Home() {
             if (applyDelayToLoop && startDelay > 0) {
               setIsPlaying(false);
               setProgress((playbackStartTime / duration) * 100);
-              setTimeout(() => {
+              playbackTimeoutRef.current = setTimeout(() => {
                 setIsPlaying(true)
               }, startDelay * 1000);
               return; // Exit animation loop until delay is over
@@ -219,13 +220,9 @@ export default function Home() {
     if (isPlaying && audioSrc) {
         if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
 
-        const isAtStartTime = Math.abs(audio.currentTime - playbackStartTime) < 0.1;
-        // Only set currentTime if it's not already at the start, to avoid re-triggering load
-        if (!isAtStartTime) {
-          audio.currentTime = playbackStartTime;
-        }
-        
-        const delay = startDelay > 0 ? startDelay * 1000 : 0;
+        // If starting from the very beginning, apply delay. Otherwise, play immediately.
+        const isNearStart = Math.abs(audio.currentTime - playbackStartTime) < 0.1;
+        const delay = (startDelay > 0 && isNearStart) ? startDelay * 1000 : 0;
         
         playbackTimeoutRef.current = setTimeout(() => {
             if (audio.paused) {
@@ -273,19 +270,23 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (waveformContainerRef.current && progress > 0) {
+    if (isPlaying && waveformContainerRef.current) {
       const scrollContainer = waveformContainerRef.current;
       const totalWidth = scrollContainer.scrollWidth;
       const playheadPosition = (progress / 100) * totalWidth;
-      const visibleWidth = scrollContainer.clientWidth;
       
-      // Only scroll if playhead is outside the middle 50% of the view
-      if (playheadPosition < scrollContainer.scrollLeft + visibleWidth * 0.25 || playheadPosition > scrollContainer.scrollLeft + visibleWidth * 0.75) {
-        const newScrollLeft = playheadPosition - visibleWidth / 2;
-        scrollContainer.scrollLeft = Math.max(0, newScrollLeft);
+      const scrollRect = scrollContainer.getBoundingClientRect();
+      const relativePlayheadX = playheadPosition - scrollContainer.scrollLeft;
+
+      const scrollZone = scrollRect.width * 0.1;
+
+      if (relativePlayheadX > scrollRect.width - scrollZone) {
+          const intensity = (relativePlayheadX - (scrollRect.width - scrollZone)) / scrollZone;
+          const scrollAmount = intensity * (scrollRect.width * 0.02);
+          scrollContainer.scrollLeft += scrollAmount;
       }
     }
-  }, [progress]);
+  }, [progress, isPlaying]);
 
   const handleSetIsPlaying = (playing: boolean) => {
     if (!audioSrc && playing) {
@@ -351,6 +352,9 @@ export default function Home() {
         setAudioSrc(url);
         
         await regenerateWaveform(track, zoom);
+        if (audioRef.current) {
+          audioRef.current.currentTime = 0;
+        }
         handleSetIsPlaying(true);
 
       } else {

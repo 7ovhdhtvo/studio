@@ -3,14 +3,13 @@
 
 import { cn } from '@/lib/utils';
 import { type WaveformData } from '@/lib/waveform';
-import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAction, useMemo, useCallback } from 'react';
-import type { TouchEvent } from 'react';
-import TimeRuler from './time-ruler';
+import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAction, useMemo, useCallback, TouchEvent } from 'react';
 import type { AutomationPoint, Marker } from '@/lib/storage-manager';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Checkbox } from '../ui/checkbox';
 import { Flag } from 'lucide-react';
+import TimeRuler from './time-ruler';
 
 const POINT_RADIUS = 6;
 const HITBOX_RADIUS = 12;
@@ -20,6 +19,8 @@ const MARKER_COLORS = [
     '#f59e0b', // amber-500
     '#3b82f6', // blue-500
     '#eab308', // yellow-500
+    '#10b981', // emerald-500
+    '#6366f1', // indigo-500
 ];
 
 const getMarkerColor = (markerId: string) => {
@@ -198,7 +199,7 @@ export default function WaveformDisplay({
     }
   };
   
-  const handleEndDrag = (e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>) => {
+  const handleEndDrag = () => {
     if (isMouseDownRef.current) {
         isMouseDownRef.current = false;
         onScrubEnd();
@@ -255,8 +256,10 @@ export default function WaveformDisplay({
       if (!draggingPointIdRef.current && !draggingMarkerIdRef.current) return;
       e.preventDefault();
       
-      if (!svgRef.current) return;
-      const { width, height } = svgRef.current.getBoundingClientRect();
+      const svg = svgRef.current;
+      if (!svg) return;
+
+      const { width, height } = svg.getBoundingClientRect();
       const { x, y } = getSvgCoords(e);
       const newTime = (x / width) * durationInSeconds;
 
@@ -293,19 +296,16 @@ export default function WaveformDisplay({
             const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
             const relativeX = clientX - scrollRect.left;
             
-            // Define a zone at the edges for scrolling, e.g., 10% of the viewport width
             const scrollZone = scrollRect.width * 0.1; 
             
             if (relativeX < scrollZone) {
-              // Scrolling left
-              const intensity = (scrollZone - relativeX) / scrollZone; // 0 to 1
-              const scrollAmount = intensity * (scrollRect.width * 0.02); // Scroll up to 2% of viewport width per frame
-              scrollContainerRef.current.scrollLeft -= scrollAmount;
+                const intensity = (scrollZone - relativeX) / scrollZone; 
+                const scrollAmount = intensity * (scrollRect.width * 0.02);
+                scrollContainerRef.current.scrollLeft -= scrollAmount;
             } else if (relativeX > scrollRect.width - scrollZone) {
-              // Scrolling right
-              const intensity = (relativeX - (scrollRect.width - scrollZone)) / scrollZone; // 0 to 1
-              const scrollAmount = intensity * (scrollRect.width * 0.02); // Scroll up to 2% of viewport width per frame
-              scrollContainerRef.current.scrollLeft += scrollAmount;
+                const intensity = (relativeX - (scrollRect.width - scrollZone)) / scrollZone;
+                const scrollAmount = intensity * (scrollRect.width * 0.02);
+                scrollContainerRef.current.scrollLeft += scrollAmount;
             }
           }
       }
@@ -319,7 +319,7 @@ export default function WaveformDisplay({
       setDebugState(`Dragging ${pointId}`);
   }
 
-  const handleMarkerInteractionStart = (e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>, markerId: string) => {
+  const handleMarkerInteractionStart = (e: MouseEvent<SVGGElement> | TouchEvent<SVGGElement>, markerId: string) => {
     e.stopPropagation();
     if (!showMarkers) return;
     
@@ -395,7 +395,7 @@ export default function WaveformDisplay({
             onMouseDown={handleScrubMouseDown}
             onMouseMove={handleScrubMouseMove}
             onMouseUp={handleEndDrag}
-            onMouseLeave={(e) => handleEndDrag(e as any)}
+            onMouseLeave={handleEndDrag}
             onTouchStart={(e) => {
               if (showVolumeAutomation || showMarkers) return;
               isMouseDownRef.current = true;
@@ -473,29 +473,27 @@ export default function WaveformDisplay({
                      {isAnyMarkerModeOn && sortedMarkers.map((marker, index) => {
                         const { width, height } = waveformInteractionRef.current!.getBoundingClientRect();
                         const x = timeToX(marker.time, width);
-                        const isStartMarker = marker.isPlaybackStart || (!markers.some(m => m.isPlaybackStart) && index === 0);
                         const color = getMarkerColor(marker.id);
                         const markerName = marker.name || `Marker ${index + 1}`;
+                        const textYPosition = -4; // Position name in the top padding area
+                        const lineY1start = 10; // Start line below the name
 
                         return (
                            <g 
-                            key={marker.id} 
-                            transform={`translate(${x}, 0)`}
+                              key={marker.id} 
+                              transform={`translate(${x}, 0)`}
+                              className={cn(showMarkers && "cursor-grab active:cursor-grabbing")}
+                              onMouseDown={(e) => handleMarkerInteractionStart(e, marker.id)}
+                              onTouchStart={(e) => handleMarkerInteractionStart(e, marker.id)}
                            >
-                              <line x1="0" y1="20" y2="100%" stroke={color} strokeWidth="2" />
-                              <polygon points="-5,20 5,20 0,25" fill={color} />
-                              
-                              <text x="0" y="15" fill={color} textAnchor="middle" className="text-xs font-semibold pointer-events-none select-none">
+                              <line x1="0" y1={lineY1start} y2="100%" stroke={color} strokeWidth="2" />
+                              <text x="0" y={textYPosition} fill={color} textAnchor="middle" className="text-xs font-semibold select-none">
                                 {markerName}
                               </text>
-                             
-                              <g 
-                                className={cn(showMarkers && "cursor-grab active:cursor-grabbing")}
-                                onMouseDown={(e) => handleMarkerInteractionStart(e, marker.id)}
-                                onTouchStart={(e) => handleMarkerInteractionStart(e, marker.id)}
-                              >
-                                <rect data-marker-id={marker.id} x="-12" y={height - 32} width="24" height="32" fill="transparent" />
-                                <Flag x="-8" y={height - 24} className="w-4 h-4" style={{ color }} fillOpacity={0.2} />
+                              {/* This is the grab handle area */}
+                              <g transform={`translate(0, ${height - 24})`}>
+                                <rect data-marker-id={marker.id} x="-12" y="0" width="24" height="24" fill="transparent" />
+                                <Flag x="-8" y="4" className="w-4 h-4 pointer-events-none" style={{ color }} fillOpacity={0.2} />
                               </g>
                            </g>
                         );
