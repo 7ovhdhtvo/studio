@@ -15,12 +15,11 @@ const POINT_RADIUS = 6;
 const HITBOX_RADIUS = 12;
 
 const MARKER_COLORS = [
-    '#ef4444', // red-500
+    '#f43f5e', // rose-500
     '#eab308', // yellow-500
     '#3b82f6', // blue-500
     '#f59e0b', // amber-500
     '#d946ef', // fuchsia-500
-    '#f43f5e', // rose-500
 ];
 
 const getMarkerColor = (markerId: string) => {
@@ -347,12 +346,12 @@ export default function WaveformDisplay({
          className="w-full overflow-x-auto"
        >
         <div 
-          className="relative h-48 bg-card rounded-lg p-2 shadow-inner"
+          className="relative h-48 bg-card rounded-lg p-2 pt-6 shadow-inner"
           style={{ width: `${100 * zoom}%` }}
         >
           <div 
             ref={waveformInteractionRef}
-            className="absolute inset-0 z-0"
+            className="absolute inset-0 top-6 bottom-0 z-0"
             onMouseDown={handleScrubMouseDown}
             onMouseMove={handleScrubMouseMove}
             onMouseUp={handleEndDrag}
@@ -388,7 +387,7 @@ export default function WaveformDisplay({
                 <svg
                     width="100%"
                     height="100%"
-                    className="absolute inset-0 z-10 overflow-visible"
+                    className="absolute inset-0 top-0 bottom-0 z-10 overflow-visible"
                     onMouseDown={handleSvgInteractionStart}
                     onMouseMove={handleSvgInteractionMove}
                     onMouseUp={handleEndDrag}
@@ -398,6 +397,17 @@ export default function WaveformDisplay({
                     onTouchEnd={handleEndDrag}
                     onTouchCancel={handleEndDrag}
                 >
+                    <defs>
+                        <filter id="text-glow" x="-0.5" y="-0.5" width="200%" height="200%">
+                            <feGaussianBlur stdDeviation="1.5 1.5" result="glow"/>
+                            <feMerge>
+                                <feMergeNode in="glow"/>
+                                <feMergeNode in="glow"/>
+                                <feMergeNode in="SourceGraphic"/>
+                            </feMerge>
+                        </filter>
+                    </defs>
+
                     {(showVolumeAutomation || isAutomationActive) && (
                       <path
                           d={automationPath}
@@ -435,8 +445,8 @@ export default function WaveformDisplay({
                         const x = timeToX(marker.time, width);
                         
                         let color: string;
-                        if (startMarker?.id === marker.id || (!startMarker && index === 0)) {
-                            color = 'hsl(var(--destructive))';
+                        if (startMarker?.id === marker.id) {
+                            color = '#ef4444'; // red-500
                         } else {
                             color = getMarkerColor(marker.id);
                         }
@@ -453,8 +463,8 @@ export default function WaveformDisplay({
                               <line x1="0" y1="0" x2="0" y2="100%" stroke={color} strokeWidth="2" />
                               <polygon points="-5,0 5,0 0,5" fill={color} />
                               <Flag x="4" y={height - 18} className="w-4 h-4" style={{ color }} fillOpacity={0.2} />
-                              <rect data-marker-id={marker.id} x="-12" y="0" width="24" height="100%" fill="transparent" />
-                              <text x="4" y="14" fill={color} textAnchor="start" className="text-xs font-semibold pointer-events-none select-none">
+                              <rect data-marker-id={marker.id} x="-12" y="-24" width="24" height="100%" fill="transparent" />
+                              <text x="4" y="-4" fill={color} textAnchor="start" className="text-xs font-semibold pointer-events-none select-none" style={{ filter: 'url(#text-glow)'}}>
                                 {markerName}
                               </text>
                            </g>
@@ -479,3 +489,5 @@ export default function WaveformDisplay({
     </div>
   );
 }
+
+    
