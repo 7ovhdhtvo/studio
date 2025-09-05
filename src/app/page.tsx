@@ -95,21 +95,21 @@ export default function Home() {
   const duration = audioRef.current?.duration ?? activeTrack?.duration ?? 0;
   const currentTime = audioRef.current?.currentTime ?? 0;
 
-  const { playbackStartTime, playbackEndTime } = useMemo(() => {
-    let startTime = 0;
-    if (selectedStartMarkerId === 'playhead') {
-      startTime = currentTime;
-    } else {
-      const startMarker = markers.find(m => m.id === selectedStartMarkerId);
-      startTime = startMarker?.time ?? 0;
+  const playbackStartTime = useMemo(() => {
+    if (!isMarkerModeActive) {
+      return 0;
     }
+    if (selectedStartMarkerId === 'playhead') {
+      return currentTime;
+    }
+    const startMarker = markers.find(m => m.id === selectedStartMarkerId);
+    return startMarker?.time ?? 0;
+  }, [isMarkerModeActive, markers, selectedStartMarkerId, currentTime]);
 
+  const playbackEndTime = useMemo(() => {
     const endMarker = markers.find(m => m.isLoopEnd);
-    return {
-      playbackStartTime: startTime,
-      playbackEndTime: endMarker?.time ?? duration,
-    };
-  }, [markers, duration, selectedStartMarkerId, currentTime]);
+    return endMarker?.time ?? duration;
+  }, [markers, duration]);
 
   useEffect(() => {
     if (isMobile) {
@@ -228,14 +228,15 @@ export default function Home() {
     if (isPlaying && audioSrc) {
         if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
         
-        // Always set currentTime to playbackStartTime when initiating play,
-        // unless the start marker is the playhead itself.
-        if (audio.paused && selectedStartMarkerId !== 'playhead') {
-          audio.currentTime = playbackStartTime;
+        // If marker mode is active, always respect the playbackStartTime.
+        // Otherwise, playback resumes from where it was.
+        if (isMarkerModeActive) {
+            audio.currentTime = playbackStartTime;
         }
 
-        const isStartingPlayback = Math.abs(audio.currentTime - playbackStartTime) < 0.1;
-        const delay = (startDelay > 0 && isStartingPlayback) ? startDelay * 1000 : 0;
+        // Delay logic only applies if we are starting from the designated start time.
+        const isStartingFromDefinedStart = Math.abs(audio.currentTime - playbackStartTime) < 0.1;
+        const delay = (startDelay > 0 && isStartingFromDefinedStart) ? startDelay * 1000 : 0;
         
         playbackTimeoutRef.current = setTimeout(() => {
             if (audio.paused) {
@@ -255,7 +256,7 @@ export default function Home() {
         if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
         if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
     }
-  }, [isPlaying, audioSrc, startDelay, playbackStartTime, selectedStartMarkerId]);
+  }, [isPlaying, audioSrc, startDelay, playbackStartTime, isMarkerModeActive]);
 
 
   useEffect(() => {
@@ -419,9 +420,9 @@ export default function Home() {
   
   const handleBackToStart = () => {
     if (!audioRef.current) return;
-    if (selectedStartMarkerId === 'playhead') return;
-    audioRef.current.currentTime = playbackStartTime;
-    setProgress((playbackStartTime / duration) * 100);
+    const targetTime = isMarkerModeActive ? playbackStartTime : 0;
+    audioRef.current.currentTime = targetTime;
+    setProgress((targetTime / duration) * 100);
   };
   
   const handleJumpToPreviousMarker = () => {
@@ -465,8 +466,10 @@ export default function Home() {
   const handleAudioEnded = () => {
     logger.log('handleAudioEnded: Audio track ended.', { isLooping });
     if (isLooping && audioRef.current) {
-        audioRef.current.currentTime = playbackStartTime;
-        setProgress((playbackStartTime / duration) * 100);
+        // Global loop respects marker start time if active, otherwise starts from 0
+        const loopStartTime = isMarkerModeActive ? playbackStartTime : 0;
+        audioRef.current.currentTime = loopStartTime;
+        setProgress((loopStartTime / duration) * 100);
 
         if (applyDelayToLoop && startDelay > 0) {
             setIsPlaying(false);
@@ -477,9 +480,10 @@ export default function Home() {
     } else {
         handleSetIsPlaying(false);
         if (audioRef.current) {
-            audioRef.current.currentTime = playbackStartTime;
+            const endPosition = isMarkerModeActive ? playbackStartTime : 0;
+            audioRef.current.currentTime = endPosition;
+            setProgress((endPosition / duration) * 100);
         }
-        setProgress((playbackStartTime / duration) * 100);
     }
   };
   

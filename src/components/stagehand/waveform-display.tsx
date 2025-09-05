@@ -3,7 +3,7 @@
 
 import { cn } from '@/lib/utils';
 import { type WaveformData } from '@/lib/waveform';
-import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAction, useMemo, useCallback, TouchEvent } from 'react';
+import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAction, useMemo, useCallback, TouchEvent, useEffect } from 'react';
 import type { AutomationPoint, Marker } from '@/lib/storage-manager';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -282,12 +282,10 @@ export default function WaveformDisplay({
           const proposedZoom = startZoomRef.current + deltaY * zoomSensitivity;
           const newZoom = Math.max(1, Math.min(20, proposedZoom));
           
-          // Only update state if zoom has changed meaningfully
-          if (Math.abs(newZoom - lastZoomAppliedRef.current) > 0.05) {
+          if (Math.abs(newZoom - zoom) > 0.01) {
             setZoom(newZoom);
-            lastZoomAppliedRef.current = newZoom;
           }
-
+          
           // Horizontal drag for time
           const updatedMarkers = markers.map(m =>
               m.id === draggingMarkerIdRef.current ? {
@@ -333,7 +331,6 @@ export default function WaveformDisplay({
     draggingMarkerIdRef.current = markerId;
     startDragYRef.current = getSvgCoords(e).y;
     startZoomRef.current = zoom;
-    lastZoomAppliedRef.current = zoom;
     onMarkerDragStart(markerId);
   };
 
@@ -479,14 +476,10 @@ export default function WaveformDisplay({
                         );
                     })}
                      {isAnyMarkerModeOn && sortedMarkers.map((marker, index) => {
-                        const { width } = waveformInteractionRef.current!.getBoundingClientRect();
+                        const { width, height } = waveformInteractionRef.current!.getBoundingClientRect();
                         const x = timeToX(marker.time, width);
                         const color = getMarkerColor(marker.id);
                         const markerName = marker.name || `Marker ${index + 1}`;
-                        const textYPosition = -4; // Position name in the top padding area
-                        const lineY1 = 10;
-                        const lineY2 = 40; // Shorter line
-                        const flagY = lineY2;
 
                         return (
                            <g 
@@ -496,15 +489,13 @@ export default function WaveformDisplay({
                               onMouseDown={(e) => handleMarkerInteractionStart(e, marker.id)}
                               onTouchStart={(e) => handleMarkerInteractionStart(e, marker.id)}
                            >
-                              <line x1="0" y1={lineY1} y2={lineY2} stroke={color} strokeWidth="2" />
-                              <text x="0" y={textYPosition} fill={color} textAnchor="middle" className="text-xs font-semibold select-none">
+                              {/* This is the grab handle area */}
+                              <rect data-marker-id={marker.id} x="-12" y="0" width="24" height={height} fill="transparent" />
+                              <line x1="0" y1={-8} y2={height} stroke={color} strokeWidth="2" />
+                              <Flag x="4" y={-23} className="w-4 h-4 pointer-events-none" style={{ color }} />
+                              <text x="-4" y={-12} fill={color} textAnchor="end" className="text-xs font-semibold select-none">
                                 {markerName}
                               </text>
-                              {/* This is the grab handle area */}
-                              <g transform={`translate(0, ${flagY})`}>
-                                <rect data-marker-id={marker.id} x="-12" y="-8" width="24" height="24" fill="transparent" />
-                                <Flag x="-8" y="0" className="w-4 h-4 pointer-events-none" style={{ color }} fillOpacity={0.2} />
-                              </g>
                            </g>
                         );
                      })}
