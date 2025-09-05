@@ -397,17 +397,6 @@ export default function WaveformDisplay({
                     onTouchEnd={handleEndDrag}
                     onTouchCancel={handleEndDrag}
                 >
-                    <defs>
-                        <filter id="text-glow" x="-0.5" y="-0.5" width="200%" height="200%">
-                            <feGaussianBlur stdDeviation="1.5 1.5" result="glow"/>
-                            <feMerge>
-                                <feMergeNode in="glow"/>
-                                <feMergeNode in="glow"/>
-                                <feMergeNode in="SourceGraphic"/>
-                            </feMerge>
-                        </filter>
-                    </defs>
-
                     {(showVolumeAutomation || isAutomationActive) && (
                       <path
                           d={automationPath}
@@ -464,7 +453,7 @@ export default function WaveformDisplay({
                               <polygon points="-5,0 5,0 0,5" fill={color} />
                               <Flag x="4" y={height - 18} className="w-4 h-4" style={{ color }} fillOpacity={0.2} />
                               <rect data-marker-id={marker.id} x="-12" y="-24" width="24" height="100%" fill="transparent" />
-                              <text x="4" y="-4" fill={color} textAnchor="start" className="text-xs font-semibold pointer-events-none select-none" style={{ filter: 'url(#text-glow)'}}>
+                              <text x="4" y="-4" fill={color} textAnchor="start" className="text-xs font-semibold pointer-events-none select-none">
                                 {markerName}
                               </text>
                            </g>
@@ -489,5 +478,3 @@ export default function WaveformDisplay({
     </div>
   );
 }
-
-    
