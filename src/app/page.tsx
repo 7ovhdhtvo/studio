@@ -78,7 +78,7 @@ export default function Home() {
   const [showMarkers, setShowMarkers] = useState(false);
   const [isMarkerModeActive, setIsMarkerModeActive] = useState(false);
   const [isMarkerLoopActive, setIsMarkerLoopActive] = useState(false);
-  const [selectedStartMarkerId, setSelectedStartMarkerId] = useState<string | null>('playhead');
+  const [selectedStartMarkerId, setSelectedStartMarkerId] = useState<string | null>(null);
   
   const [isDraggingAutomation, setIsDraggingAutomation] = useState(false);
   const [debugState, setDebugState] = useState('Ready');
@@ -227,6 +227,12 @@ export default function Home() {
 
     if (isPlaying && audioSrc) {
         if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
+        
+        // Always set currentTime to playbackStartTime when initiating play,
+        // unless the start marker is the playhead itself.
+        if (audio.paused && selectedStartMarkerId !== 'playhead') {
+          audio.currentTime = playbackStartTime;
+        }
 
         const isStartingPlayback = Math.abs(audio.currentTime - playbackStartTime) < 0.1;
         const delay = (startDelay > 0 && isStartingPlayback) ? startDelay * 1000 : 0;
@@ -249,7 +255,7 @@ export default function Home() {
         if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
         if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
     }
-  }, [isPlaying, audioSrc, startDelay, playbackStartTime]);
+  }, [isPlaying, audioSrc, startDelay, playbackStartTime, selectedStartMarkerId]);
 
 
   useEffect(() => {
@@ -345,6 +351,7 @@ export default function Home() {
     setMarkers(track.markers || []);
     setProgress(0); // Reset progress on new track
     setVolumePoints(track.volumeAutomation || []);
+    setSelectedStartMarkerId(null);
     
     if ((track.volumeAutomation || []).length === 0) {
       setVolume(75);

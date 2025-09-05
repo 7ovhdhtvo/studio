@@ -126,6 +126,7 @@ export default function WaveformDisplay({
   const draggingMarkerIdRef = useRef<string | null>(null);
   const startDragYRef = useRef(0);
   const startZoomRef = useRef(1);
+  const lastZoomAppliedRef = useRef(1);
 
   const getSvgCoords = useCallback((e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>): {x: number, y: number} => {
     const svg = svgRef.current;
@@ -277,9 +278,15 @@ export default function WaveformDisplay({
       } else if (draggingMarkerIdRef.current && showMarkers) {
           // Vertical drag for zoom
           const deltaY = startDragYRef.current - y;
-          const zoomSensitivity = 0.01;
-          const newZoom = Math.max(1, Math.min(20, startZoomRef.current + deltaY * zoomSensitivity));
-          setZoom(newZoom);
+          const zoomSensitivity = 0.02; // Increased sensitivity for smoother feel
+          const proposedZoom = startZoomRef.current + deltaY * zoomSensitivity;
+          const newZoom = Math.max(1, Math.min(20, proposedZoom));
+          
+          // Only update state if zoom has changed meaningfully
+          if (Math.abs(newZoom - lastZoomAppliedRef.current) > 0.05) {
+            setZoom(newZoom);
+            lastZoomAppliedRef.current = newZoom;
+          }
 
           // Horizontal drag for time
           const updatedMarkers = markers.map(m =>
@@ -296,11 +303,11 @@ export default function WaveformDisplay({
             const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
             const relativeX = clientX - scrollRect.left;
             
-            const scrollZone = scrollRect.width * 0.1; 
+            const scrollZone = scrollRect.width * 0.1; // 10% of viewport width
             
             if (relativeX < scrollZone) {
-                const intensity = (scrollZone - relativeX) / scrollZone; 
-                const scrollAmount = intensity * (scrollRect.width * 0.02);
+                const intensity = (scrollZone - relativeX) / scrollZone; // 0 to 1
+                const scrollAmount = intensity * (scrollRect.width * 0.02); // max 2% of width per frame
                 scrollContainerRef.current.scrollLeft -= scrollAmount;
             } else if (relativeX > scrollRect.width - scrollZone) {
                 const intensity = (relativeX - (scrollRect.width - scrollZone)) / scrollZone;
@@ -326,6 +333,7 @@ export default function WaveformDisplay({
     draggingMarkerIdRef.current = markerId;
     startDragYRef.current = getSvgCoords(e).y;
     startZoomRef.current = zoom;
+    lastZoomAppliedRef.current = zoom;
     onMarkerDragStart(markerId);
   };
 
@@ -471,12 +479,14 @@ export default function WaveformDisplay({
                         );
                     })}
                      {isAnyMarkerModeOn && sortedMarkers.map((marker, index) => {
-                        const { width, height } = waveformInteractionRef.current!.getBoundingClientRect();
+                        const { width } = waveformInteractionRef.current!.getBoundingClientRect();
                         const x = timeToX(marker.time, width);
                         const color = getMarkerColor(marker.id);
                         const markerName = marker.name || `Marker ${index + 1}`;
                         const textYPosition = -4; // Position name in the top padding area
-                        const lineY1start = 10; // Start line below the name
+                        const lineY1 = 10;
+                        const lineY2 = 40; // Shorter line
+                        const flagY = lineY2;
 
                         return (
                            <g 
@@ -486,14 +496,14 @@ export default function WaveformDisplay({
                               onMouseDown={(e) => handleMarkerInteractionStart(e, marker.id)}
                               onTouchStart={(e) => handleMarkerInteractionStart(e, marker.id)}
                            >
-                              <line x1="0" y1={lineY1start} y2="100%" stroke={color} strokeWidth="2" />
+                              <line x1="0" y1={lineY1} y2={lineY2} stroke={color} strokeWidth="2" />
                               <text x="0" y={textYPosition} fill={color} textAnchor="middle" className="text-xs font-semibold select-none">
                                 {markerName}
                               </text>
                               {/* This is the grab handle area */}
-                              <g transform={`translate(0, ${height - 24})`}>
-                                <rect data-marker-id={marker.id} x="-12" y="0" width="24" height="24" fill="transparent" />
-                                <Flag x="-8" y="4" className="w-4 h-4 pointer-events-none" style={{ color }} fillOpacity={0.2} />
+                              <g transform={`translate(0, ${flagY})`}>
+                                <rect data-marker-id={marker.id} x="-12" y="-8" width="24" height="24" fill="transparent" />
+                                <Flag x="-8" y="0" className="w-4 h-4 pointer-events-none" style={{ color }} fillOpacity={0.2} />
                               </g>
                            </g>
                         );
