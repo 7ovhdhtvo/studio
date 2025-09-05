@@ -9,18 +9,18 @@ import type { AutomationPoint, Marker } from '@/lib/storage-manager';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Checkbox } from '../ui/checkbox';
-import { Flag } from 'lucide-react';
+import { Flag, SkipBack, SkipForward } from 'lucide-react';
 
 const POINT_RADIUS = 6;
 const HITBOX_RADIUS = 12;
 
 const MARKER_COLORS = [
-    'hsl(var(--chart-2))',
-    'hsl(var(--chart-4))',
-    'hsl(var(--chart-5))',
+    '#ef4444', // red-500
+    '#eab308', // yellow-500
     '#3b82f6', // blue-500
-    '#8b5cf6', // violet-500
-    '#ec4899', // pink-500
+    '#f59e0b', // amber-500
+    '#6366f1', // indigo-500
+    '#d946ef', // fuchsia-500
 ];
 
 const getMarkerColor = (markerId: string) => {
@@ -357,6 +357,18 @@ export default function WaveformDisplay({
             onMouseMove={handleScrubMouseMove}
             onMouseUp={handleEndDrag}
             onMouseLeave={handleEndDrag}
+            onTouchStart={(e) => {
+              if (showVolumeAutomation || showMarkers) return;
+              isMouseDownRef.current = true;
+              onScrubStart();
+            }}
+            onTouchMove={(e) => {
+              if (!isMouseDownRef.current) return;
+              const rect = waveformInteractionRef.current!.getBoundingClientRect();
+              const x = e.touches[0].clientX - rect.left;
+              const newProgress = Math.max(0, Math.min(100, (x / rect.width) * 100));
+              onProgressChange(newProgress);
+            }}
             onTouchEnd={handleEndDrag}
             onTouchCancel={handleEndDrag}
           >
@@ -422,15 +434,16 @@ export default function WaveformDisplay({
                         const { width, height } = waveformInteractionRef.current!.getBoundingClientRect();
                         const x = timeToX(marker.time, width);
                         
-                        let color = 'hsl(var(--primary))'; // Default to green for first marker
+                        let color: string;
                         if (startMarker?.id === marker.id) {
-                            color = 'hsl(var(--destructive))'; // Red for the designated start marker
-                        } else if (startMarker || index > 0) {
-                             color = getMarkerColor(marker.id); // Other colors for other markers
+                            color = 'hsl(var(--destructive))';
+                        } else if (!startMarker && index === 0) {
+                            color = 'hsl(var(--primary))';
+                        } else {
+                            color = getMarkerColor(marker.id);
                         }
 
                         const markerName = marker.name || `Marker ${index + 1}`;
-                        const flagYPosition = height - 18; // Position at the bottom
                         return (
                            <g 
                             key={marker.id} 
@@ -441,7 +454,7 @@ export default function WaveformDisplay({
                            >
                               <line x1="0" y1="0" x2="0" y2="100%" stroke={color} strokeWidth="2" />
                               <polygon points="-5,0 5,0 0,5" fill={color} />
-                              <Flag x="4" y={flagYPosition} className="w-4 h-4" style={{ color }} fillOpacity={0.2} />
+                              <Flag x="4" y={height - 18} className="w-4 h-4" style={{ color }} fillOpacity={0.2} />
                               <rect data-marker-id={marker.id} x="-12" y="0" width="24" height="100%" fill="transparent" />
                               <text x="4" y="14" fill={color} textAnchor="start" className="text-xs font-semibold pointer-events-none select-none">
                                 {markerName}
