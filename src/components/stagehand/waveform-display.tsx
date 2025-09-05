@@ -3,7 +3,7 @@
 
 import { cn } from '@/lib/utils';
 import { type WaveformData } from '@/lib/waveform';
-import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAction, useMemo, useCallback, TouchEvent } from 'react';
+import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAction, useMemo, useCallback, TouchEvent, useEffect } from 'react';
 import TimeRuler from './time-ruler';
 import type { AutomationPoint, Marker } from '@/lib/storage-manager';
 import { Input } from '../ui/input';
@@ -21,7 +21,6 @@ const MARKER_COLORS = [
     '#eab308', // yellow-500
     '#ef4444', // red-500
 ];
-
 
 const getMarkerColor = (markerId: string) => {
     // Simple hash function to get a consistent color index
@@ -120,14 +119,17 @@ export default function WaveformDisplay({
   onApplyDelayToLoopChange
 }: WaveformDisplayProps) {
   const waveformInteractionRef = useRef<HTMLDivElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   const isMouseDownRef = useRef(false);
   const draggingPointIdRef = useRef<string | null>(null);
   const draggingMarkerIdRef = useRef<string | null>(null);
   const startDragYRef = useRef(0);
   const startZoomRef = useRef(1);
 
-  const getSvgCoords = (e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>): {x: number, y: number} => {
-    const svg = e.currentTarget as SVGSVGElement;
+  const getSvgCoords = useCallback((e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>): {x: number, y: number} => {
+    const svg = svgRef.current;
+    if (!svg) return { x: 0, y: 0 };
+
     const pt = svg.createSVGPoint();
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
@@ -135,7 +137,7 @@ export default function WaveformDisplay({
     pt.y = clientY;
     const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
     return { x: svgP.x, y: svgP.y };
-  };
+  }, []);
 
   const timeToX = useCallback((time: number, width: number) => {
     if (durationInSeconds === 0) return 0;
@@ -252,8 +254,9 @@ export default function WaveformDisplay({
   const handleSvgInteractionMove = (e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>) => {
       if (!draggingPointIdRef.current && !draggingMarkerIdRef.current) return;
       e.preventDefault();
-
-      const { width, height } = e.currentTarget.getBoundingClientRect();
+      
+      if (!svgRef.current) return;
+      const { width, height } = svgRef.current.getBoundingClientRect();
       const { x, y } = getSvgCoords(e);
       const newTime = (x / width) * durationInSeconds;
 
@@ -414,6 +417,7 @@ export default function WaveformDisplay({
             
             {(showVolumeAutomation || isAutomationActive || isAnyMarkerModeOn) && durationInSeconds > 0 && waveformInteractionRef.current && (
                 <svg
+                    ref={svgRef}
                     width="100%"
                     height="100%"
                     className="absolute inset-0 top-0 bottom-0 z-10 overflow-visible"
@@ -493,7 +497,7 @@ export default function WaveformDisplay({
           
           {durationInSeconds > 0 && (
             <div 
-              className="absolute top-0 h-full w-0.5 bg-foreground/70 pointer-events-none z-20"
+              className="absolute top-6 h-[calc(100%-1.5rem)] w-0.5 bg-foreground/70 pointer-events-none z-20"
               style={{ left: `${progress}%` }}
             >
               <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 bg-foreground/70 rounded-full"></div>
