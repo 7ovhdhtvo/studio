@@ -292,11 +292,13 @@ export default function WaveformDisplay({
             const scrollRect = scrollContainerRef.current.getBoundingClientRect();
             const relativeX = ('touches' in e ? e.touches[0].clientX : e.clientX) - scrollRect.left;
             const scrollThreshold = 50; // pixels from edge
-
+            const scrollSpeed = Math.max(1, (scrollThreshold - relativeX) / 5) / zoom;
+            
             if (relativeX < scrollThreshold) {
-              scrollContainerRef.current.scrollLeft -= (scrollThreshold - relativeX);
+              scrollContainerRef.current.scrollLeft -= scrollSpeed;
             } else if (relativeX > scrollRect.width - scrollThreshold) {
-              scrollContainerRef.current.scrollLeft += (relativeX - (scrollRect.width - scrollThreshold));
+              const rightScrollSpeed = Math.max(1, (relativeX - (scrollRect.width - scrollThreshold)) / 5) / zoom;
+              scrollContainerRef.current.scrollLeft += rightScrollSpeed;
             }
           }
 
