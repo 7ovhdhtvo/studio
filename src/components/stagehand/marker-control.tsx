@@ -7,9 +7,8 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { LineChart, Flag, Minus, Trash2, Edit } from 'lucide-react';
+import { Flag, Minus, Trash2, Edit } from 'lucide-react';
 import type { Marker } from '@/lib/storage-manager';
-import { Checkbox } from '../ui/checkbox';
 
 type MarkerEditorProps = {
   marker: Marker;
@@ -79,7 +78,9 @@ type MarkerControlProps = {
   onToggleShowMarkers: (value: boolean) => void;
   isMarkerModeActive: boolean;
   onToggleIsMarkerModeActive: (value: boolean) => void;
-  onUpdateMarker: (id: string, newName: string, newTime: number, isStart: boolean) => void;
+  isLoopActive: boolean;
+  onToggleIsLoopActive: (value: boolean) => void;
+  onUpdateMarker: (id: string, newName: string, newTime: number) => void;
   onDeleteMarker: (id: string) => void;
   onDeleteAllMarkers: () => void;
   onJumpToMarker: (time: number) => void;
@@ -93,18 +94,13 @@ export default function MarkerControl({
   onToggleShowMarkers, 
   isMarkerModeActive,
   onToggleIsMarkerModeActive,
+  isLoopActive,
+  onToggleIsLoopActive,
   onUpdateMarker,
   onDeleteMarker,
   onDeleteAllMarkers,
   onJumpToMarker,
 }: MarkerControlProps) {
-
-  const handleUpdate = (id: string, newName: string, newTime: number) => {
-    const marker = markers.find(m => m.id === id);
-    if (marker) {
-        onUpdateMarker(id, newName, newTime, !!marker.isPlaybackStart);
-    }
-  }
 
   if (!isOpen) {
     return (
@@ -146,6 +142,14 @@ export default function MarkerControl({
                   onCheckedChange={onToggleIsMarkerModeActive}
               />
             </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="loop-active-switch">Loop active</Label>
+              <Switch
+                  id="loop-active-switch"
+                  checked={isLoopActive}
+                  onCheckedChange={onToggleIsLoopActive}
+              />
+            </div>
           </div>
           <div className="grid gap-2">
             <div className="flex justify-between items-center mb-1">
@@ -173,7 +177,7 @@ export default function MarkerControl({
                                 onClick={() => onJumpToMarker(marker.time)}
                             >
                                 <div className="flex flex-col overflow-hidden">
-                                    <span className="font-semibold truncate">{displayName}</span>
+                                    <span className="font-semibold break-words whitespace-pre-wrap">{displayName}</span>
                                     <span className="font-mono text-xs text-muted-foreground">{marker.time.toFixed(2)}s</span>
                                 </div>
                             </Button>
@@ -183,7 +187,7 @@ export default function MarkerControl({
                                         <Edit className="h-4 w-4" />
                                     </Button>
                                 </PopoverTrigger>
-                                <MarkerEditor marker={marker} markerNumber={markerNumber} onUpdate={handleUpdate} onDelete={onDeleteMarker} />
+                                <MarkerEditor marker={marker} markerNumber={markerNumber} onUpdate={onUpdateMarker} onDelete={onDeleteMarker} />
                             </Popover>
                         </div>
                     )

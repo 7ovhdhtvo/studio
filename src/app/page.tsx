@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Header from '@/components/stagehand/header';
 import PlaybackControls from '@/components/stagehand/playback-controls';
 import WaveformDisplay from '@/components/stagehand/waveform-display';
@@ -75,9 +75,9 @@ export default function Home() {
     { id: '2', time: 6.8, value: 125 },
   ]);
   const [markers, setMarkers] = useState<Marker[]>([]);
-  const [playbackStartTime, setPlaybackStartTime] = useState(0);
   const [showMarkers, setShowMarkers] = useState(false);
   const [isMarkerModeActive, setIsMarkerModeActive] = useState(false);
+  const [isMarkerLoopActive, setIsMarkerLoopActive] = useState(false);
   
   const [isDraggingAutomation, setIsDraggingAutomation] = useState(false);
   const [debugState, setDebugState] = useState('Ready');
@@ -89,6 +89,18 @@ export default function Home() {
   const waveformContainerRef = useRef<HTMLDivElement>(null);
   const isMobile = useMediaQuery("(max-width: 768px)");
 
+  const duration = audioRef.current?.duration ?? activeTrack?.duration ?? 0;
+  const currentTime = audioRef.current?.currentTime ?? 0;
+
+  const { playbackStartTime, playbackEndTime } = useMemo(() => {
+    const startMarker = markers.find(m => m.isPlaybackStart);
+    const endMarker = markers.find(m => m.isLoopEnd);
+    return {
+      playbackStartTime: startMarker?.time ?? 0,
+      playbackEndTime: endMarker?.time ?? duration,
+    };
+  }, [markers, duration]);
+
   useEffect(() => {
     if (isMobile) {
       setIsLibraryOpen(false);
@@ -96,9 +108,6 @@ export default function Home() {
       setIsLibraryOpen(true);
     }
   }, [isMobile]);
-
-  const duration = audioRef.current?.duration ?? activeTrack?.duration ?? 0;
-  const currentTime = audioRef.current?.currentTime ?? 0;
 
   const getAutomationValue = useCallback((points: AutomationPoint[], time: number): number | null => {
     if (points.length === 0) return null;
@@ -132,8 +141,12 @@ export default function Home() {
   const startProgressLoop = useCallback(() => {
     stopProgressLoop();
     const animate = () => {
-      if (audioRef.current && !isScrubbingRef.current && !audioRef.current.paused) {
-        const audio = audioRef.current;
+      const audio = audioRef.current;
+      if (audio && !isScrubbingRef.current && !audio.paused) {
+        if (isMarkerLoopActive && audio.currentTime >= playbackEndTime) {
+          audio.currentTime = playbackStartTime;
+        }
+
         const newProgress = (audio.currentTime / audio.duration) * 100;
         setProgress(newProgress);
 
@@ -151,7 +164,7 @@ export default function Home() {
       }
     };
     animationFrameRef.current = requestAnimationFrame(animate);
-  }, [stopProgressLoop, isAutomationActive, volumePoints, getAutomationValue, isDraggingAutomation, volume]);
+  }, [stopProgressLoop, isAutomationActive, volumePoints, getAutomationValue, isDraggingAutomation, volume, isMarkerLoopActive, playbackStartTime, playbackEndTime]);
 
 
   useEffect(() => {
@@ -304,12 +317,8 @@ export default function Home() {
     handleSetIsPlaying(false);
     
     setActiveTrack(track);
-    const trackMarkers = track.markers || [];
-    setMarkers(trackMarkers);
-    const startMarker = trackMarkers.find(m => m.isPlaybackStart);
-    setPlaybackStartTime(startMarker ? startMarker.time : 0);
-
-    setProgress(startMarker ? (startMarker.time / track.duration) * 100 : 0);
+    setMarkers(track.markers || []);
+    setProgress((playbackStartTime / track.duration) * 100);
     setVolumePoints(track.volumeAutomation || []);
     
     if ((track.volumeAutomation || []).length === 0) {
@@ -495,22 +504,11 @@ export default function Home() {
     updateTrackAutomation(activeTrack.id, []);
   };
 
-  const handleUpdateMarker = (id: string, newName: string, newTime: number, isStart: boolean) => {
+  const handleUpdateMarker = (id: string, newName: string, newTime: number) => {
     if (!activeTrack) return;
-    let updatedMarkers = markers.map(m => {
-        const isThisMarker = m.id === id;
-        const shouldBeStart = isThisMarker && isStart;
-        return {
-            ...m,
-            name: isThisMarker ? newName : m.name,
-            time: isThisMarker ? newTime : m.time,
-            isPlaybackStart: shouldBeStart ? true : (isStart ? false : m.isPlaybackStart),
-        };
-    });
-
-    const startMarker = updatedMarkers.find(m => m.isPlaybackStart);
-    setPlaybackStartTime(startMarker ? startMarker.time : 0);
-
+    let updatedMarkers = markers.map(m => 
+      m.id === id ? { ...m, name: newName, time: newTime } : m
+    );
     setMarkers(updatedMarkers);
     updateTrackMarkers(activeTrack.id, updatedMarkers);
   };
@@ -521,10 +519,16 @@ export default function Home() {
         ...m,
         isPlaybackStart: m.id === markerId
     }));
-    
-    const startMarker = updatedMarkers.find(m => m.isPlaybackStart);
-    setPlaybackStartTime(startMarker ? startMarker.time : 0);
-    
+    setMarkers(updatedMarkers);
+    updateTrackMarkers(activeTrack.id, updatedMarkers);
+  }
+  
+  const handleSelectEndMarker = (markerId: string | null) => {
+    if (!activeTrack) return;
+    const updatedMarkers = markers.map(m => ({
+        ...m,
+        isLoopEnd: m.id === markerId
+    }));
     setMarkers(updatedMarkers);
     updateTrackMarkers(activeTrack.id, updatedMarkers);
   }
@@ -718,6 +722,9 @@ export default function Home() {
                     onJumpToNext={handleJumpToNextMarker}
                     onSelectStartMarker={handleSelectStartMarker}
                     selectedStartMarkerId={markers.find(m => m.isPlaybackStart)?.id || null}
+                    onSelectEndMarker={handleSelectEndMarker}
+                    selectedEndMarkerId={markers.find(m => m.isLoopEnd)?.id || null}
+                    isLoopActive={isMarkerLoopActive}
                   />
                 )}
 
@@ -753,6 +760,8 @@ export default function Home() {
                       onToggleShowMarkers={setShowMarkers}
                       isMarkerModeActive={isMarkerModeActive}
                       onToggleIsMarkerModeActive={setIsMarkerModeActive}
+                      isLoopActive={isMarkerLoopActive}
+                      onToggleIsLoopActive={setIsMarkerLoopActive}
                       onUpdateMarker={handleUpdateMarker}
                       onDeleteMarker={handleDeleteMarker}
                       onDeleteAllMarkers={handleDeleteAllMarkers}
