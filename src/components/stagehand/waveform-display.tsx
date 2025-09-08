@@ -9,6 +9,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Checkbox } from '../ui/checkbox';
 import TimeRuler from './time-ruler';
+import { Flag } from 'lucide-react';
 
 const POINT_RADIUS = 6;
 const HITBOX_RADIUS = 12;
@@ -539,3 +540,4 @@ export default function WaveformDisplay({
     </div>
   );
 }
+
