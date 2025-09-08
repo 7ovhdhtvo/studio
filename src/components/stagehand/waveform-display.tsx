@@ -9,7 +9,6 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Checkbox } from '../ui/checkbox';
 import TimeRuler from './time-ruler';
-import { Flag } from 'lucide-react';
 
 const POINT_RADIUS = 6;
 const HITBOX_RADIUS = 12;
@@ -125,7 +124,7 @@ export default function WaveformDisplay({
   const startDragYRef = useRef(0);
   const startZoomRef = useRef(1);
 
-  const getSvgCoords = useCallback((e: MouseEvent<SVGSVGElement | SVGLineElement> | TouchEvent<SVGSVGElement | SVGLineElement>): {x: number, y: number} => {
+  const getSvgCoords = useCallback((e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>): {x: number, y: number} => {
     const svg = svgRef.current;
     if (!svg) return { x: 0, y: 0 };
 
@@ -272,9 +271,8 @@ export default function WaveformDisplay({
         onAutomationPointsChange(updatedPoints);
         setDebugState(`Dragging ${draggingPointIdRef.current}`);
       } else if (draggingMarkerIdRef.current && showMarkers) {
-          // Vertical drag for zoom
           const deltaY = startDragYRef.current - y;
-          const zoomSensitivity = 0.02; // Fine-tuned for smoother feel
+          const zoomSensitivity = 0.02;
           const proposedZoom = startZoomRef.current + deltaY * zoomSensitivity;
           const newZoom = Math.max(1, Math.min(20, proposedZoom));
           
@@ -285,13 +283,12 @@ export default function WaveformDisplay({
               if (markerToDrag) {
                   const markerTime = markerToDrag.time;
                   
-                  // Calculate marker's absolute pixel position before zoom
                   const totalWidthBefore = scrollContainer.scrollWidth;
                   const markerXBefore = (markerTime / durationInSeconds) * totalWidthBefore;
                   const markerRatioInView = (markerXBefore - scrollContainer.scrollLeft) / scrollContainer.clientWidth;
 
                   setZoom(newZoom);
-                  // Use a timeout to allow the DOM to update with the new zoom level (new scrollWidth)
+                  
                   setTimeout(() => {
                       const totalWidthAfter = scrollContainer.scrollWidth;
                       const markerXAfter = (markerTime / durationInSeconds) * totalWidthAfter;
@@ -300,12 +297,9 @@ export default function WaveformDisplay({
                       scrollContainer.scrollLeft = newScrollLeft;
                   }, 0);
               }
-            } else {
-               setZoom(newZoom);
             }
           }
           
-          // Horizontal drag for time
           const updatedMarkers = markers.map(m =>
               m.id === draggingMarkerIdRef.current ? {
                   ...m,
@@ -314,17 +308,16 @@ export default function WaveformDisplay({
           );
           onMarkersChange(updatedMarkers);
 
-          // Auto-scroll logic based on viewport
           if (scrollContainerRef.current) {
             const scrollRect = scrollContainerRef.current.getBoundingClientRect();
             const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
             const relativeX = clientX - scrollRect.left;
             
-            const scrollZone = scrollRect.width * 0.1; // 10% on each side
+            const scrollZone = scrollRect.width * 0.1;
             
             if (relativeX < scrollZone) {
                 const intensity = (scrollZone - relativeX) / scrollZone;
-                const scrollAmount = intensity * (scrollRect.width * 0.02); // Scroll up to 2% of viewport width per frame
+                const scrollAmount = intensity * (scrollRect.width * 0.02);
                 scrollContainerRef.current.scrollLeft -= scrollAmount;
             } else if (relativeX > scrollRect.width - scrollZone) {
                 const intensity = (relativeX - (scrollRect.width - scrollZone)) / scrollZone;
@@ -343,7 +336,7 @@ export default function WaveformDisplay({
       setDebugState(`Dragging ${pointId}`);
   }
 
-  const handleMarkerInteractionStart = (e: MouseEvent<SVGSVGElement | SVGLineElement> | TouchEvent<SVGSVGElement | SVGLineElement>, markerId: string) => {
+  const handleMarkerInteractionStart = (e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>, markerId: string) => {
     e.stopPropagation();
     if (!showMarkers) return;
     
@@ -508,13 +501,13 @@ export default function WaveformDisplay({
                            >
                               <line 
                                 data-marker-id={marker.id} 
-                                x1="0" y1="0" x2="0" y2={height} 
+                                x1="0" y1="-32" x2="0" y2={height}
                                 stroke={color} 
                                 strokeWidth="2"
                                 className="cursor-grab active:cursor-grabbing"
                               />
                                <g className="pointer-events-none">
-                                <text x="4" y="14" fill={color} className="text-xs font-semibold select-none">
+                                <text x="4" y="-18" fill={color} className="text-xs font-semibold select-none">
                                   {markerName}
                                 </text>
                                </g>
@@ -540,4 +533,5 @@ export default function WaveformDisplay({
     </div>
   );
 }
+
 
