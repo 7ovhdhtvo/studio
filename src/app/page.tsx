@@ -107,9 +107,10 @@ export default function Home() {
   }, [isMarkerModeActive, markers, selectedStartMarkerId, currentTime]);
 
   const playbackEndTime = useMemo(() => {
+    if (!isMarkerLoopActive) return duration;
     const endMarker = markers.find(m => m.isLoopEnd);
     return endMarker?.time ?? duration;
-  }, [markers, duration]);
+  }, [markers, duration, isMarkerLoopActive]);
 
   useEffect(() => {
     if (isMobile) {
@@ -228,13 +229,12 @@ export default function Home() {
     if (isPlaying && audioSrc) {
         if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
         
-        // If marker mode is active, always respect the playbackStartTime.
-        // Otherwise, playback resumes from where it was.
+        // When in marker mode, always start from the designated playback start time.
+        // Otherwise, resume from the current playhead position.
         if (isMarkerModeActive) {
             audio.currentTime = playbackStartTime;
         }
 
-        // Delay logic only applies if we are starting from the designated start time.
         const isStartingFromDefinedStart = Math.abs(audio.currentTime - playbackStartTime) < 0.1;
         const delay = (startDelay > 0 && isStartingFromDefinedStart) ? startDelay * 1000 : 0;
         
@@ -466,14 +466,13 @@ export default function Home() {
   const handleAudioEnded = () => {
     logger.log('handleAudioEnded: Audio track ended.', { isLooping });
     if (isLooping && audioRef.current) {
-        // Global loop respects marker start time if active, otherwise starts from 0
         const loopStartTime = isMarkerModeActive ? playbackStartTime : 0;
         audioRef.current.currentTime = loopStartTime;
         setProgress((loopStartTime / duration) * 100);
 
         if (applyDelayToLoop && startDelay > 0) {
             setIsPlaying(false);
-            setTimeout(() => setIsPlaying(true), 10); // small timeout to re-trigger useEffect
+            setTimeout(() => setIsPlaying(true), 10);
         } else {
             audioRef.current.play().catch(e => logger.error("Loop playback failed", e));
         }
@@ -518,10 +517,12 @@ export default function Home() {
 
   const handleMarkerDragStart = (markerId: string) => {
     setDebugState(`Dragging Marker ${markerId}`);
+    setZoomBeforeDrag(zoom);
   };
 
   const handleMarkerDragEnd = (newTime: number) => {
     setDebugState('Ready');
+    setZoomAndRegenerate(zoomBeforeDrag);
 
     if (activeTrack) {
       updateTrackMarkers(activeTrack.id, markers);
@@ -613,6 +614,13 @@ export default function Home() {
   
   const handleBaselineVolumeChange = (newVolume: number) => {
     setVolume(newVolume);
+  };
+
+  const handleToggleMarkerLoop = (isActive: boolean) => {
+    setIsMarkerLoopActive(isActive);
+    if (isActive) {
+        setIsLooping(true);
+    }
   };
 
   const getTracksInCurrentProject = () => {
@@ -830,7 +838,7 @@ export default function Home() {
                       isMarkerModeActive={isMarkerModeActive}
                       onToggleIsMarkerModeActive={setIsMarkerModeActive}
                       isLoopActive={isMarkerLoopActive}
-                      onToggleIsLoopActive={setIsMarkerLoopActive}
+                      onToggleIsLoopActive={handleToggleMarkerLoop}
                       onUpdateMarker={handleUpdateMarker}
                       onDeleteMarker={handleDeleteMarker}
                       onDeleteAllMarkers={handleDeleteAllMarkers}
