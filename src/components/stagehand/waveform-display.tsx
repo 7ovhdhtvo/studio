@@ -9,7 +9,6 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Checkbox } from '../ui/checkbox';
 import TimeRuler from './time-ruler';
-import { Flag } from 'lucide-react';
 
 const POINT_RADIUS = 6;
 const HITBOX_RADIUS = 12;
@@ -124,18 +123,17 @@ export default function WaveformDisplay({
   const isMouseDownRef = useRef(false);
   const draggingPointIdRef = useRef<string | null>(null);
   const draggingMarkerIdRef = useRef<string | null>(null);
-  const startDragYRef = useRef(0);
+  
+  const startDragCoords = useRef({ x: 0, y: 0 });
   const startZoomRef = useRef(1);
 
-  const getSvgCoords = useCallback((e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>): {x: number, y: number} => {
+  const getSvgCoords = useCallback((e: MouseEvent<SVGSVGElement> | globalThis.MouseEvent): {x: number, y: number} => {
     const svg = svgRef.current;
     if (!svg) return { x: 0, y: 0 };
 
     const pt = svg.createSVGPoint();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    pt.x = clientX;
-    pt.y = clientY;
+    pt.x = e.clientX;
+    pt.y = e.clientY;
     const svgP = pt.matrixTransform(svg.getScreenCTM()?.inverse());
     return { x: svgP.x, y: svgP.y };
   }, []);
@@ -199,23 +197,7 @@ export default function WaveformDisplay({
     }
   };
   
-  const handleEndDrag = () => {
-    if (isMouseDownRef.current) {
-        isMouseDownRef.current = false;
-        onScrubEnd();
-    }
-    if (draggingPointIdRef.current) {
-        setDebugState('Ready');
-        draggingPointIdRef.current = null;
-        onAutomationDragEnd();
-    }
-    if (draggingMarkerIdRef.current) {
-        onMarkerDragEnd();
-        draggingMarkerIdRef.current = null;
-    }
-  };
-
-  const handleSvgInteractionStart = (e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>) => {
+  const handleSvgInteractionStart = (e: MouseEvent<SVGSVGElement>) => {
       if ((e.target as SVGElement).dataset.pointId || (e.target as SVGElement).dataset.markerId) return;
       e.preventDefault();
 
@@ -248,104 +230,127 @@ export default function WaveformDisplay({
       }
   };
 
-  const handleSvgInteractionMove = (e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>) => {
-      if (!draggingPointIdRef.current && !draggingMarkerIdRef.current) return;
-      e.preventDefault();
-      
-      const svg = svgRef.current;
-      if (!svg) return;
+    const handleGlobalMouseMove = useCallback((e: globalThis.MouseEvent) => {
+        if (!draggingPointIdRef.current && !draggingMarkerIdRef.current) return;
+        e.preventDefault();
 
-      const { width, height } = svg.getBoundingClientRect();
-      const { x, y } = getSvgCoords(e);
-      const newTime = (x / width) * durationInSeconds;
+        const svg = svgRef.current;
+        if (!svg) return;
 
-      if (draggingPointIdRef.current && showVolumeAutomation) {
-        const newValue = 100 - (y / height) * 100;
-        const updatedPoints = automationPoints.map(p =>
-          p.id === draggingPointIdRef.current ? { 
-              ...p, 
-              time: Math.max(0, Math.min(durationInSeconds, newTime)), 
-              value: Math.max(0, Math.min(100, newValue))
-          } : p
-        );
-        onAutomationPointsChange(updatedPoints);
-        setDebugState(`Dragging ${draggingPointIdRef.current}`);
-      } else if (draggingMarkerIdRef.current && showMarkers) {
-          const deltaY = startDragYRef.current - y;
-          const zoomSensitivity = 0.02;
-          const proposedZoom = startZoomRef.current + deltaY * zoomSensitivity;
-          const newZoom = Math.max(1, Math.min(20, proposedZoom));
-          
-          if (Math.abs(newZoom - zoom) > 0.05) {
+        const { width, height } = svg.getBoundingClientRect();
+        const { x, y } = getSvgCoords(e);
+        const newTime = (x / width) * durationInSeconds;
+
+        if (draggingPointIdRef.current && showVolumeAutomation) {
+            const newValue = 100 - (y / height) * 100;
+            const updatedPoints = automationPoints.map(p =>
+                p.id === draggingPointIdRef.current ? {
+                    ...p,
+                    time: Math.max(0, Math.min(durationInSeconds, newTime)),
+                    value: Math.max(0, Math.min(100, newValue))
+                } : p
+            );
+            onAutomationPointsChange(updatedPoints);
+            setDebugState(`Dragging ${draggingPointIdRef.current}`);
+        } else if (draggingMarkerIdRef.current && showMarkers) {
+            const deltaY = startDragCoords.current.y - e.clientY;
+            const zoomSensitivity = 0.02;
+            const proposedZoom = startZoomRef.current + deltaY * zoomSensitivity;
+            const newZoom = Math.max(1, Math.min(20, proposedZoom));
+
             const scrollContainer = scrollContainerRef.current;
             if (scrollContainer) {
-              const markerToDrag = markers.find(m => m.id === draggingMarkerIdRef.current);
-              if (markerToDrag) {
-                  const markerTime = markerToDrag.time;
-                  
-                  const totalWidthBefore = scrollContainer.scrollWidth;
-                  const markerXBefore = (markerTime / durationInSeconds) * totalWidthBefore;
-                  const markerRatioInView = (markerXBefore - scrollContainer.scrollLeft) / scrollContainer.clientWidth;
+                const markerToDrag = markers.find(m => m.id === draggingMarkerIdRef.current);
+                if (markerToDrag) {
+                    const markerTime = markerToDrag.time;
+                    const markerXBeforeZoom = (markerTime / durationInSeconds) * scrollContainer.scrollWidth;
+                    const viewPortXBeforeZoom = markerXBeforeZoom - scrollContainer.scrollLeft;
 
-                  setZoom(newZoom);
-                  startDragYRef.current = y;
-                  startZoomRef.current = newZoom;
-                  
-                  setTimeout(() => {
-                      const totalWidthAfter = scrollContainer.scrollWidth;
-                      const markerXAfter = (markerTime / durationInSeconds) * totalWidthAfter;
-                      
-                      const newScrollLeft = markerXAfter - (scrollContainer.clientWidth * markerRatioInView);
-                      scrollContainer.scrollLeft = newScrollLeft;
-                  }, 0);
-              }
+                    setZoom(newZoom);
+
+                    // This needs to be in a timeout to allow the DOM to update with the new scrollWidth
+                    setTimeout(() => {
+                        const totalWidthAfter = scrollContainer.scrollWidth;
+                        const markerXAfter = (markerTime / durationInSeconds) * totalWidthAfter;
+                        const newScrollLeft = markerXAfter - viewPortXBeforeZoom;
+                        scrollContainer.scrollLeft = newScrollLeft;
+                    }, 0);
+                }
             }
-          }
-          
-          const updatedMarkers = markers.map(m =>
-              m.id === draggingMarkerIdRef.current ? {
-                  ...m,
-                  time: Math.max(0, Math.min(durationInSeconds, newTime)),
-              } : m
-          );
-          onMarkersChange(updatedMarkers);
 
-          if (scrollContainerRef.current) {
-            const scrollRect = scrollContainerRef.current.getBoundingClientRect();
-            const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-            const relativeX = clientX - scrollRect.left;
+            const updatedMarkers = markers.map(m =>
+                m.id === draggingMarkerIdRef.current ? {
+                    ...m,
+                    time: Math.max(0, Math.min(durationInSeconds, newTime)),
+                } : m
+            );
+            onMarkersChange(updatedMarkers);
+            
+            const scrollRect = scrollContainer.getBoundingClientRect();
+            const relativeX = e.clientX - scrollRect.left;
             
             const scrollZone = scrollRect.width * 0.1;
             
             if (relativeX < scrollZone) {
                 const intensity = (scrollZone - relativeX) / scrollZone;
                 const scrollAmount = intensity * (scrollRect.width * 0.02);
-                scrollContainerRef.current.scrollLeft -= scrollAmount;
+                scrollContainer.scrollLeft -= scrollAmount;
             } else if (relativeX > scrollRect.width - scrollZone) {
                 const intensity = (relativeX - (scrollRect.width - scrollZone)) / scrollZone;
                 const scrollAmount = intensity * (scrollRect.width * 0.02);
-                scrollContainerRef.current.scrollLeft += scrollAmount;
+                scrollContainer.scrollLeft += scrollAmount;
             }
-          }
-      }
-  };
+        }
+    }, [automationPoints, durationInSeconds, getSvgCoords, markers, onAutomationPointsChange, onMarkersChange, scrollContainerRef, setZoom, showMarkers, showVolumeAutomation]);
 
-  const handlePointInteractionStart = (e: MouseEvent | TouchEvent, pointId: string) => {
+
+  const handleGlobalMouseUp = useCallback(() => {
+    if (isMouseDownRef.current) {
+        isMouseDownRef.current = false;
+        onScrubEnd();
+    }
+    if (draggingPointIdRef.current) {
+        setDebugState('Ready');
+        draggingPointIdRef.current = null;
+        onAutomationDragEnd();
+    }
+    if (draggingMarkerIdRef.current) {
+        onMarkerDragEnd();
+        draggingMarkerIdRef.current = null;
+    }
+    window.removeEventListener('mousemove', handleGlobalMouseMove);
+    window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, [onScrubEnd, onAutomationDragEnd, onMarkerDragEnd, handleGlobalMouseMove]);
+
+
+  useEffect(() => {
+    return () => {
+        window.removeEventListener('mousemove', handleGlobalMouseMove);
+        window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [handleGlobalMouseMove, handleGlobalMouseUp]);
+
+
+  const handlePointInteractionStart = (e: MouseEvent, pointId: string) => {
       e.stopPropagation();
       if (!showVolumeAutomation) return;
       draggingPointIdRef.current = pointId;
       onAutomationDragStart();
       setDebugState(`Dragging ${pointId}`);
+      window.addEventListener('mousemove', handleGlobalMouseMove);
+      window.addEventListener('mouseup', handleGlobalMouseUp);
   }
 
-  const handleMarkerInteractionStart = (e: MouseEvent<SVGSVGElement> | TouchEvent<SVGSVGElement>, markerId: string) => {
+  const handleMarkerInteractionStart = (e: MouseEvent<SVGGElement>, markerId: string) => {
     e.stopPropagation();
     if (!showMarkers) return;
     
     draggingMarkerIdRef.current = markerId;
-    startDragYRef.current = getSvgCoords(e).y;
+    startDragCoords.current = { x: e.clientX, y: e.clientY };
     startZoomRef.current = zoom;
     onMarkerDragStart(markerId);
+    window.addEventListener('mousemove', handleGlobalMouseMove);
+    window.addEventListener('mouseup', handleGlobalMouseUp);
   };
 
   const sortedMarkers = useMemo(() => [...markers].sort((a, b) => a.time - b.time), [markers]);
@@ -411,22 +416,8 @@ export default function WaveformDisplay({
             className="absolute inset-0 top-8 bottom-0 z-0"
             onMouseDown={handleScrubMouseDown}
             onMouseMove={handleScrubMouseMove}
-            onMouseUp={handleEndDrag}
-            onMouseLeave={handleEndDrag}
-            onTouchStart={(e) => {
-              if (showVolumeAutomation || showMarkers) return;
-              isMouseDownRef.current = true;
-              onScrubStart();
-            }}
-            onTouchMove={(e) => {
-              if (!isMouseDownRef.current) return;
-              const rect = waveformInteractionRef.current!.getBoundingClientRect();
-              const x = e.touches[0].clientX - rect.left;
-              const newProgress = Math.max(0, Math.min(100, (x / rect.width) * 100));
-              onProgressChange(newProgress);
-            }}
-            onTouchEnd={handleEndDrag}
-            onTouchCancel={handleEndDrag}
+            onMouseUp={handleGlobalMouseUp}
+            onMouseLeave={handleGlobalMouseUp}
           >
             {waveformData ? (
               <div className="w-full h-full flex flex-col justify-center items-center pointer-events-none">
@@ -447,13 +438,6 @@ export default function WaveformDisplay({
                     height="100%"
                     className="absolute inset-0 top-0 bottom-0 z-10 overflow-visible"
                     onMouseDown={handleSvgInteractionStart}
-                    onMouseMove={handleSvgInteractionMove}
-                    onMouseUp={handleEndDrag}
-                    onMouseLeave={handleEndDrag}
-                    onTouchStart={handleSvgInteractionStart}
-                    onTouchMove={handleSvgInteractionMove}
-                    onTouchEnd={handleEndDrag}
-                    onTouchCancel={handleEndDrag}
                 >
                     {(showVolumeAutomation || isAutomationActive) && (
                       <path
@@ -473,7 +457,6 @@ export default function WaveformDisplay({
                               key={point.id}
                               className={cn(showVolumeAutomation && "cursor-grab active:cursor-grabbing")}
                               onMouseDown={(e) => handlePointInteractionStart(e, point.id)}
-                              onTouchStart={(e) => handlePointInteractionStart(e, point.id)}
                             >
                                 <circle
                                     data-point-id={point.id}
@@ -499,11 +482,10 @@ export default function WaveformDisplay({
                               transform={`translate(${x}, 0)`}
                               className={cn(showMarkers && "cursor-ew-resize")}
                               onMouseDown={(e) => handleMarkerInteractionStart(e, marker.id)}
-                              onTouchStart={(e) => handleMarkerInteractionStart(e, marker.id)}
                            >
                               <line 
                                 data-marker-id={marker.id} 
-                                x1="0" y1="-16" x2="0" y2={height}
+                                y1="-16" y2={height}
                                 stroke={color} 
                                 strokeWidth="2"
                               />
