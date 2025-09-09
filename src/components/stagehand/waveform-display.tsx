@@ -2,14 +2,13 @@
 "use client";
 
 import { cn } from '@/lib/utils';
-import { type WaveformData, generateWaveformData } from '@/lib/waveform';
+import { type WaveformData } from '@/lib/waveform';
 import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAction, useMemo, useCallback, useEffect } from 'react';
 import type { AutomationPoint, Marker, AudioFile } from '@/lib/storage-manager';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Checkbox } from '../ui/checkbox';
 import TimeRuler from './time-ruler';
-import { storageManager } from '@/lib/storage-manager';
 
 const POINT_RADIUS = 6;
 const HITBOX_RADIUS = 12;
@@ -27,7 +26,6 @@ const getMarkerColor = (markerId: string) => {
 type WaveformDisplayProps = {
   activeTrack: AudioFile | null;
   waveformData: WaveformData | null;
-  onRegenerateWaveform: (track: AudioFile, zoom: number) => void;
   durationInSeconds: number;
   zoom: number;
   setZoom: (zoom: number) => void;
@@ -57,6 +55,7 @@ type WaveformDisplayProps = {
   applyDelayToLoop: boolean;
   onApplyDelayToLoopChange: (checked: boolean) => void;
   isMarkerModeActive: boolean;
+  highResWaveformData: WaveformData | null; // Added for downsampling
 };
 
 const ChannelWaveform = ({ data, progress, isStereo }: { data: number[], progress: number, isStereo: boolean }) => {
@@ -82,7 +81,6 @@ const ChannelWaveform = ({ data, progress, isStereo }: { data: number[], progres
 export default function WaveformDisplay({ 
   activeTrack,
   waveformData,
-  onRegenerateWaveform,
   durationInSeconds,
   zoom,
   setZoom,
@@ -112,6 +110,7 @@ export default function WaveformDisplay({
   applyDelayToLoop,
   onApplyDelayToLoopChange,
   isMarkerModeActive,
+  highResWaveformData
 }: WaveformDisplayProps) {
   const waveformInteractionRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -124,48 +123,6 @@ export default function WaveformDisplay({
   const startZoomRef = useRef(1);
   const startScrollLeftRef = useRef(0);
   const markerTimeAtDragStartRef = useRef(0);
-  
-  const [preloadedWaveformData, setPreloadedWaveformData] = useState<{[key: string]: WaveformData}>({});
-  const preloadingRef = useRef<{[key: string]: boolean}>({});
-
-  useEffect(() => {
-    const preloadNextZoomLevel = async () => {
-      if (!activeTrack || zoom >= 20) return;
-
-      const nextZoom = zoom * 1.5;
-      const nextZoomKey = nextZoom.toFixed(2);
-      
-      if (!preloadedWaveformData[nextZoomKey] && !preloadingRef.current[nextZoomKey]) {
-        try {
-          preloadingRef.current[nextZoomKey] = true;
-          const audioBlob = await storageManager.getAudioBlob(activeTrack.id);
-          if (audioBlob) {
-            const data = await generateWaveformData(await audioBlob.arrayBuffer(), nextZoom);
-            setPreloadedWaveformData(prev => ({...prev, [nextZoomKey]: data}));
-          }
-        } catch (error) {
-          console.error("Failed to preload waveform data", error);
-        } finally {
-          preloadingRef.current[nextZoomKey] = false;
-        }
-      }
-    };
-
-    preloadNextZoomLevel();
-
-  }, [zoom, activeTrack, preloadedWaveformData]);
-
-  const handleSetZoom = (newZoom: number) => {
-      const zoomKey = newZoom.toFixed(2);
-      if (preloadedWaveformData[zoomKey]) {
-          setZoom(newZoom);
-          onRegenerateWaveform(activeTrack!, newZoom); // This will now be instant
-      } else {
-          setZoom(newZoom);
-          onRegenerateWaveform(activeTrack!, newZoom);
-      }
-  };
-
 
   const getSvgCoords = useCallback((e: MouseEvent<SVGElement> | globalThis.MouseEvent): {x: number, y: number} => {
     const svg = svgRef.current;
@@ -237,20 +194,6 @@ export default function WaveformDisplay({
     }
   };
 
-  const handleGlobalMouseUp = useCallback(() => {
-    if (isMouseDownRef.current) {
-        isMouseDownRef.current = false;
-        onScrubEnd();
-    }
-  }, [onScrubEnd]);
-
-  useEffect(() => {
-    window.addEventListener('mouseup', handleGlobalMouseUp);
-    return () => {
-        window.removeEventListener('mouseup', handleGlobalMouseUp);
-    };
-  }, [handleGlobalMouseUp]);
-  
   const handleSvgInteractionStart = (e: MouseEvent<SVGSVGElement>) => {
       if ((e.target as SVGElement).dataset.pointId || (e.target as SVGElement).dataset.markerId) return;
       e.preventDefault();
@@ -333,13 +276,14 @@ export default function WaveformDisplay({
       
       const markerXInViewport = markerXBefore - startScrollLeftRef.current;
       
-      handleSetZoom(newZoom);
+      setZoom(newZoom);
       
       setTimeout(() => {
-        const totalWidthAfter = viewPortWidth * newZoom;
+        if (!scrollContainerRef.current) return;
+        const totalWidthAfter = scrollContainerRef.current.getBoundingClientRect().width * newZoom;
         const markerXAfter = (markerTime / durationInSeconds) * totalWidthAfter;
         const newScrollLeft = markerXAfter - markerXInViewport;
-        scrollContainer.scrollLeft = newScrollLeft;
+        scrollContainerRef.current.scrollLeft = newScrollLeft;
       }, 0);
       
     } else {
@@ -355,13 +299,31 @@ export default function WaveformDisplay({
     }
   };
 
-
-  const handleMarkerInteractionEnd = () => {
+  const handleMarkerInteractionEnd = useCallback(() => {
     if (!draggingMarkerIdRef.current) return;
     onMarkerDragEnd();
     draggingMarkerIdRef.current = null;
     setIsInteractingWithMarker(false);
-  };
+  }, [onMarkerDragEnd]);
+
+  useEffect(() => {
+    const handleMouseUp = () => {
+        if (isMouseDownRef.current) {
+            isMouseDownRef.current = false;
+            onScrubEnd();
+        }
+        if (draggingPointIdRef.current) {
+            draggingPointIdRef.current = null;
+            onAutomationDragEnd();
+        }
+    };
+
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+        window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [onScrubEnd, onAutomationDragEnd]);
+
 
   const sortedMarkers = useMemo(() => [...markers].sort((a, b) => a.time - b.time), [markers]);
 
@@ -434,8 +396,6 @@ export default function WaveformDisplay({
             className="absolute inset-0 top-8 bottom-0 z-0"
             onMouseDown={handleScrubMouseDown}
             onMouseMove={handleScrubMouseMove}
-            onMouseUp={handleGlobalMouseUp}
-            onMouseLeave={handleGlobalMouseUp}
           >
             {waveformData ? (
               <div className="w-full h-full flex flex-col justify-center items-center pointer-events-none">

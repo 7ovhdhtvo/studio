@@ -59,22 +59,19 @@ function getPeaks(channelData: Float32Array, targetPoints: number): number[] {
 
 
 /**
- * Generates waveform data from an audio buffer.
+ * Generates waveform data from an audio buffer at a fixed high resolution.
  * @param audioBuffer The ArrayBuffer of the audio file.
- * @param zoom The current zoom level, used to determine resolution.
  * @returns A promise that resolves to an object with left and right channel waveform data.
  */
 export async function generateWaveformData(
-  audioBuffer: ArrayBuffer,
-  zoom: number = 1
+  audioBuffer: ArrayBuffer
 ): Promise<WaveformData> {
-  const basePoints = 150;
-  const targetPoints = Math.floor(basePoints * zoom);
+  const highResPoints = 4000; // Always calculate a high number of points
   
   const context = getAudioContext();
   if (!context) {
     console.error("AudioContext is not supported in this environment.");
-    const flatLine = new Array(targetPoints).fill(0.1);
+    const flatLine = new Array(highResPoints).fill(0.1);
     return { left: flatLine, right: flatLine };
   }
 
@@ -82,12 +79,12 @@ export async function generateWaveformData(
     const decodedBuffer = await context.decodeAudioData(audioBuffer);
     
     const leftChannelData = decodedBuffer.getChannelData(0);
-    const leftPeaks = getPeaks(leftChannelData, targetPoints);
+    const leftPeaks = getPeaks(leftChannelData, highResPoints);
     
     let rightPeaks: number[];
     if (decodedBuffer.numberOfChannels > 1) {
         const rightChannelData = decodedBuffer.getChannelData(1);
-        rightPeaks = getPeaks(rightChannelData, targetPoints);
+        rightPeaks = getPeaks(rightChannelData, highResPoints);
     } else {
         // For mono, just duplicate the left channel
         rightPeaks = [...leftPeaks];
@@ -97,7 +94,7 @@ export async function generateWaveformData(
   } catch (error) {
     console.error("Failed to generate waveform data:", error);
     // Return a flat line on error
-    const flatLine = new Array(targetPoints).fill(0.1);
+    const flatLine = new Array(highResPoints).fill(0.1);
     return { left: flatLine, right: flatLine };
   }
 }

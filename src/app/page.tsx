@@ -27,6 +27,36 @@ import MarkerPlaybackControls from '@/components/stagehand/marker-playback-contr
 
 export type OpenControlPanel = 'volume' | 'speed' | 'metronome' | 'markers' | null;
 
+const downsampleWaveform = (highResData: WaveformData, targetPoints: number): WaveformData => {
+    if (!highResData) {
+        return { left: [], right: [] };
+    }
+    const downsampleChannel = (data: number[]): number[] => {
+        if (!data || data.length <= targetPoints) {
+            return data || [];
+        }
+        const result: number[] = [];
+        const samplesPerPoint = Math.floor(data.length / targetPoints);
+        for (let i = 0; i < targetPoints; i++) {
+            const start = i * samplesPerPoint;
+            const end = start + samplesPerPoint;
+            let maxPeak = 0;
+            for (let j = start; j < end; j++) {
+                if (data[j] > maxPeak) {
+                    maxPeak = data[j];
+                }
+            }
+            result.push(maxPeak);
+        }
+        return result;
+    };
+
+    return {
+        left: downsampleChannel(highResData.left),
+        right: downsampleChannel(highResData.right),
+    };
+};
+
 export default function Home() {
   const { 
     tracks, 
@@ -50,7 +80,7 @@ export default function Home() {
 
   const [activeTrack, setActiveTrack] = useState<AudioFile | null>(null);
   const [audioSrc, setAudioSrc] = useState<string | null>(null);
-  const [waveformData, setWaveformData] = useState<WaveformData | null>(null);
+  const [highResWaveformData, setHighResWaveformData] = useState<WaveformData | null>(null);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [showStereo, setShowStereo] = useState(false);
   const [isPlaybackMode, setIsPlaybackMode] = useState(false);
@@ -93,13 +123,20 @@ export default function Home() {
   const duration = audioRef.current?.duration ?? activeTrack?.duration ?? 0;
   const currentTime = audioRef.current?.currentTime ?? 0;
 
+  const waveformData = useMemo(() => {
+    if (!highResWaveformData) return null;
+    const targetPoints = Math.floor(150 * zoom);
+    return downsampleWaveform(highResWaveformData, targetPoints);
+  }, [highResWaveformData, zoom]);
+
   const playbackStartTime = useMemo(() => {
+    if (!isMarkerModeActive) return 0;
     if (selectedStartMarkerId === 'playhead') {
       return currentTime;
     }
     const startMarker = markers.find(m => m.id === selectedStartMarkerId);
     return startMarker?.time ?? 0;
-  }, [markers, selectedStartMarkerId, currentTime]);
+  }, [markers, selectedStartMarkerId, currentTime, isMarkerModeActive]);
 
   const playbackEndTime = useMemo(() => {
     if (!isMarkerLoopActive) return duration;
@@ -224,19 +261,21 @@ export default function Home() {
     if (isPlaying && audioSrc) {
         if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
 
-        if (isMarkerModeActive) {
-            audio.currentTime = playbackStartTime;
-        }
+        const playStartTime = isMarkerModeActive ? playbackStartTime : audio.currentTime;
+        audio.currentTime = playStartTime;
 
         const isStartingFromDefinedStart = isMarkerModeActive ? Math.abs(audio.currentTime - playbackStartTime) < 0.1 : audio.currentTime < 0.1;
         const delay = (startDelay > 0 && isStartingFromDefinedStart) ? startDelay * 1000 : 0;
         
         playbackTimeoutRef.current = setTimeout(() => {
             if (audio.paused) {
-                audio.play().catch(error => {
-                    logger.error("Playback failed", error);
-                    setIsPlaying(false);
-                });
+                const playPromise = audio.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        logger.error("Playback failed", error);
+                        setIsPlaying(false);
+                    });
+                }
             }
         }, delay);
     } else {
@@ -262,12 +301,12 @@ export default function Home() {
     }
   }, [volume, isAutomationActive]);
 
-  const regenerateWaveform = useCallback(async (track: AudioFile, currentZoom: number) => {
+  const regenerateWaveform = useCallback(async (track: AudioFile) => {
     try {
       const audioBlob = await storageManager.getAudioBlob(track.id);
       if (audioBlob) {
-        const data = await generateWaveformData(await audioBlob.arrayBuffer(), currentZoom);
-        setWaveformData(data);
+        const data = await generateWaveformData(await audioBlob.arrayBuffer());
+        setHighResWaveformData(data);
       }
     } catch (error) {
       logger.error('regenerateWaveform: Failed to generate waveform.', { error });
@@ -307,6 +346,11 @@ export default function Home() {
     if (playing && audio) {
         if (isMarkerModeActive) {
             audio.currentTime = playbackStartTime;
+        } else {
+            // If not in marker mode, and play is hit when at the end, start from beginning.
+            if (audio.currentTime >= duration - 0.1) {
+                audio.currentTime = 0;
+            }
         }
     }
     setIsPlaying(playing);
@@ -323,18 +367,11 @@ export default function Home() {
   };
   
   const handleZoomIn = () => {
-    setZoomAndRegenerate(Math.min(zoom * 1.5, 20));
+    setZoom(Math.min(zoom * 1.5, 20));
   };
   const handleZoomOut = () => {
-    setZoomAndRegenerate(Math.max(zoom / 1.5, 1));
+    setZoom(Math.max(zoom / 1.5, 1));
   };
-
-  const setZoomAndRegenerate = (newZoom: number) => {
-    setZoom(newZoom);
-    if (activeTrack) {
-        regenerateWaveform(activeTrack, newZoom);
-    }
-  }
 
   const handleSelectTrack = async (track: AudioFile) => {
     logger.log('handleSelectTrack: Track selected.', { trackId: track.id, title: track.title });
@@ -359,7 +396,7 @@ export default function Home() {
        setVolume(initialVolume ?? 75);
     }
 
-    setWaveformData(null);
+    setHighResWaveformData(null);
     setAudioSrc(null);
 
     try {
@@ -368,7 +405,7 @@ export default function Home() {
         logger.log('handleSelectTrack: Audio URL received.', { url });
         setAudioSrc(url);
         
-        await regenerateWaveform(track, zoom);
+        await regenerateWaveform(track);
         if (audioRef.current) {
           audioRef.current.currentTime = 0;
         }
@@ -733,10 +770,10 @@ export default function Home() {
                 <WaveformDisplay
                   activeTrack={activeTrack}
                   waveformData={waveformData}
+                  highResWaveformData={highResWaveformData}
                   durationInSeconds={duration}
                   zoom={zoom}
                   setZoom={setZoom}
-                  onRegenerateWaveform={regenerateWaveform}
                   progress={progress}
                   onProgressChange={handleProgressChange}
                   onScrubStart={() => isScrubbingRef.current = true}
