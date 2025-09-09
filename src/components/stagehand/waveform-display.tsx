@@ -231,77 +231,68 @@ export default function WaveformDisplay({
   };
 
     const handleGlobalMouseMove = useCallback((e: globalThis.MouseEvent) => {
-        if (!draggingPointIdRef.current && !draggingMarkerIdRef.current) return;
+        if (!draggingMarkerIdRef.current) return;
         e.preventDefault();
 
         const svg = svgRef.current;
-        if (!svg) return;
+        const scrollContainer = scrollContainerRef.current;
+        if (!svg || !scrollContainer) return;
 
-        const { width, height } = svg.getBoundingClientRect();
-        const { x, y } = getSvgCoords(e);
-        const newTime = (x / width) * durationInSeconds;
-
-        if (draggingPointIdRef.current && showVolumeAutomation) {
-            const newValue = 100 - (y / height) * 100;
-            const updatedPoints = automationPoints.map(p =>
-                p.id === draggingPointIdRef.current ? {
-                    ...p,
-                    time: Math.max(0, Math.min(durationInSeconds, newTime)),
-                    value: Math.max(0, Math.min(100, newValue))
-                } : p
-            );
-            onAutomationPointsChange(updatedPoints);
-            setDebugState(`Dragging ${draggingPointIdRef.current}`);
-        } else if (draggingMarkerIdRef.current && showMarkers) {
-            const deltaY = startDragCoords.current.y - e.clientY;
-            const zoomSensitivity = 0.02;
-            const proposedZoom = startZoomRef.current + deltaY * zoomSensitivity;
-            const newZoom = Math.max(1, Math.min(20, proposedZoom));
-
-            const scrollContainer = scrollContainerRef.current;
-            if (scrollContainer) {
-                const markerToDrag = markers.find(m => m.id === draggingMarkerIdRef.current);
-                if (markerToDrag) {
-                    const markerTime = markerToDrag.time;
-                    const markerXBeforeZoom = (markerTime / durationInSeconds) * scrollContainer.scrollWidth;
-                    const viewPortXBeforeZoom = markerXBeforeZoom - scrollContainer.scrollLeft;
-
-                    setZoom(newZoom);
-
-                    // This needs to be in a timeout to allow the DOM to update with the new scrollWidth
-                    setTimeout(() => {
-                        const totalWidthAfter = scrollContainer.scrollWidth;
-                        const markerXAfter = (markerTime / durationInSeconds) * totalWidthAfter;
-                        const newScrollLeft = markerXAfter - viewPortXBeforeZoom;
-                        scrollContainer.scrollLeft = newScrollLeft;
-                    }, 0);
-                }
-            }
-
+        const deltaX = e.clientX - startDragCoords.current.x;
+        const deltaY = e.clientY - startDragCoords.current.y;
+        
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+            // Horizontal movement: Dragging the marker
+            const { width } = svg.getBoundingClientRect();
+            const { x } = getSvgCoords(e);
+            const newTime = (x / width) * durationInSeconds;
+            
             const updatedMarkers = markers.map(m =>
-                m.id === draggingMarkerIdRef.current ? {
-                    ...m,
-                    time: Math.max(0, Math.min(durationInSeconds, newTime)),
-                } : m
+                m.id === draggingMarkerIdRef.current ? { ...m, time: Math.max(0, Math.min(durationInSeconds, newTime)) } : m
             );
             onMarkersChange(updatedMarkers);
+
+        } else {
+            // Vertical movement: Zooming
+            const zoomSensitivity = 0.02;
+            const yChange = startDragCoords.current.y - e.clientY;
+            const proposedZoom = startZoomRef.current + yChange * zoomSensitivity;
+            const newZoom = Math.max(1, Math.min(20, proposedZoom));
             
-            const scrollRect = scrollContainer.getBoundingClientRect();
-            const relativeX = e.clientX - scrollRect.left;
+            const markerToDrag = markers.find(m => m.id === draggingMarkerIdRef.current);
+            if (!markerToDrag) return;
             
-            const scrollZone = scrollRect.width * 0.1;
-            
-            if (relativeX < scrollZone) {
-                const intensity = (scrollZone - relativeX) / scrollZone;
-                const scrollAmount = intensity * (scrollRect.width * 0.02);
-                scrollContainer.scrollLeft -= scrollAmount;
-            } else if (relativeX > scrollRect.width - scrollZone) {
-                const intensity = (relativeX - (scrollRect.width - scrollZone)) / scrollZone;
-                const scrollAmount = intensity * (scrollRect.width * 0.02);
-                scrollContainer.scrollLeft += scrollAmount;
-            }
+            const markerTime = markerToDrag.time;
+            const totalWidthBefore = scrollContainer.scrollWidth;
+            const markerXBeforeZoom = (markerTime / durationInSeconds) * totalWidthBefore;
+            const viewPortXBeforeZoom = markerXBeforeZoom - scrollContainer.scrollLeft;
+
+            setZoom(newZoom);
+
+            setTimeout(() => {
+                const totalWidthAfter = scrollContainer.scrollWidth;
+                const markerXAfter = (markerTime / durationInSeconds) * totalWidthAfter;
+                const newScrollLeft = markerXAfter - viewPortXBeforeZoom;
+                scrollContainer.scrollLeft = newScrollLeft;
+            }, 0);
         }
-    }, [automationPoints, durationInSeconds, getSvgCoords, markers, onAutomationPointsChange, onMarkersChange, scrollContainerRef, setZoom, showMarkers, showVolumeAutomation]);
+
+        // Auto-scroll logic (applies to horizontal dragging)
+        const scrollRect = scrollContainer.getBoundingClientRect();
+        const relativeX = e.clientX - scrollRect.left;
+        const scrollZone = scrollRect.width * 0.1;
+        
+        if (relativeX < scrollZone) {
+            const intensity = (scrollZone - relativeX) / scrollZone;
+            const scrollAmount = intensity * (scrollRect.width * 0.02);
+            scrollContainer.scrollLeft -= scrollAmount;
+        } else if (relativeX > scrollRect.width - scrollZone) {
+            const intensity = (relativeX - (scrollRect.width - scrollZone)) / scrollZone;
+            const scrollAmount = intensity * (scrollRect.width * 0.02);
+            scrollContainer.scrollLeft += scrollAmount;
+        }
+
+    }, [durationInSeconds, getSvgCoords, markers, onMarkersChange, scrollContainerRef, setZoom]);
 
 
   const handleGlobalMouseUp = useCallback(() => {
@@ -516,3 +507,5 @@ export default function WaveformDisplay({
     </div>
   );
 }
+
+    
