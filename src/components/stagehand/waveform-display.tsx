@@ -243,29 +243,23 @@ export default function WaveformDisplay({
       const deltaY = e.clientY - startDragCoords.current.y;
       
       if (Math.abs(deltaY) > Math.abs(deltaX)) {
-        // --- Vertical movement: Zooming ---
-        const zoomSensitivity = 0.005;
+        const zoomSensitivity = 0.01;
         
         setZoom(currentZoom => {
             const proposedZoom = currentZoom * (1 - deltaY * zoomSensitivity);
             const newZoom = Math.max(1, Math.min(20, proposedZoom));
             
-            // --- Anchor Zoom Logic ---
             const containerRect = scrollContainer.getBoundingClientRect();
-            const mouseXInContainer = e.clientX - containerRect.left;
-            
-            const timeAtCursor = ((scrollContainer.scrollLeft + mouseXInContainer) / (containerRect.width * currentZoom)) * durationInSeconds;
             
             const newTotalWidth = containerRect.width * newZoom;
-            const newCursorPixelPos = (timeAtCursor / durationInSeconds) * newTotalWidth;
+            const newMarkerPixelPos = (markerTimeAtDragStartRef.current / durationInSeconds) * newTotalWidth;
             
-            scrollContainer.scrollLeft = newCursorPixelPos - mouseXInContainer;
+            scrollContainer.scrollLeft = newMarkerPixelPos - (containerRect.width / 2);
             
             return newZoom;
         });
 
       } else {
-        // --- Horizontal movement: Dragging the marker ---
         const totalWidth = scrollContainer.scrollWidth;
         const pixelPerSecond = totalWidth / durationInSeconds;
         const timeDelta = deltaX / pixelPerSecond;
@@ -275,16 +269,16 @@ export default function WaveformDisplay({
           m.id === draggingMarkerIdRef.current ? { ...m, time: Math.max(0, Math.min(durationInSeconds, newTime)) } : m
         ));
       }
-      // Update start coordinates for the next move event to calculate delta from the last point
       startDragCoords.current = { x: e.clientX, y: e.clientY };
   };
 
   const handleGlobalMouseUp = useCallback(() => {
     if (interactionOverlayRef.current) {
       interactionOverlayRef.current.style.display = 'none';
-      document.removeEventListener('mousemove', handleGlobalMouseMove);
-      document.removeEventListener('mouseup', handleGlobalMouseUp);
     }
+    document.removeEventListener('mousemove', handleGlobalMouseMove);
+    document.removeEventListener('mouseup', handleGlobalMouseUp);
+
     if (draggingMarkerIdRef.current) {
         onMarkerDragEnd();
         draggingMarkerIdRef.current = null;
@@ -305,9 +299,9 @@ export default function WaveformDisplay({
       
       if (interactionOverlayRef.current) {
         interactionOverlayRef.current.style.display = 'block';
-        document.addEventListener('mousemove', handleGlobalMouseMove);
-        document.addEventListener('mouseup', handleGlobalMouseUp, { once: true });
       }
+      document.addEventListener('mousemove', handleGlobalMouseMove);
+      document.addEventListener('mouseup', handleGlobalMouseUp, { once: true });
 
       onMarkerDragStart(markerId);
   };
@@ -497,5 +491,7 @@ export default function WaveformDisplay({
     </div>
   );
 }
+
+    
 
     
