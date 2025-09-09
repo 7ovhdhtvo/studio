@@ -28,7 +28,7 @@ type WaveformDisplayProps = {
   waveformData: WaveformData | null;
   durationInSeconds: number;
   zoom: number;
-  setZoom: (zoom: number) => void;
+  setZoom: (zoom: number | ((prevZoom: number) => number)) => void;
   progress: number;
   onProgressChange: (newProgress: number) => void;
   onScrubStart: () => void;
@@ -55,7 +55,7 @@ type WaveformDisplayProps = {
   applyDelayToLoop: boolean;
   onApplyDelayToLoopChange: (checked: boolean) => void;
   isMarkerModeActive: boolean;
-  highResWaveformData: WaveformData | null; // Added for downsampling
+  highResWaveformData: WaveformData | null;
 };
 
 const ChannelWaveform = ({ data, progress, isStereo }: { data: number[], progress: number, isStereo: boolean }) => {
@@ -117,11 +117,9 @@ export default function WaveformDisplay({
   const isMouseDownRef = useRef(false);
   const draggingPointIdRef = useRef<string | null>(null);
   const draggingMarkerIdRef = useRef<string | null>(null);
+  const interactionOverlayRef = useRef<HTMLDivElement>(null);
   
-  const [isInteractingWithMarker, setIsInteractingWithMarker] = useState(false);
   const startDragCoords = useRef({ x: 0, y: 0 });
-  const startZoomRef = useRef(1);
-  const startScrollLeftRef = useRef(0);
   const markerTimeAtDragStartRef = useRef(0);
 
   const getSvgCoords = useCallback((e: MouseEvent<SVGElement> | globalThis.MouseEvent): {x: number, y: number} => {
@@ -234,77 +232,86 @@ export default function WaveformDisplay({
       onAutomationDragStart();
       setDebugState(`Dragging ${pointId}`);
   }
-
-  const handleMarkerInteractionStart = (e: MouseEvent<SVGGElement>, markerId: string) => {
-    e.stopPropagation();
-    if (!showMarkers || !scrollContainerRef.current) return;
-    
-    draggingMarkerIdRef.current = markerId;
-    startDragCoords.current = { x: e.clientX, y: e.clientY };
-    startZoomRef.current = zoom;
-    startScrollLeftRef.current = scrollContainerRef.current.scrollLeft;
-
-    const marker = markers.find(m => m.id === markerId);
-    if (marker) {
-      markerTimeAtDragStartRef.current = marker.time;
-    }
-    
-    onMarkerDragStart(markerId);
-    setIsInteractingWithMarker(true);
-  };
-
+  
   const handleGlobalMouseMove = (e: globalThis.MouseEvent) => {
-    if (!draggingMarkerIdRef.current || !scrollContainerRef.current) return;
-    
-    e.preventDefault();
-    const scrollContainer = scrollContainerRef.current;
-    
-    const deltaX = e.clientX - startDragCoords.current.x;
-    const deltaY = e.clientY - startDragCoords.current.y;
-    
-    if (Math.abs(deltaY) > Math.abs(deltaX)) {
-      // Vertical movement: Zooming
-      const zoomSensitivity = 0.01;
-      const proposedZoom = startZoomRef.current * (1 - deltaY * zoomSensitivity);
-      const newZoom = Math.max(1, Math.min(20, proposedZoom));
+      if (!draggingMarkerIdRef.current || !scrollContainerRef.current) return;
       
-      const viewPortWidth = scrollContainer.getBoundingClientRect().width;
-      const markerTime = markerTimeAtDragStartRef.current;
+      e.preventDefault();
+      const scrollContainer = scrollContainerRef.current;
       
-      const totalWidthBefore = viewPortWidth * startZoomRef.current;
-      const markerXBefore = (markerTime / durationInSeconds) * totalWidthBefore;
+      const deltaX = e.clientX - startDragCoords.current.x;
+      const deltaY = e.clientY - startDragCoords.current.y;
       
-      const markerXInViewport = markerXBefore - startScrollLeftRef.current;
-      
-      setZoom(newZoom);
-      
-      setTimeout(() => {
-        if (!scrollContainerRef.current) return;
-        const totalWidthAfter = scrollContainerRef.current.getBoundingClientRect().width * newZoom;
-        const markerXAfter = (markerTime / durationInSeconds) * totalWidthAfter;
-        const newScrollLeft = markerXAfter - markerXInViewport;
-        scrollContainerRef.current.scrollLeft = newScrollLeft;
-      }, 0);
-      
-    } else {
-      // Horizontal movement: Dragging the marker
-      const totalWidth = scrollContainer.scrollWidth;
-      const pixelPerSecond = totalWidth / durationInSeconds;
-      const timeDelta = deltaX / pixelPerSecond;
-      const newTime = markerTimeAtDragStartRef.current + timeDelta;
+      if (Math.abs(deltaY) > Math.abs(deltaX)) {
+        // --- Vertical movement: Zooming ---
+        const zoomSensitivity = 0.005;
+        
+        setZoom(currentZoom => {
+            const proposedZoom = currentZoom * (1 - deltaY * zoomSensitivity);
+            const newZoom = Math.max(1, Math.min(20, proposedZoom));
+            
+            // --- Anchor Zoom Logic ---
+            const containerRect = scrollContainer.getBoundingClientRect();
+            const mouseXInContainer = e.clientX - containerRect.left;
+            
+            const timeAtCursor = ((scrollContainer.scrollLeft + mouseXInContainer) / (containerRect.width * currentZoom)) * durationInSeconds;
+            
+            const newTotalWidth = containerRect.width * newZoom;
+            const newCursorPixelPos = (timeAtCursor / durationInSeconds) * newTotalWidth;
+            
+            scrollContainer.scrollLeft = newCursorPixelPos - mouseXInContainer;
+            
+            return newZoom;
+        });
 
-      onMarkersChange(prevMarkers => prevMarkers.map(m =>
-        m.id === draggingMarkerIdRef.current ? { ...m, time: Math.max(0, Math.min(durationInSeconds, newTime)) } : m
-      ));
-    }
+      } else {
+        // --- Horizontal movement: Dragging the marker ---
+        const totalWidth = scrollContainer.scrollWidth;
+        const pixelPerSecond = totalWidth / durationInSeconds;
+        const timeDelta = deltaX / pixelPerSecond;
+        const newTime = markerTimeAtDragStartRef.current + timeDelta;
+
+        onMarkersChange(prevMarkers => prevMarkers.map(m =>
+          m.id === draggingMarkerIdRef.current ? { ...m, time: Math.max(0, Math.min(durationInSeconds, newTime)) } : m
+        ));
+      }
+      // Update start coordinates for the next move event to calculate delta from the last point
+      startDragCoords.current = { x: e.clientX, y: e.clientY };
   };
 
-  const handleMarkerInteractionEnd = useCallback(() => {
-    if (!draggingMarkerIdRef.current) return;
-    onMarkerDragEnd();
-    draggingMarkerIdRef.current = null;
-    setIsInteractingWithMarker(false);
+  const handleGlobalMouseUp = useCallback(() => {
+    if (interactionOverlayRef.current) {
+      interactionOverlayRef.current.style.display = 'none';
+      document.removeEventListener('mousemove', handleGlobalMouseMove);
+      document.removeEventListener('mouseup', handleGlobalMouseUp);
+    }
+    if (draggingMarkerIdRef.current) {
+        onMarkerDragEnd();
+        draggingMarkerIdRef.current = null;
+    }
   }, [onMarkerDragEnd]);
+  
+  const handleMarkerInteractionStart = (e: MouseEvent<SVGGElement>, markerId: string) => {
+      e.stopPropagation();
+      if (!showMarkers || !scrollContainerRef.current) return;
+      
+      draggingMarkerIdRef.current = markerId;
+      startDragCoords.current = { x: e.clientX, y: e.clientY };
+      
+      const marker = markers.find(m => m.id === markerId);
+      if (marker) {
+        markerTimeAtDragStartRef.current = marker.time;
+      }
+      
+      if (interactionOverlayRef.current) {
+        interactionOverlayRef.current.style.display = 'block';
+        document.addEventListener('mousemove', handleGlobalMouseMove);
+        document.addEventListener('mouseup', handleGlobalMouseUp, { once: true });
+      }
+
+      onMarkerDragStart(markerId);
+  };
+
 
   useEffect(() => {
     const handleMouseUp = () => {
@@ -343,14 +350,11 @@ export default function WaveformDisplay({
 
   return (
     <div className="flex flex-col items-center space-y-2">
-       {isInteractingWithMarker && (
-         <div 
-            className="fixed inset-0 z-50 cursor-ns-resize"
-            onMouseMove={handleGlobalMouseMove}
-            onMouseUp={handleMarkerInteractionEnd}
-            onMouseLeave={handleMarkerInteractionEnd}
-         />
-       )}
+       <div 
+         ref={interactionOverlayRef}
+         className="fixed inset-0 z-50 cursor-ns-resize"
+         style={{ display: 'none' }}
+       />
        <div className="flex w-full items-stretch gap-4">
         <div className="font-mono text-4xl font-bold text-center w-full bg-secondary text-secondary-foreground py-2 rounded-lg flex items-center justify-center">
             {formatTime(currentTime)}
@@ -460,6 +464,7 @@ export default function WaveformDisplay({
                               transform={`translate(${x}, 0)`}
                               className={cn(showMarkers && "cursor-ew-resize")}
                               onMouseDown={(e) => handleMarkerInteractionStart(e, marker.id)}
+                              style={{ pointerEvents: showMarkers ? 'all' : 'none' }}
                            >
                               <line 
                                 data-marker-id={marker.id} 
@@ -467,11 +472,9 @@ export default function WaveformDisplay({
                                 stroke={color} 
                                 strokeWidth="2"
                               />
-                               <g>
-                                <text x="4" y="-4" fill={color} className="text-sm font-semibold select-none">
-                                  {displayName}
-                                </text>
-                               </g>
+                               <text x="4" y="-4" fill={color} className="text-sm font-semibold select-none">
+                                 {displayName}
+                               </text>
                            </g>
                         );
                      })}
