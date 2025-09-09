@@ -87,7 +87,6 @@ export default function Home() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const animationFrameRef = useRef<number>();
   const playbackTimeoutRef = useRef<NodeJS.Timeout>();
-  const previewTimeoutRef = useRef<NodeJS.Timeout>();
   const isScrubbingRef = useRef(false);
   const waveformContainerRef = useRef<HTMLDivElement>(null);
   const isMobile = useMediaQuery("(max-width: 768px)");
@@ -228,14 +227,12 @@ export default function Home() {
 
     if (isPlaying && audioSrc) {
         if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
-        
-        // When in marker mode, always start from the designated playback start time.
-        // Otherwise, resume from the current playhead position.
+
         if (isMarkerModeActive) {
             audio.currentTime = playbackStartTime;
         }
 
-        const isStartingFromDefinedStart = Math.abs(audio.currentTime - playbackStartTime) < 0.1;
+        const isStartingFromDefinedStart = isMarkerModeActive ? Math.abs(audio.currentTime - playbackStartTime) < 0.1 : audio.currentTime < 0.1;
         const delay = (startDelay > 0 && isStartingFromDefinedStart) ? startDelay * 1000 : 0;
         
         playbackTimeoutRef.current = setTimeout(() => {
@@ -248,13 +245,11 @@ export default function Home() {
         }, delay);
     } else {
         if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
-        if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
         audio.pause();
     }
     
     return () => {
         if (playbackTimeoutRef.current) clearTimeout(playbackTimeoutRef.current);
-        if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
     }
   }, [isPlaying, audioSrc, startDelay, playbackStartTime, isMarkerModeActive]);
 
@@ -520,27 +515,12 @@ export default function Home() {
     setZoomBeforeDrag(zoom);
   };
 
-  const handleMarkerDragEnd = (newTime: number) => {
+  const handleMarkerDragEnd = () => {
     setDebugState('Ready');
     setZoomAndRegenerate(zoomBeforeDrag);
 
     if (activeTrack) {
       updateTrackMarkers(activeTrack.id, markers);
-    }
-
-    if (audioRef.current) {
-      if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
-      const wasPlaying = isPlaying;
-      setIsPlaying(false);
-      audioRef.current.currentTime = newTime;
-      audioRef.current.play().catch(e => logger.error("Preview playback failed", e));
-
-      previewTimeoutRef.current = setTimeout(() => {
-        audioRef.current?.pause();
-        if (wasPlaying) {
-          setIsPlaying(true);
-        }
-      }, 6000);
     }
   };
 

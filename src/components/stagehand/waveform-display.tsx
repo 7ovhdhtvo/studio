@@ -3,7 +3,7 @@
 
 import { cn } from '@/lib/utils';
 import { type WaveformData } from '@/lib/waveform';
-import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAction, useMemo, useCallback } from 'react';
+import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAction, useMemo, useCallback, useEffect } from 'react';
 import type { AutomationPoint, Marker } from '@/lib/storage-manager';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -57,13 +57,14 @@ type WaveformDisplayProps = {
   showMarkers: boolean;
   onMarkersChange: (markers: Marker[]) => void;
   onMarkerDragStart: (markerId: string) => void;
-  onMarkerDragEnd: (newTime: number) => void;
+  onMarkerDragEnd: () => void;
   debugState: string;
   setDebugState: Dispatch<SetStateAction<string>>;
   startDelay: number;
   onStartDelayChange: (delay: number) => void;
   applyDelayToLoop: boolean;
   onApplyDelayToLoopChange: (checked: boolean) => void;
+  isMarkerModeActive: boolean;
 };
 
 const ChannelWaveform = ({ data, progress, isStereo }: { data: number[], progress: number, isStereo: boolean }) => {
@@ -115,7 +116,8 @@ export default function WaveformDisplay({
   startDelay,
   onStartDelayChange,
   applyDelayToLoop,
-  onApplyDelayToLoopChange
+  onApplyDelayToLoopChange,
+  isMarkerModeActive,
 }: WaveformDisplayProps) {
   const waveformInteractionRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -208,11 +210,8 @@ export default function WaveformDisplay({
         onAutomationDragEnd();
     }
     if (draggingMarkerIdRef.current) {
-        const draggedMarker = markers.find(m => m.id === draggingMarkerIdRef.current);
+        onMarkerDragEnd();
         draggingMarkerIdRef.current = null;
-        if (draggedMarker) {
-            onMarkerDragEnd(draggedMarker.time);
-        }
     }
   };
 
@@ -242,7 +241,7 @@ export default function WaveformDisplay({
           const newMarker: Marker = {
               id: `marker_${Date.now()}`,
               time: Math.max(0, Math.min(durationInSeconds, clickTime)),
-              name: `Marker ${markers.length + 1}`,
+              name: ``,
           };
           onMarkersChange([...markers, newMarker]);
           setDebugState(`Created Marker ${newMarker.id}`);
@@ -277,7 +276,7 @@ export default function WaveformDisplay({
           const proposedZoom = startZoomRef.current + deltaY * zoomSensitivity;
           const newZoom = Math.max(1, Math.min(20, proposedZoom));
           
-          if (Math.abs(newZoom - zoom) > 0.01) {
+          if (Math.abs(newZoom - zoom) > 0.05) {
             const scrollContainer = scrollContainerRef.current;
             if (scrollContainer) {
               const markerToDrag = markers.find(m => m.id === draggingMarkerIdRef.current);
@@ -289,6 +288,8 @@ export default function WaveformDisplay({
                   const markerRatioInView = (markerXBefore - scrollContainer.scrollLeft) / scrollContainer.clientWidth;
 
                   setZoom(newZoom);
+                  startDragYRef.current = y;
+                  startZoomRef.current = newZoom;
                   
                   setTimeout(() => {
                       const totalWidthAfter = scrollContainer.scrollWidth;
@@ -490,7 +491,7 @@ export default function WaveformDisplay({
                         const { width, height } = waveformInteractionRef.current!.getBoundingClientRect();
                         const x = timeToX(marker.time, width);
                         const color = getMarkerColor(marker.id);
-                        const markerName = marker.name || `Marker ${index + 1}`;
+                        const displayName = marker.name || `Marker ${index + 1}`;
 
                         return (
                            <g 
@@ -502,13 +503,13 @@ export default function WaveformDisplay({
                            >
                               <line 
                                 data-marker-id={marker.id} 
-                                x1="0" y1="-32" x2="0" y2={height}
+                                x1="0" y1="-16" x2="0" y2={height}
                                 stroke={color} 
                                 strokeWidth="2"
                               />
-                               <g className="pointer-events-none">
+                               <g>
                                 <text x="4" y="-4" fill={color} className="text-sm font-semibold select-none">
-                                  {markerName}
+                                  {displayName}
                                 </text>
                                </g>
                            </g>
@@ -533,8 +534,3 @@ export default function WaveformDisplay({
     </div>
   );
 }
-
-
-
-
-    
