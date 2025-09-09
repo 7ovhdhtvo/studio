@@ -49,12 +49,12 @@ type WaveformDisplayProps = {
   isAutomationActive: boolean;
   showVolumeAutomation: boolean;
   automationPoints: AutomationPoint[];
-  onAutomationPointsChange: (points: AutomationPoint[]) => void;
+  onAutomationPointsChange: (points: AutomationPoint[] | ((prev: AutomationPoint[]) => AutomationPoint[])) => void;
   onAutomationDragStart: () => void;
   onAutomationDragEnd: () => void;
   markers: Marker[];
   showMarkers: boolean;
-  onMarkersChange: (markers: Marker[]) => void;
+  onMarkersChange: (markers: Marker[] | ((prev: Marker[]) => Marker[])) => void;
   onMarkerDragStart: (markerId: string) => void;
   onMarkerDragEnd: () => void;
   debugState: string;
@@ -215,7 +215,7 @@ export default function WaveformDisplay({
           value: Math.max(0, Math.min(100, clickValue)),
         };
         
-        onAutomationPointsChange([...automationPoints, newPoint]);
+        onAutomationPointsChange(prev => [...prev, newPoint]);
         draggingPointIdRef.current = newPoint.id;
         onAutomationDragStart();
         setDebugState(`Created & Dragging ${newPoint.id}`);
@@ -225,7 +225,7 @@ export default function WaveformDisplay({
               time: Math.max(0, Math.min(durationInSeconds, clickTime)),
               name: ``,
           };
-          onMarkersChange([...markers, newMarker]);
+          onMarkersChange(prev => [...prev, newMarker]);
           setDebugState(`Created Marker ${newMarker.id}`);
       }
   };
@@ -247,10 +247,9 @@ export default function WaveformDisplay({
             const { x } = getSvgCoords(e);
             const newTime = (x / width) * durationInSeconds;
             
-            const updatedMarkers = markers.map(m =>
+            onMarkersChange(prevMarkers => prevMarkers.map(m =>
                 m.id === draggingMarkerIdRef.current ? { ...m, time: Math.max(0, Math.min(durationInSeconds, newTime)) } : m
-            );
-            onMarkersChange(updatedMarkers);
+            ));
 
         } else {
             // Vertical movement: Zooming
