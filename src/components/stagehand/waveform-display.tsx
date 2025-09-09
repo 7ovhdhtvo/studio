@@ -9,6 +9,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Checkbox } from '../ui/checkbox';
 import TimeRuler from './time-ruler';
+import { Flag } from 'lucide-react';
 
 const POINT_RADIUS = 6;
 const HITBOX_RADIUS = 12;
@@ -504,10 +505,9 @@ export default function WaveformDisplay({
                                 x1="0" y1="-32" x2="0" y2={height}
                                 stroke={color} 
                                 strokeWidth="2"
-                                className="cursor-grab active:cursor-grabbing"
                               />
                                <g className="pointer-events-none">
-                                <text x="4" y="-18" fill={color} className="text-xs font-semibold select-none">
+                                <text x="4" y="-4" fill={color} className="text-sm font-semibold select-none">
                                   {markerName}
                                 </text>
                                </g>
@@ -535,3 +535,6 @@ export default function WaveformDisplay({
 }
 
 
+
+
+    
