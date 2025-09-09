@@ -2,30 +2,32 @@
 "use client";
 
 import { cn } from '@/lib/utils';
-import { type WaveformData } from '@/lib/waveform';
+import { type WaveformData, generateWaveformData } from '@/lib/waveform';
 import { useRef, type MouseEvent, type RefObject, useState, Dispatch, SetStateAction, useMemo, useCallback, useEffect } from 'react';
-import type { AutomationPoint, Marker } from '@/lib/storage-manager';
+import type { AutomationPoint, Marker, AudioFile } from '@/lib/storage-manager';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Checkbox } from '../ui/checkbox';
 import TimeRuler from './time-ruler';
+import { storageManager } from '@/lib/storage-manager';
 
 const POINT_RADIUS = 6;
 const HITBOX_RADIUS = 12;
 
 const getMarkerColor = (markerId: string) => {
-    // Simple hash function to get a consistent color index
     let hash = 0;
     for (let i = 0; i < markerId.length; i++) {
         hash = markerId.charCodeAt(i) + ((hash << 5) - hash);
     }
-    const index = Math.abs(hash % 6); // 6 colors
+    const index = Math.abs(hash % 6);
     return `hsl(var(--chart-${index + 1}))`;
 };
 
 
 type WaveformDisplayProps = {
+  activeTrack: AudioFile | null;
   waveformData: WaveformData | null;
+  onRegenerateWaveform: (track: AudioFile, zoom: number) => void;
   durationInSeconds: number;
   zoom: number;
   setZoom: (zoom: number) => void;
@@ -78,7 +80,9 @@ const ChannelWaveform = ({ data, progress, isStereo }: { data: number[], progres
 };
 
 export default function WaveformDisplay({ 
+  activeTrack,
   waveformData,
+  onRegenerateWaveform,
   durationInSeconds,
   zoom,
   setZoom,
@@ -120,6 +124,48 @@ export default function WaveformDisplay({
   const startZoomRef = useRef(1);
   const startScrollLeftRef = useRef(0);
   const markerTimeAtDragStartRef = useRef(0);
+  
+  const [preloadedWaveformData, setPreloadedWaveformData] = useState<{[key: string]: WaveformData}>({});
+  const preloadingRef = useRef<{[key: string]: boolean}>({});
+
+  useEffect(() => {
+    const preloadNextZoomLevel = async () => {
+      if (!activeTrack || zoom >= 20) return;
+
+      const nextZoom = zoom * 1.5;
+      const nextZoomKey = nextZoom.toFixed(2);
+      
+      if (!preloadedWaveformData[nextZoomKey] && !preloadingRef.current[nextZoomKey]) {
+        try {
+          preloadingRef.current[nextZoomKey] = true;
+          const audioBlob = await storageManager.getAudioBlob(activeTrack.id);
+          if (audioBlob) {
+            const data = await generateWaveformData(await audioBlob.arrayBuffer(), nextZoom);
+            setPreloadedWaveformData(prev => ({...prev, [nextZoomKey]: data}));
+          }
+        } catch (error) {
+          console.error("Failed to preload waveform data", error);
+        } finally {
+          preloadingRef.current[nextZoomKey] = false;
+        }
+      }
+    };
+
+    preloadNextZoomLevel();
+
+  }, [zoom, activeTrack, preloadedWaveformData]);
+
+  const handleSetZoom = (newZoom: number) => {
+      const zoomKey = newZoom.toFixed(2);
+      if (preloadedWaveformData[zoomKey]) {
+          setZoom(newZoom);
+          onRegenerateWaveform(activeTrack!, newZoom); // This will now be instant
+      } else {
+          setZoom(newZoom);
+          onRegenerateWaveform(activeTrack!, newZoom);
+      }
+  };
+
 
   const getSvgCoords = useCallback((e: MouseEvent<SVGElement> | globalThis.MouseEvent): {x: number, y: number} => {
     const svg = svgRef.current;
@@ -264,7 +310,7 @@ export default function WaveformDisplay({
     setIsInteractingWithMarker(true);
   };
 
-  const handleMarkerInteractionMove = (e: globalThis.MouseEvent) => {
+  const handleGlobalMouseMove = (e: globalThis.MouseEvent) => {
     if (!draggingMarkerIdRef.current || !scrollContainerRef.current) return;
     
     e.preventDefault();
@@ -284,9 +330,10 @@ export default function WaveformDisplay({
       
       const totalWidthBefore = viewPortWidth * startZoomRef.current;
       const markerXBefore = (markerTime / durationInSeconds) * totalWidthBefore;
+      
       const markerXInViewport = markerXBefore - startScrollLeftRef.current;
       
-      setZoom(newZoom);
+      handleSetZoom(newZoom);
       
       setTimeout(() => {
         const totalWidthAfter = viewPortWidth * newZoom;
@@ -308,13 +355,13 @@ export default function WaveformDisplay({
     }
   };
 
+
   const handleMarkerInteractionEnd = () => {
     if (!draggingMarkerIdRef.current) return;
     onMarkerDragEnd();
     draggingMarkerIdRef.current = null;
     setIsInteractingWithMarker(false);
   };
-
 
   const sortedMarkers = useMemo(() => [...markers].sort((a, b) => a.time - b.time), [markers]);
 
@@ -336,8 +383,8 @@ export default function WaveformDisplay({
     <div className="flex flex-col items-center space-y-2">
        {isInteractingWithMarker && (
          <div 
-            className="fixed inset-0 z-50 cursor-ew-resize"
-            onMouseMove={handleMarkerInteractionMove}
+            className="fixed inset-0 z-50 cursor-ns-resize"
+            onMouseMove={handleGlobalMouseMove}
             onMouseUp={handleMarkerInteractionEnd}
             onMouseLeave={handleMarkerInteractionEnd}
          />
@@ -489,4 +536,3 @@ export default function WaveformDisplay({
 }
 
     
-

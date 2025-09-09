@@ -82,7 +82,6 @@ export default function Home() {
   
   const [isDraggingAutomation, setIsDraggingAutomation] = useState(false);
   const [debugState, setDebugState] = useState('Ready');
-  const [zoomBeforeDrag, setZoomBeforeDrag] = useState(1);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const animationFrameRef = useRef<number>();
@@ -95,15 +94,12 @@ export default function Home() {
   const currentTime = audioRef.current?.currentTime ?? 0;
 
   const playbackStartTime = useMemo(() => {
-    if (!isMarkerModeActive) {
-      return 0;
-    }
     if (selectedStartMarkerId === 'playhead') {
       return currentTime;
     }
     const startMarker = markers.find(m => m.id === selectedStartMarkerId);
     return startMarker?.time ?? 0;
-  }, [isMarkerModeActive, markers, selectedStartMarkerId, currentTime]);
+  }, [markers, selectedStartMarkerId, currentTime]);
 
   const playbackEndTime = useMemo(() => {
     if (!isMarkerLoopActive) return duration;
@@ -305,6 +301,13 @@ export default function Home() {
     if (!audioSrc && playing) {
       logger.log('handleSetIsPlaying: Cannot play, no audio source.');
       return;
+    }
+
+    const audio = audioRef.current;
+    if (playing && audio) {
+        if (isMarkerModeActive) {
+            audio.currentTime = playbackStartTime;
+        }
     }
     setIsPlaying(playing);
   };
@@ -512,13 +515,10 @@ export default function Home() {
 
   const handleMarkerDragStart = (markerId: string) => {
     setDebugState(`Dragging Marker ${markerId}`);
-    setZoomBeforeDrag(zoom);
   };
 
   const handleMarkerDragEnd = () => {
     setDebugState('Ready');
-    setZoomAndRegenerate(zoomBeforeDrag);
-
     if (activeTrack) {
       updateTrackMarkers(activeTrack.id, markers);
     }
@@ -730,11 +730,13 @@ export default function Home() {
                   </div>
                 </div>
                 
-                <WaveformDisplay 
+                <WaveformDisplay
+                  activeTrack={activeTrack}
                   waveformData={waveformData}
                   durationInSeconds={duration}
                   zoom={zoom}
-                  setZoom={setZoomAndRegenerate}
+                  setZoom={setZoom}
+                  onRegenerateWaveform={regenerateWaveform}
                   progress={progress}
                   onProgressChange={handleProgressChange}
                   onScrubStart={() => isScrubbingRef.current = true}
@@ -842,3 +844,5 @@ export default function Home() {
     </>
   );
 }
+
+    
